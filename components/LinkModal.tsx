@@ -19,6 +19,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'common');
+  const [subCategoryId, setSubCategoryId] = useState('');
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -26,6 +27,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
   const [batchMode, setBatchMode] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // 获取当前选中的分类对象
+  const currentCategory = categories.find(cat => cat.id === categoryId);
   
   // 当模态框关闭时，重置批量模式为默认关闭状态
   useEffect(() => {
@@ -52,6 +56,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setUrl(initialData.url);
         setDescription(initialData.description || '');
         setCategoryId(initialData.categoryId);
+        setSubCategoryId(initialData.subCategoryId || '');
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
       } else {
@@ -135,6 +140,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       icon,
       description,
       categoryId,
+      subCategoryId: subCategoryId || undefined,
       pinned
     });
     
@@ -411,7 +417,10 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             <label className="block text-sm font-medium mb-1 dark:text-slate-300">分类</label>
             <select
             value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            onChange={(e) => {
+              setCategoryId(e.target.value);
+              setSubCategoryId(''); // 切换分类时重置二级分类
+            }}
             className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             >
             {categories.map(cat => (
@@ -419,6 +428,23 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             ))}
             </select>
           </div>
+
+          {/* 二级分类选择 */}
+          {currentCategory?.subcategories && currentCategory.subcategories.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-slate-300">二级分类 (可选)</label>
+              <select
+                value={subCategoryId}
+                onChange={(e) => setSubCategoryId(e.target.value)}
+                className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              >
+                <option value="">-- 不选择 --</option>
+                {currentCategory.subcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="pt-2 relative">
             {/* 成功提示 */}

@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
-  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X
+  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 import {
   DndContext,
@@ -171,6 +172,10 @@ function App() {
     categoryId: '',
     categoryName: ''
   });
+
+  // 二级分类相关状态
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // --- Helpers & Sync Logic ---
 
@@ -1315,7 +1320,46 @@ function App() {
           setSidebarOpen(false);
           return;
       }
+      
+      // 如果有二级分类，自动展开
+      if (cat.subcategories && cat.subcategories.length > 0) {
+          setExpandedCategories(prev => {
+              const newSet = new Set(prev);
+              newSet.add(cat.id);
+              return newSet;
+          });
+      }
+      
       setSelectedCategory(cat.id);
+      setSelectedSubCategory(null); // 重置二级分类选择
+      setSidebarOpen(false);
+  };
+
+  // 切换分类展开/折叠
+  const toggleCategoryExpansion = (catId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setExpandedCategories(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(catId)) {
+              newSet.delete(catId);
+          } else {
+              newSet.add(catId);
+          }
+          return newSet;
+      });
+  };
+
+  // 处理二级分类点击
+  const handleSubCategoryClick = (catId: string, subCatId: string) => {
+      const cat = categories.find(c => c.id === catId);
+      // 检查父分类是否有密码保护
+      if (cat?.password && !unlockedCategoryIds.has(catId)) {
+          setCatAuthModalData(cat);
+          setSidebarOpen(false);
+          return;
+      }
+      setSelectedCategory(catId);
+      setSelectedSubCategory(subCatId);
       setSidebarOpen(false);
   };
 
@@ -1717,6 +1761,11 @@ function App() {
     if (selectedCategory !== 'all') {
       result = result.filter(l => l.categoryId === selectedCategory);
     }
+
+    // 二级分类过滤
+    if (selectedSubCategory) {
+      result = result.filter(l => l.subCategoryId === selectedSubCategory);
+    }
     
     // 按照order字段排序，如果没有order字段则按创建时间排序
     // 修改排序逻辑：order值越大排在越前面，新增的卡片order值最大，会排在最前面
@@ -1727,7 +1776,7 @@ function App() {
       // 改为升序排序，这样order值小(旧卡片)的排在前面，order值大(新卡片)的排在后面
       return aOrder - bOrder;
     });
-  }, [links, selectedCategory, searchQuery, categories, unlockedCategoryIds]);
+  }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
 
   // 计算其他目录的搜索结果
   const otherCategoryResults = useMemo(() => {
@@ -2099,22 +2148,68 @@ function App() {
 
             {categories.map(cat => {
                 const isLocked = cat.password && !unlockedCategoryIds.has(cat.id);
+                const hasSubCategories = cat.subcategories && cat.subcategories.length > 0;
+                const isExpanded = expandedCategories.has(cat.id);
+                const isSelected = selectedCategory === cat.id && !selectedSubCategory;
+                
                 return (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategoryClick(cat)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
+                  <div key={cat.id}>
+                    <div className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
                       selectedCategory === cat.id 
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
                         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                      {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
+                    }`}>
+                      {/* 展开/折叠按钮 */}
+                      {hasSubCategories && (
+                        <button
+                          onClick={(e) => toggleCategoryExpansion(cat.id, e)}
+                          className="p-0.5 text-slate-400 hover:text-blue-500 transition-colors"
+                        >
+                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      )}
+                      {!hasSubCategories && <div className="w-[18px]" />}
+                      
+                      <button
+                        onClick={() => handleCategoryClick(cat)}
+                        className="flex items-center gap-3 flex-1 text-left"
+                      >
+                        <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                          {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
+                        </div>
+                        <span className="truncate flex-1 text-left">{cat.name}</span>
+                      </button>
+                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
                     </div>
-                    <span className="truncate flex-1 text-left">{cat.name}</span>
-                    {selectedCategory === cat.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
-                  </button>
+                    
+                    {/* 二级分类列表 */}
+                    {hasSubCategories && isExpanded && (
+                      <div className="ml-8 mt-1 space-y-1">
+                        {cat.subcategories!.map(subCat => {
+                          const isSubSelected = selectedCategory === cat.id && selectedSubCategory === subCat.id;
+                          return (
+                            <button
+                              key={subCat.id}
+                              onClick={() => handleSubCategoryClick(cat.id, subCat.id)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                                isSubSelected
+                                  ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-600 dark:text-blue-400 font-medium'
+                                  : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <div className={`p-1 rounded flex items-center justify-center ${
+                                isSubSelected ? 'bg-blue-200 dark:bg-blue-700' : 'bg-slate-200 dark:bg-slate-700'
+                              }`}>
+                                <Icon name={subCat.icon} size={12} />
+                              </div>
+                              <span className="truncate flex-1 text-left text-sm">{subCat.name}</span>
+                              {isSubSelected && <div className="w-1 h-1 rounded-full bg-blue-500"></div>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
             })}
         </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, Lock, Unlock, Palette } from 'lucide-react';
-import { Category } from '../types';
+import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, Lock, Unlock, Palette, ChevronDown, ChevronRight } from 'lucide-react';
+import { Category, SubCategory } from '../types';
 import Icon from './Icon';
 import IconSelector from './IconSelector';
 import CategoryActionAuthModal from './CategoryActionAuthModal';
@@ -32,7 +32,16 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [newCatIcon, setNewCatIcon] = useState('Folder');
   
   const [isIconSelectorOpen, setIsIconSelectorOpen] = useState(false);
-  const [iconSelectorTarget, setIconSelectorTarget] = useState<'edit' | 'new' | null>(null);
+  const [iconSelectorTarget, setIconSelectorTarget] = useState<'edit' | 'new' | 'subEdit' | 'subNew' | null>(null);
+  
+  // 二级分类相关状态
+  const [expandedCatIds, setExpandedCatIds] = useState<Set<string>>(new Set());
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubName, setEditSubName] = useState('');
+  const [editSubIcon, setEditSubIcon] = useState('');
+  const [newSubCatName, setNewSubCatName] = useState('');
+  const [newSubCatIcon, setNewSubCatIcon] = useState('Tag');
+  const [addingSubToCatId, setAddingSubToCatId] = useState<string | null>(null);
   
   // 分类操作验证相关状态
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -176,7 +185,105 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       setEditIcon(iconName);
     } else if (iconSelectorTarget === 'new') {
       setNewCatIcon(iconName);
+    } else if (iconSelectorTarget === 'subEdit') {
+      setEditSubIcon(iconName);
+    } else if (iconSelectorTarget === 'subNew') {
+      setNewSubCatIcon(iconName);
     }
+  };
+  
+  // 切换分类展开/折叠
+  const toggleCategoryExpand = (catId: string) => {
+    setExpandedCatIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(catId)) {
+        newSet.delete(catId);
+      } else {
+        newSet.add(catId);
+      }
+      return newSet;
+    });
+  };
+  
+  // 开始添加二级分类
+  const startAddSubCategory = (catId: string) => {
+    setAddingSubToCatId(catId);
+    setNewSubCatName('');
+    setNewSubCatIcon('Tag');
+    // 确保该分类展开
+    setExpandedCatIds(prev => new Set(prev).add(catId));
+  };
+  
+  // 添加二级分类
+  const handleAddSubCategory = (catId: string) => {
+    if (!newSubCatName.trim()) return;
+    
+    const newSubCat: SubCategory = {
+      id: Date.now().toString(),
+      name: newSubCatName.trim(),
+      icon: newSubCatIcon
+    };
+    
+    const newCats = categories.map(c => {
+      if (c.id === catId) {
+        return {
+          ...c,
+          subcategories: [...(c.subcategories || []), newSubCat]
+        };
+      }
+      return c;
+    });
+    
+    onUpdateCategories(newCats);
+    setAddingSubToCatId(null);
+    setNewSubCatName('');
+    setNewSubCatIcon('Tag');
+  };
+  
+  // 开始编辑二级分类
+  const startEditSubCategory = (sub: SubCategory) => {
+    setEditingSubId(sub.id);
+    setEditSubName(sub.name);
+    setEditSubIcon(sub.icon);
+  };
+  
+  // 保存编辑二级分类
+  const saveEditSubCategory = (catId: string) => {
+    if (!editingSubId || !editSubName.trim()) return;
+    
+    const newCats = categories.map(c => {
+      if (c.id === catId && c.subcategories) {
+        return {
+          ...c,
+          subcategories: c.subcategories.map(sub => 
+            sub.id === editingSubId 
+              ? { ...sub, name: editSubName.trim(), icon: editSubIcon }
+              : sub
+          )
+        };
+      }
+      return c;
+    });
+    
+    onUpdateCategories(newCats);
+    setEditingSubId(null);
+  };
+  
+  // 删除二级分类
+  const deleteSubCategory = (catId: string, subId: string, subName: string) => {
+    if (!confirm(`确定删除"${subName}"二级分类吗？`)) return;
+    
+    const newCats = categories.map(c => {
+      if (c.id === catId && c.subcategories) {
+        return {
+          ...c,
+          subcategories: c.subcategories.filter(sub => sub.id !== subId)
+        };
+      }
+      return c;
+    });
+    
+    onUpdateCategories(newCats);
   };
   
   const cancelIconSelector = () => {
@@ -277,6 +384,22 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                        <button onClick={saveEdit} className="text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 p-1.5 rounded bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-600"><Check size={16}/></button>
                     ) : (
                        <>
+                        {/* 展开/折叠二级分类按钮 */}
+                        <button
+                          onClick={() => toggleCategoryExpand(cat.id)}
+                          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                          title={expandedCatIds.has(cat.id) ? "收起二级分类" : "展开二级分类"}
+                        >
+                          {expandedCatIds.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                        {/* 添加二级分类按钮 */}
+                        <button
+                          onClick={() => startAddSubCategory(cat.id)}
+                          className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                          title="添加二级分类"
+                        >
+                          <Plus size={14} />
+                        </button>
                         {cat.id !== 'common' && (
                           <button onClick={() => handleStartEdit(cat)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded">
                               <Edit2 size={14} />
@@ -301,6 +424,109 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     )}
                   </div>
               </div>
+              
+              {/* 二级分类列表 */}
+              {expandedCatIds.has(cat.id) && (
+                <div className="ml-8 mt-2 space-y-1 border-l-2 border-slate-200 dark:border-slate-600 pl-3">
+                  {cat.subcategories && cat.subcategories.map(sub => (
+                    <div key={sub.id} className="flex items-center gap-2 py-1.5 px-2 bg-white dark:bg-slate-800 rounded-md">
+                      {editingSubId === sub.id ? (
+                        <>
+                          <Icon name={editSubIcon} size={14} />
+                          <input
+                            type="text"
+                            value={editSubName}
+                            onChange={(e) => setEditSubName(e.target.value)}
+                            className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
+                            placeholder="二级分类名称"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
+                            className="p-1 text-slate-400 hover:text-blue-500"
+                            title="选择图标"
+                          >
+                            <Palette size={12} />
+                          </button>
+                          <button
+                            onClick={() => saveEditSubCategory(cat.id)}
+                            className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            onClick={() => setEditingSubId(null)}
+                            className="p-1 text-slate-400 hover:text-red-500"
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name={sub.icon} size={14} />
+                          <span className="flex-1 text-sm dark:text-slate-300">{sub.name}</span>
+                          <button
+                            onClick={() => startEditSubCategory(sub)}
+                            className="p-1 text-slate-400 hover:text-blue-500"
+                            title="编辑"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <button
+                            onClick={() => deleteSubCategory(cat.id, sub.id, sub.name)}
+                            className="p-1 text-slate-400 hover:text-red-500"
+                            title="删除"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* 添加新二级分类输入框 */}
+                  {addingSubToCatId === cat.id && (
+                    <div className="flex items-center gap-2 py-1.5 px-2 bg-blue-50 dark:bg-blue-900/30 rounded-md">
+                      <Icon name={newSubCatIcon} size={14} />
+                      <input
+                        type="text"
+                        value={newSubCatName}
+                        onChange={(e) => setNewSubCatName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory(cat.id)}
+                        className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
+                        placeholder="新二级分类名称"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => { setIconSelectorTarget('subNew'); setIsIconSelectorOpen(true); }}
+                        className="p-1 text-slate-400 hover:text-blue-500"
+                        title="选择图标"
+                      >
+                        <Palette size={12} />
+                      </button>
+                      <button
+                        onClick={() => handleAddSubCategory(cat.id)}
+                        disabled={!newSubCatName.trim()}
+                        className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded disabled:opacity-50"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        onClick={() => setAddingSubToCatId(null)}
+                        className="p-1 text-slate-400 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {(!cat.subcategories || cat.subcategories.length === 0) && addingSubToCatId !== cat.id && (
+                    <div className="text-xs text-slate-400 py-2 text-center">
+                      暂无二级分类
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

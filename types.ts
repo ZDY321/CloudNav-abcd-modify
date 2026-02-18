@@ -5,9 +5,18 @@ export interface LinkItem {
   icon?: string;
   description?: string;
   categoryId: string;
+  subCategoryId?: string; // 二级分类ID
   createdAt: number;
   pinned?: boolean; // New field for pinning
   pinnedOrder?: number; // Field for pinned link sorting order
+  order?: number; // 排序字段
+}
+
+// 二级分类接口
+export interface SubCategory {
+  id: string;
+  name: string;
+  icon: string; // Lucide icon name or emoji
 }
 
 export interface Category {
@@ -15,6 +24,7 @@ export interface Category {
   name: string;
   icon: string; // Lucide icon name or emoji
   password?: string; // Optional password for category protection
+  subcategories?: SubCategory[]; // 二级分类列表
 }
 
 export interface SiteSettings {
