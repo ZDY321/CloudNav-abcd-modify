@@ -2605,6 +2605,14 @@ function App() {
                             : (
                                 <>
                                     {categories.find(c => c.id === selectedCategory)?.name}
+                                    {selectedSubCategory && (
+                                      <>
+                                        <span className="text-slate-400 dark:text-slate-500">/</span>
+                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400 normal-case">
+                                          {categories.find(c => c.id === selectedCategory)?.subcategories?.find(sub => sub.id === selectedSubCategory)?.name}
+                                        </span>
+                                      </>
+                                    )}
                                     {isCategoryLocked(selectedCategory) && <Lock size={14} className="text-amber-500" />}
                                     <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
                                         {displayedLinks.length}
