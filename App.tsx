@@ -1946,7 +1946,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
             {isDetailedView && link.description && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 mt-2">
                 {link.description}
               </p>
             )}
@@ -1980,7 +1980,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
               {isDetailedView && link.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 mt-2">
                   {link.description}
                 </p>
               )}
