@@ -2605,14 +2605,6 @@ function App() {
                             : (
                                 <>
                                     {categories.find(c => c.id === selectedCategory)?.name}
-                                    {selectedSubCategory && (
-                                      <>
-                                        <span className="text-slate-400 dark:text-slate-500">/</span>
-                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400 normal-case">
-                                          {categories.find(c => c.id === selectedCategory)?.subcategories?.find(sub => sub.id === selectedSubCategory)?.name}
-                                        </span>
-                                      </>
-                                    )}
                                     {isCategoryLocked(selectedCategory) && <Lock size={14} className="text-amber-500" />}
                                     <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
                                         {displayedLinks.length}
@@ -2706,6 +2698,61 @@ function App() {
                          )
                      )}
                  </div>
+
+                 {/* 二级分类标签栏 */}
+                 {selectedCategory !== 'all' && !searchQuery && categories.find(c => c.id === selectedCategory)?.subcategories && categories.find(c => c.id === selectedCategory)!.subcategories!.length > 0 && (
+                   <div className="flex flex-wrap gap-2 mb-4">
+                     {/* 全部标签 */}
+                     <button
+                       onClick={() => setSelectedSubCategory(null)}
+                       className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                         !selectedSubCategory
+                           ? 'bg-blue-600 text-white shadow-sm'
+                           : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                       }`}
+                     >
+                       全部
+                       <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                         !selectedSubCategory
+                           ? 'bg-blue-500 text-white'
+                           : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
+                       }`}>
+                         {links.filter(l => l.categoryId === selectedCategory && !isCategoryLocked(l.categoryId)).length}
+                       </span>
+                     </button>
+                     
+                     {/* 二级分类标签 */}
+                     {categories.find(c => c.id === selectedCategory)?.subcategories?.map(subCat => {
+                       const subCatCount = links.filter(l => 
+                         l.categoryId === selectedCategory && 
+                         l.subCategoryId === subCat.id && 
+                         !isCategoryLocked(l.categoryId)
+                       ).length;
+                       
+                       return (
+                         <button
+                           key={subCat.id}
+                           onClick={() => setSelectedSubCategory(selectedSubCategory === subCat.id ? null : subCat.id)}
+                           className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                             selectedSubCategory === subCat.id
+                               ? 'bg-blue-600 text-white shadow-sm'
+                               : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                           }`}
+                         >
+                           <Icon name={subCat.icon} size={12} />
+                           {subCat.name}
+                           <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                             selectedSubCategory === subCat.id
+                               ? 'bg-blue-500 text-white'
+                               : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
+                           }`}>
+                             {subCatCount}
+                           </span>
+                         </button>
+                       );
+                     })}
+                   </div>
+                 )}
 
                  {displayedLinks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
