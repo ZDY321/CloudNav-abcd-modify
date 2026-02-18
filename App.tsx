@@ -1959,7 +1959,6 @@ function App() {
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
               isDetailedView ? 'flex-col' : 'items-center'
             }`}
-            title={link.description || link.title} // 悬停显示完整描述，没有描述时显示网站名
           >
             {/* 第一行：图标和标题水平排列 */}
             <div className={`flex items-center gap-3 w-full`}>
@@ -1984,12 +1983,18 @@ function App() {
                   {link.description}
                 </p>
               )}
-            {!isDetailedView && link.description && (
-              <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[200px] bg-black text-white text-xs p-2 rounded opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate">
-                {link.description}
-              </div>
-            )}
           </a>
+        )}
+
+        {/* 自定义多行悬停提示框 - 显示完整描述 */}
+        {!isBatchEditMode && (link.description || link.title) && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-30 pointer-events-none shadow-lg">
+            <div className="whitespace-pre-wrap break-words leading-relaxed">
+              {link.description || link.title}
+            </div>
+            {/* 三角箭头 */}
+            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
+          </div>
         )}
 
         {/* Hover Actions (Absolute Right) - 在批量编辑模式下隐藏 */}
