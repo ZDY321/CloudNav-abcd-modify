@@ -1946,7 +1946,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
             {isDetailedView && link.description && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 mt-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
                 {link.description}
               </p>
             )}
@@ -1959,7 +1959,7 @@ function App() {
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
               isDetailedView ? 'flex-col' : 'items-center'
             }`}
-            title={isDetailedView ? link.url : (link.description || link.url)} // 详情版视图只显示URL作为tooltip
+            title={link.description || link.title} // 悬停显示完整描述，没有描述时显示网站名
           >
             {/* 第一行：图标和标题水平排列 */}
             <div className={`flex items-center gap-3 w-full`}>
@@ -1980,7 +1980,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
               {isDetailedView && link.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 mt-2">
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
                   {link.description}
                 </p>
               )}
