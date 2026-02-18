@@ -339,12 +339,25 @@ function buildMenus() {
 
         if (categoryCache.length > 0) {
             categoryCache.forEach(cat => {
+                // 创建一级分类菜单
                 chrome.contextMenus.create({
                     id: \`save_to_\${cat.id}\`,
                     parentId: "cloudnav_root",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
+                
+                // 如果有二级分类，创建子菜单
+                if (cat.subcategories && cat.subcategories.length > 0) {
+                    cat.subcategories.forEach(subCat => {
+                        chrome.contextMenus.create({
+                            id: \`save_to_\${cat.id}_\${subCat.id}\`,
+                            parentId: \`save_to_\${cat.id}\`,
+                            title: subCat.name,
+                            contexts: ["page", "link", "action"]
+                        });
+                    });
+                }
             });
         } else {
             chrome.contextMenus.create({
@@ -382,16 +395,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (String(info.menuItemId).startsWith("save_to_")) {
-        const catId = String(info.menuItemId).replace("save_to_", "");
+        const idParts = String(info.menuItemId).replace("save_to_", "").split("_");
+        const catId = idParts[0];
+        const subCatId = idParts.length > 1 ? idParts[1] : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
         const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
         const exists = linkCache.some(l => l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
-        saveLink(title, url, catId);
+        saveLink(title, url, catId, subCatId);
     }
 });
 
-async function saveLink(title, url, categoryId, icon = '') {
+async function saveLink(title, url, categoryId, subCategoryId = null, icon = '') {
     if (!CONFIG.password) {
         notify('保存失败', '未配置密码，请先在侧边栏登录。');
         return;
@@ -415,6 +430,7 @@ async function saveLink(title, url, categoryId, icon = '') {
                 title: title || '未命名',
                 url: url,
                 categoryId: categoryId,
+                subCategoryId: subCategoryId,
                 icon: icon
             })
         });
