@@ -1986,10 +1986,16 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 */}
+        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被侧边栏遮挡 */}
         {!isBatchEditMode && (link.description || link.title) && (
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-[100] pointer-events-none shadow-lg">
-            <div className="whitespace-pre-wrap break-words leading-relaxed">
+          <div 
+            className="fixed left-1/2 -translate-x-1/2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-[9999] pointer-events-none shadow-xl"
+            style={{
+              top: 'var(--tooltip-top, 0)',
+              transform: 'translateX(-50%) translateY(-100%)',
+            }}
+          >
+            <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
               {link.description || link.title}
             </div>
             {/* 三角箭头 */}
