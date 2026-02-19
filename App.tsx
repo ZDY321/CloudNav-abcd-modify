@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Wifi, WifiOff, Globe, Star
 } from 'lucide-react';
 import {
   DndContext,
@@ -25,7 +25,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig } from './types';
+import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, UrlItem } from './types';
 import { parseBookmarks } from './services/bookmarkParser';
 import Icon from './components/Icon';
 import LinkModal from './components/LinkModal';

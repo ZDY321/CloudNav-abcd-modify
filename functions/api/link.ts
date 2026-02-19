@@ -18,6 +18,123 @@ export const onRequestOptions = async () => {
   });
 };
 
+// GET 请求处理 - 用于连通性检测
+export const onRequestGet = async (context: { request: Request; env: Env }) => {
+  const { request } = context;
+  const url = new URL(request.url);
+  const targetUrl = url.searchParams.get('url');
+  const isCheck = url.searchParams.get('check');
+
+  // 如果是连通性检测请求
+  if (isCheck === 'true' && targetUrl) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+      const response = await fetch(targetUrl, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'CloudNav Link Checker/1.0',
+        },
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeoutId);
+
+      return new Response(JSON.stringify({ 
+        online: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      }), {
+        status: response.ok ? 200 : 502,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    } catch (error: any) {
+      // 如果 HEAD 请求失败，尝试 GET 请求
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'CloudNav Link Checker/1.0',
+          },
+          redirect: 'follow',
+        });
+
+        clearTimeout(timeoutId);
+
+        return new Response(JSON.stringify({ 
+          online: response.ok,
+          status: response.status,
+          statusText: response.statusText
+        }), {
+          status: response.ok ? 200 : 502,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      } catch (getError: any) {
+        return new Response(JSON.stringify({ 
+          online: false,
+          error: getError.message || 'Connection failed'
+        }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+    }
+  }
+
+  return new Response(JSON.stringify({ error: 'Invalid request' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+};
+
+// HEAD 请求处理 - 用于连通性检测
+export const onRequestHead = async (context: { request: Request; env: Env }) => {
+  const { request } = context;
+  const url = new URL(request.url);
+  const targetUrl = url.searchParams.get('url');
+  const isCheck = url.searchParams.get('check');
+
+  // 如果是连通性检测请求
+  if (isCheck === 'true' && targetUrl) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+      const response = await fetch(targetUrl, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'CloudNav Link Checker/1.0',
+        },
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeoutId);
+
+      return new Response(null, {
+        status: response.ok ? 200 : 502,
+        headers: corsHeaders,
+      });
+    } catch (error: any) {
+      return new Response(null, {
+        status: 502,
+        headers: corsHeaders,
+      });
+    }
+  }
+
+  return new Response(null, {
+    status: 400,
+    headers: corsHeaders,
+  });
+};
+
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
   const { request, env } = context;
 

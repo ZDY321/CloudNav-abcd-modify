@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Pin, Wand2, Trash2 } from 'lucide-react';
-import { LinkItem, Category, AIConfig } from '../types';
+import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock } from 'lucide-react';
+import { LinkItem, Category, AIConfig, UrlItem } from '../types';
 import { generateLinkDescription, suggestCategory } from '../services/geminiService';
 
 interface LinkModalProps {
@@ -27,6 +27,10 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
   const [batchMode, setBatchMode] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // 多网址相关状态
+  const [urls, setUrls] = useState<UrlItem[]>([]);
+  const [showMultiUrl, setShowMultiUrl] = useState(false);
   
   // 获取当前选中的分类对象
   const currentCategory = categories.find(cat => cat.id === categoryId);
@@ -59,6 +63,14 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setSubCategoryId(initialData.subCategoryId || '');
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
+        // 加载多网址数据
+        if (initialData.urls && initialData.urls.length > 0) {
+          setUrls(initialData.urls);
+          setShowMultiUrl(true);
+        } else {
+          setUrls([]);
+          setShowMultiUrl(false);
+        }
       } else {
         setTitle('');
         setUrl('');
@@ -68,6 +80,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setCategoryId(defaultCategory ? defaultCategoryId : (categories[0]?.id || 'common'));
         setPinned(false);
         setIcon('');
+        setUrls([]);
+        setShowMultiUrl(false);
       }
     }
   }, [isOpen, initialData, categories, defaultCategoryId]);
@@ -132,11 +146,21 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       finalUrl = 'https://' + url;
     }
     
+    // 处理多网址数据，确保URL有协议前缀
+    const processedUrls = urls.map(u => {
+      let processedUrl = u.url;
+      if (processedUrl && !processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
+        processedUrl = 'https://' + processedUrl;
+      }
+      return { ...u, url: processedUrl };
+    });
+
     // 保存链接数据
     onSave({
       id: initialData?.id || '',
       title,
       url: finalUrl,
+      urls: processedUrls.length > 0 ? processedUrls : undefined,
       icon,
       description,
       categoryId,
@@ -190,6 +214,108 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         console.error("AI Assist failed", e);
     } finally {
         setIsGenerating(false);
+    }
+  };
+
+  // 多网址管理函数
+  const addNewUrl = () => {
+    const newUrlItem: UrlItem = {
+      id: Date.now().toString(),
+      url: '',
+      label: urls.length === 0 ? '主站' : `备用站${urls.length}`,
+      isDefault: urls.length === 0, // 第一个网址默认为默认
+      status: 'unknown'
+    };
+    setUrls([...urls, newUrlItem]);
+    if (!showMultiUrl) {
+      setShowMultiUrl(true);
+    }
+  };
+
+  const removeUrl = (urlId: string) => {
+    const newUrls = urls.filter(u => u.id !== urlId);
+    // 如果删除的是默认网址，将第一个设为默认
+    if (newUrls.length > 0 && !newUrls.some(u => u.isDefault)) {
+      newUrls[0].isDefault = true;
+    }
+    setUrls(newUrls);
+    if (newUrls.length === 0) {
+      setShowMultiUrl(false);
+    }
+  };
+
+  const updateUrlItem = (urlId: string, field: keyof UrlItem, value: string | boolean) => {
+    setUrls(urls.map(u => {
+      if (u.id === urlId) {
+        if (field === 'isDefault' && value === true) {
+          // 如果设为默认，先取消其他默认
+          return { ...u, isDefault: true };
+        }
+        return { ...u, [field]: value };
+      }
+      // 如果设置了新的默认，取消其他的默认状态
+      if (field === 'isDefault' && value === true) {
+        return { ...u, isDefault: false };
+      }
+      return u;
+    }));
+  };
+
+  // 检测单个网址连通性
+  const checkUrlConnectivity = async (urlId: string) => {
+    const urlItem = urls.find(u => u.id === urlId);
+    if (!urlItem || !urlItem.url) return;
+
+    updateUrlItem(urlId, 'status', 'checking');
+    
+    try {
+      let testUrl = urlItem.url;
+      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+        testUrl = 'https://' + testUrl;
+      }
+      
+      const startTime = Date.now();
+      
+      // 使用 /api/link 代理检测
+      const response = await fetch(`/api/link?url=${encodeURIComponent(testUrl)}&check=true`, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(10000) // 10秒超时
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      setUrls(prev => prev.map(u => {
+        if (u.id === urlId) {
+          return {
+            ...u,
+            status: response.ok ? 'online' : 'offline',
+            lastChecked: Date.now(),
+            responseTime: response.ok ? responseTime : undefined
+          };
+        }
+        return u;
+      }));
+    } catch (error) {
+      setUrls(prev => prev.map(u => {
+        if (u.id === urlId) {
+          return {
+            ...u,
+            status: 'offline',
+            lastChecked: Date.now(),
+            responseTime: undefined
+          };
+        }
+        return u;
+      }));
+    }
+  };
+
+  // 检测所有网址连通性
+  const checkAllUrlsConnectivity = async () => {
+    for (const urlItem of urls) {
+      if (urlItem.url) {
+        await checkUrlConnectivity(urlItem.id);
+      }
     }
   };
 
@@ -327,7 +453,17 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300">URL 链接</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium dark:text-slate-300">URL 链接</label>
+              <button
+                type="button"
+                onClick={addNewUrl}
+                className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                <Plus size={12} />
+                添加备用网址
+              </button>
+            </div>
             <div className="flex gap-2">
                 <input
                 type="text"
@@ -338,6 +474,86 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 placeholder="example.com 或 https://..."
                 />
             </div>
+            
+            {/* 多网址管理区域 */}
+            {showMultiUrl && urls.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">备用网址列表</span>
+                  <button
+                    type="button"
+                    onClick={checkAllUrlsConnectivity}
+                    className="text-xs flex items-center gap-1 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                  >
+                    <Wifi size={12} />
+                    检测所有
+                  </button>
+                </div>
+                {urls.map((urlItem, index) => (
+                  <div key={urlItem.id} className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={urlItem.label}
+                        onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
+                        className="w-20 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="标签"
+                      />
+                      <input
+                        type="text"
+                        value={urlItem.url}
+                        onChange={(e) => updateUrlItem(urlItem.id, 'url', e.target.value)}
+                        className="flex-1 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="备用网址..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => checkUrlConnectivity(urlItem.id)}
+                        className="p-1 text-slate-400 hover:text-green-500 transition-colors"
+                        title="检测连通性"
+                      >
+                        {urlItem.status === 'checking' ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : urlItem.status === 'online' ? (
+                          <Wifi size={14} className="text-green-500" />
+                        ) : urlItem.status === 'offline' ? (
+                          <WifiOff size={14} className="text-red-500" />
+                        ) : (
+                          <Globe size={14} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeUrl(urlItem.id)}
+                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                        title="删除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={urlItem.isDefault}
+                          onChange={(e) => updateUrlItem(urlItem.id, 'isDefault', e.target.checked)}
+                          className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-slate-300 rounded dark:border-slate-600 dark:bg-slate-700"
+                        />
+                        <Star size={10} className={urlItem.isDefault ? 'text-yellow-500 fill-yellow-500' : ''} />
+                        设为默认
+                      </label>
+                      {urlItem.lastChecked && (
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Clock size={10} />
+                          {urlItem.status === 'online' && urlItem.responseTime ? `${urlItem.responseTime}ms` : ''}
+                          {urlItem.status === 'offline' ? '不可用' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

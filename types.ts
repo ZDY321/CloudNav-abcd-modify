@@ -1,7 +1,19 @@
+// 单个URL对象
+export interface UrlItem {
+  id: string;
+  url: string;
+  label: string; // 网址标签/名称，如"主站"、"镜像站"、"发布页"等
+  isDefault: boolean; // 是否为默认打开的网址
+  status?: 'unknown' | 'checking' | 'online' | 'offline'; // 连通性状态
+  lastChecked?: number; // 上次检测时间戳
+  responseTime?: number; // 响应时间(ms)
+}
+
 export interface LinkItem {
   id: string;
   title: string;
-  url: string;
+  url: string; // 保留主URL字段，用于兼容和默认显示
+  urls?: UrlItem[]; // 多网址数组
   icon?: string;
   description?: string;
   categoryId: string;
