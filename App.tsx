@@ -40,6 +40,59 @@ import ContextMenu from './components/ContextMenu';
 import QRCodeModal from './components/QRCodeModal';
 import Tooltip from './components/Tooltip';
 
+// --- 智能描述提示框组件 ---
+// 自动检测边缘位置，避免提示框被裁切
+const SmartTooltip = ({ text, parentRef }: { text: string; parentRef?: React.RefObject<HTMLElement> }) => {
+  const [positionClass, setPositionClass] = useState("left-1/2 -translate-x-1/2 top-full mt-2");
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  const adjustPosition = () => {
+    const el = tooltipRef.current;
+    if (!el) return;
+
+    // 获取父元素(卡片)的位置信息
+    const parentRect = el.parentElement?.getBoundingClientRect();
+    if (!parentRect) return;
+
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    
+    // 阈值设置
+    const safeRight = 300; // 如果距离右边小于300px
+    const safeBottom = 150; // 如果距离底部小于150px
+    const safeLeft = 100;
+
+    let hClass = "left-1/2 -translate-x-1/2"; // 默认水平居中
+    let vClass = "top-full mt-2";             // 默认在下方
+
+    // 水平方向判断
+    if (screenW - parentRect.right < safeRight) {
+      hClass = "right-0"; // 靠右对齐
+    } else if (parentRect.left < safeLeft) {
+      hClass = "left-0";  // 靠左对齐
+    }
+
+    // 垂直方向判断
+    if (screenH - parentRect.bottom < safeBottom) {
+      vClass = "bottom-full mb-2"; // 显示在上方
+    }
+
+    setPositionClass(`${hClass} ${vClass}`);
+  };
+
+  return (
+    <div 
+      ref={tooltipRef}
+      onMouseEnter={adjustPosition} // 鼠标进入时计算一次位置
+      className={`absolute z-[999] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 w-72 max-w-[90vw] ${positionClass}`}
+    >
+      <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600">
+        {text}
+      </div>
+    </div>
+  );
+};
+
 // --- 配置项 ---
 // 项目核心仓库地址
 const GITHUB_REPO_URL = 'https://github.com/aabacada/CloudNav-abcd';
@@ -457,15 +510,9 @@ function App() {
     });
   };
 
-  // 单独检测链接可用性并更新分类统计
-  const checkSingleLinkAvailability = async () => {
-    if (!contextMenu.link) return;
-    
-    const link = contextMenu.link;
+  // 1. 提取核心检测逻辑为通用函数（支持右键菜单和卡片按钮调用）
+  const runLinkCheck = async (link: LinkItem, showAlert: boolean = false) => {
     const categoryId = link.categoryId;
-    
-    // 设置检测状态
-    setContextMenu(prev => ({ ...prev, isChecking: true }));
     
     try {
       let testUrl = link.url;
@@ -475,14 +522,14 @@ function App() {
       
       const isOnline = await checkUrlWithLocalNetwork(testUrl);
 
-      // 立即记录单独检测结果（优先级高于批量检测），确保卡片样式立刻更新
+      // A. 更新单项检测结果状态 (用于卡片变色)
       setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
       
-      // 更新分类检测状态 - 在函数内部检查之前的状态以确保使用最新值
+      // B. 核心：同步更新批量检测的统计数据 (categoryCheckStatus)
       setCategoryCheckStatus(prev => {
         const currentStatus = prev[categoryId];
         
-        // 如果该分类还没有检测过，创建初始状态
+        // 如果该分类还没有进行过批量检测，创建初始状态
         if (!currentStatus) {
           return {
             ...prev,
@@ -496,20 +543,21 @@ function App() {
           };
         }
         
-        // 使用 prev 中的最新数据判断该链接之前的状态
+        // 判断之前的状态：如果在 offlineLinks 数组里，说明之前是离线的
         const wasOffline = currentStatus.offlineLinks.includes(link.id);
         
         let newOnline = currentStatus.online;
         let newOffline = currentStatus.offline;
         let newOfflineLinks = [...currentStatus.offlineLinks];
         
+        // 状态变更逻辑：
         if (isOnline && wasOffline) {
-          // 之前离线 → 现在在线：online+1, offline-1, 从 offlineLinks 中移除
+          // 修正：从离线变在线 -> 在线数+1，离线数-1，移除ID
           newOnline++;
           newOffline--;
           newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
         } else if (!isOnline && !wasOffline) {
-          // 之前在线（或未检测过）→ 现在离线：offline+1, online-1, 加入 offlineLinks
+          // 修正：从在线(或未知)变离线 -> 离线数+1，在线数-1，添加ID
           newOffline++;
           if (newOnline > 0) newOnline--;
           newOfflineLinks.push(link.id);
@@ -528,15 +576,32 @@ function App() {
         };
       });
       
-      // 显示检测结果
-      const resultText = isOnline ? '可用 ✓' : '不可用 ✗';
-      alert(`"${link.title}" 检测结果: ${resultText}`);
+      // 只有通过右键菜单调用时才显示弹窗
+      if (showAlert) {
+        const resultText = isOnline ? '可用 ✓' : '不可用 ✗';
+        alert(`"${link.title}" 检测结果: ${resultText}`);
+      }
       
+      return isOnline;
+
     } catch (error) {
       console.error('检测链接失败:', error);
-      alert('检测失败，请重试');
+      if (showAlert) {
+        alert('检测失败，请重试');
+      }
+      return false;
+    }
+  };
+
+  // 2. 保留原有的右键菜单调用入口，改为调用上面的通用函数
+  const checkSingleLinkAvailability = async () => {
+    if (!contextMenu.link) return;
+    
+    setContextMenu(prev => ({ ...prev, isChecking: true }));
+    
+    try {
+      await runLinkCheck(contextMenu.link, true);
     } finally {
-      // 重置检测状态并关闭菜单
       setContextMenu(prev => ({ ...prev, isChecking: false }));
       closeContextMenu();
     }
@@ -2252,12 +2317,28 @@ function App() {
           </a>
         )}
 
-        {/* 描述悬浮提示 - 防止边缘卡片提示被裁切 */}
+        {/* 智能描述悬浮提示 - 自动感知边缘位置，避免被裁切 */}
         {link.description && !isBatchEditMode && (
-          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-[999] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 w-72 max-w-[90vw]">
-            <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl break-words leading-relaxed whitespace-pre-wrap">
-              {link.description}
-            </div>
+          <SmartTooltip text={link.description} />
+        )}
+
+        {/* 离线状态下的快速重试按钮 */}
+        {!isBatchEditMode && isOfflineLink && (
+          <div className="absolute top-1 right-1 z-20">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                runLinkCheck(link); // 点击直接调用通用检测函数
+              }}
+              className="p-1 bg-white/90 dark:bg-slate-800/90 text-red-500 hover:text-white hover:bg-red-500 rounded-full shadow-sm border border-red-200 dark:border-red-900 transition-all"
+              title="检测到连接失败，点击重试"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 4v6h-6"></path>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
           </div>
         )}
 
