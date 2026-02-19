@@ -177,6 +177,57 @@ function App() {
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
+  // 分类可用性检测状态
+  const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number }>>({});
+  
+  // 批量检测分类下所有网站可用性
+  const checkCategoryAvailability = async (categoryId: string) => {
+    const categoryLinks = links.filter(l => l.categoryId === categoryId && !isCategoryLocked(l.categoryId));
+    if (categoryLinks.length === 0) return;
+    
+    setCategoryCheckStatus(prev => ({
+      ...prev,
+      [categoryId]: { checking: true, online: 0, offline: 0, total: categoryLinks.length }
+    }));
+    
+    let online = 0;
+    let offline = 0;
+    
+    for (const link of categoryLinks) {
+      try {
+        let testUrl = link.url;
+        if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+          testUrl = 'https://' + testUrl;
+        }
+        
+        const response = await fetch(`/api/link?url=${encodeURIComponent(testUrl)}&check=true`, {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(8000)
+        });
+        
+        if (response.ok) {
+          online++;
+        } else {
+          offline++;
+        }
+      } catch (error) {
+        offline++;
+      }
+      
+      // 实时更新进度
+      setCategoryCheckStatus(prev => ({
+        ...prev,
+        [categoryId]: { checking: true, online, offline, total: categoryLinks.length }
+      }));
+    }
+    
+    // 检测完成
+    setCategoryCheckStatus(prev => ({
+      ...prev,
+      [categoryId]: { checking: false, online, offline, total: categoryLinks.length }
+    }));
+  };
+  
   // --- Helpers & Sync Logic ---
 
   const loadFromLocal = () => {
@@ -1907,6 +1958,18 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     
+    // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
+    const getDefaultUrl = () => {
+      if (link.urls && link.urls.length > 0) {
+        const defaultUrl = link.urls.find(u => u.isDefault);
+        if (defaultUrl && defaultUrl.url) {
+          return defaultUrl.url;
+        }
+      }
+      return link.url;
+    };
+    const targetUrl = getDefaultUrl();
+    
     return (
       <div
         key={link.id}
@@ -1953,7 +2016,7 @@ function App() {
           </div>
         ) : (
           <a
-            href={link.url}
+            href={targetUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
@@ -1986,14 +2049,10 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被侧边栏遮挡 */}
+        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用absolute定位相对于卡片 */}
         {!isBatchEditMode && (link.description || link.title) && (
           <div 
-            className="fixed left-1/2 -translate-x-1/2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-[9999] pointer-events-none shadow-xl"
-            style={{
-              top: 'var(--tooltip-top, 0)',
-              transform: 'translateX(-50%) translateY(-100%)',
-            }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-[9999] pointer-events-none shadow-xl"
           >
             <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
               {link.description || link.title}
@@ -2147,7 +2206,12 @@ function App() {
             </button>
             
             <div className="flex items-center justify-between pt-4 pb-2 px-4">
-               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">分类目录</span>
+               <div className="flex items-center gap-2">
+                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">分类目录</span>
+                 <span className="px-1.5 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full">
+                   {links.filter(l => !isCategoryLocked(l.categoryId)).length}
+                 </span>
+               </div>
                <button 
                   onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsCatManagerOpen(true); }}
                   className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
@@ -2189,6 +2253,9 @@ function App() {
                           {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
                         </div>
                         <span className="truncate flex-1 text-left">{cat.name}</span>
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full">
+                          {links.filter(l => l.categoryId === cat.id && !isCategoryLocked(l.categoryId)).length}
+                        </span>
                       </button>
                       {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
                     </div>

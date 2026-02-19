@@ -479,7 +479,10 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             {showMultiUrl && urls.length > 0 && (
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">备用网址列表</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">备用网址列表</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">（标签如：主站、备用站、发布页）</span>
+                  </div>
                   <button
                     type="button"
                     onClick={checkAllUrlsConnectivity}
@@ -492,13 +495,26 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 {urls.map((urlItem, index) => (
                   <div key={urlItem.id} className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 space-y-2">
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={urlItem.label}
-                        onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
-                        className="w-20 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
-                        placeholder="标签"
-                      />
+                      <div className="relative w-24">
+                        <input
+                          type="text"
+                          value={urlItem.label}
+                          onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
+                          className="w-full px-2 py-1 pr-6 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                          placeholder="标签"
+                          list={`label-options-${urlItem.id}`}
+                        />
+                        <datalist id={`label-options-${urlItem.id}`}>
+                          <option value="主站" />
+                          <option value="备用站" />
+                          <option value="镜像站" />
+                          <option value="发布页" />
+                          <option value="官网" />
+                          <option value="下载页" />
+                          <option value="文档" />
+                          <option value="API" />
+                        </datalist>
+                      </div>
                       <input
                         type="text"
                         value={urlItem.url}
