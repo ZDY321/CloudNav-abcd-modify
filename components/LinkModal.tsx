@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock } from 'lucide-react';
-import { LinkItem, Category, AIConfig, UrlItem } from '../types';
+import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus } from '../types';
 import { generateLinkDescription, suggestCategory } from '../services/geminiService';
 
 interface LinkModalProps {
@@ -32,6 +32,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [urls, setUrls] = useState<UrlItem[]>([]);
   const [showMultiUrl, setShowMultiUrl] = useState(false);
   const [customLabelId, setCustomLabelId] = useState<string | null>(null); // 正在编辑自定义标签的URL ID
+  
+  // 主URL检测状态
+  const [mainUrlStatus, setMainUrlStatus] = useState<MainUrlStatus>({ status: 'unknown' });
   
   // 获取当前选中的分类对象
   const currentCategory = categories.find(cat => cat.id === categoryId);
@@ -320,6 +323,108 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
   };
 
+  // 检测主URL连通性
+  const checkMainUrlConnectivity = async () => {
+    if (!url) return;
+
+    setMainUrlStatus({ status: 'checking' });
+    
+    try {
+      let testUrl = url;
+      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+        testUrl = 'https://' + testUrl;
+      }
+      
+      const startTime = Date.now();
+      
+      // 使用 /api/link 代理检测
+      const response = await fetch(`/api/link?url=${encodeURIComponent(testUrl)}&check=true`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(15000) // 15秒超时
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          // 检查是否有额外的状态信息
+          if (data.vpnRequired) {
+            setMainUrlStatus({
+              status: 'vpn_required',
+              lastChecked: Date.now(),
+              responseTime
+            });
+          } else if (data.cloudflare) {
+            setMainUrlStatus({
+              status: 'cloudflare',
+              lastChecked: Date.now(),
+              responseTime
+            });
+          } else {
+            setMainUrlStatus({
+              status: 'online',
+              lastChecked: Date.now(),
+              responseTime
+            });
+          }
+        } catch {
+          setMainUrlStatus({
+            status: 'online',
+            lastChecked: Date.now(),
+            responseTime
+          });
+        }
+      } else {
+        setMainUrlStatus({
+          status: 'offline',
+          lastChecked: Date.now()
+        });
+      }
+    } catch (error) {
+      setMainUrlStatus({
+        status: 'offline',
+        lastChecked: Date.now()
+      });
+    }
+  };
+
+  // 获取主URL状态图标
+  const getMainUrlStatusIcon = () => {
+    switch (mainUrlStatus.status) {
+      case 'checking':
+        return <Loader2 size={14} className="animate-spin text-blue-500" />;
+      case 'online':
+        return <Wifi size={14} className="text-green-500" />;
+      case 'offline':
+        return <WifiOff size={14} className="text-red-500" />;
+      case 'vpn_required':
+        return <Shield size={14} className="text-orange-500" />;
+      case 'cloudflare':
+        return <AlertTriangle size={14} className="text-yellow-500" />;
+      default:
+        return <Globe size={14} className="text-slate-400" />;
+    }
+  };
+
+  // 获取主URL状态提示
+  const getMainUrlStatusText = () => {
+    switch (mainUrlStatus.status) {
+      case 'checking':
+        return '检测中...';
+      case 'online':
+        return mainUrlStatus.responseTime ? `可用 (${mainUrlStatus.responseTime}ms)` : '可用';
+      case 'offline':
+        return '不可用';
+      case 'vpn_required':
+        return '需要VPN';
+      case 'cloudflare':
+        return 'CF保护';
+      default:
+        return '检测可用性';
+    }
+  };
+
   const handleFetchIcon = async () => {
     if (!url) return;
     
@@ -388,8 +493,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-700">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold dark:text-white">
               {initialData ? '编辑链接' : '添加新链接'}
@@ -440,7 +545,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-4 space-y-4">
+        <form onSubmit={handleSave} className="p-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300">标题</label>
             <input
@@ -471,9 +576,25 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 required
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 placeholder="example.com 或 https://..."
                 />
+                <button
+                  type="button"
+                  onClick={checkMainUrlConnectivity}
+                  disabled={!url || mainUrlStatus.status === 'checking'}
+                  className={`px-3 py-2 rounded-lg flex items-center gap-1 transition-colors text-xs font-medium ${
+                    mainUrlStatus.status === 'online' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                    mainUrlStatus.status === 'offline' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                    mainUrlStatus.status === 'vpn_required' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                    mainUrlStatus.status === 'cloudflare' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  } disabled:opacity-50`}
+                  title={getMainUrlStatusText()}
+                >
+                  {getMainUrlStatusIcon()}
+                  <span className="hidden sm:inline">{getMainUrlStatusText()}</span>
+                </button>
             </div>
             
             {/* 多网址管理区域 */}

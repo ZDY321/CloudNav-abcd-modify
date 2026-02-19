@@ -2062,12 +2062,13 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被侧边栏遮挡 */}
+        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被顶部区域遮挡 */}
         {!isBatchEditMode && (link.description || link.title) && (
           <div 
-            className="absolute left-0 right-0 bottom-full mb-2 flex justify-center pointer-events-none z-[9999]"
+            className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] pointer-events-none"
+            style={{ zIndex: 99999 }}
           >
-            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 shadow-xl ml-auto mr-auto">
+            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 shadow-xl">
               <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
                 {link.description || link.title}
               </div>

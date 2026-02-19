@@ -2,11 +2,18 @@
 export interface UrlItem {
   id: string;
   url: string;
-  label: string; // 网址标签/名称，如"主站"、"镜像站"、"发布页"等
-  isDefault: boolean; // 是否为默认打开的网址
-  status?: 'unknown' | 'checking' | 'online' | 'offline'; // 连通性状态
-  lastChecked?: number; // 上次检测时间戳
+  label: string; // 如：主站、备用站、镜像站
+  isDefault?: boolean; // 是否为默认打开的网址
+  status?: 'online' | 'offline' | 'checking' | 'unknown' | 'vpn_required' | 'cloudflare'; // 连通性状态
+  lastChecked?: number; // 上次检测时间
   responseTime?: number; // 响应时间(ms)
+}
+
+// 主URL检测状态
+export interface MainUrlStatus {
+  status: 'online' | 'offline' | 'checking' | 'unknown' | 'vpn_required' | 'cloudflare';
+  lastChecked?: number;
+  responseTime?: number;
 }
 
 export interface LinkItem {
