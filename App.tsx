@@ -184,6 +184,28 @@ function App() {
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   // 单独检测结果：linkId -> true(在线)/false(离线)，优先级高于批量检测结果
   const [linkCheckResults, setLinkCheckResults] = useState<Record<string, boolean>>({});
+
+  // 单独检测结果重置：按分类重置
+  const resetCategorySingleCheckResults = (categoryId: string) => {
+    const categoryLinkIds = new Set(
+      links.filter(l => l.categoryId === categoryId).map(l => l.id)
+    );
+
+    setLinkCheckResults(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(id => {
+        if (categoryLinkIds.has(id)) {
+          delete next[id];
+        }
+      });
+      return next;
+    });
+  };
+
+  // 单独检测结果重置：全部重置
+  const resetAllSingleCheckResults = () => {
+    setLinkCheckResults({});
+  };
   
   // 并发限制常量
   const CONCURRENT_LIMIT = 5;
@@ -2230,9 +2252,9 @@ function App() {
           </a>
         )}
 
-        {/* 描述悬浮提示 - 简约视图和详情视图超长描述均适用，鼠标悬停时显示在卡片下方 */}
+        {/* 描述悬浮提示 - 防止边缘卡片提示被裁切 */}
         {link.description && !isBatchEditMode && (
-          <div className="absolute left-0 right-0 top-full mt-1 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-[999] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 w-72 max-w-[90vw]">
             <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl break-words leading-relaxed whitespace-pre-wrap">
               {link.description}
             </div>
@@ -2794,7 +2816,7 @@ function App() {
         </header>
 
         {/* Content Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 pb-24">
             
             {/* 1. Pinned Area (Custom Top Area) */}
             {pinnedLinks.length > 0 && !searchQuery && (selectedCategory === 'all') && (
@@ -2922,6 +2944,13 @@ function App() {
                                         >
                                           <Globe size={10} />
                                           检测
+                                        </button>
+                                        <button
+                                          onClick={() => resetCategorySingleCheckResults(selectedCategory)}
+                                          className="flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                                          title="清除当前分类的单独检测结果，恢复以批量检测结果为准"
+                                        >
+                                          重置检测
                                         </button>
                                       </>
                                     )}
