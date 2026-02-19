@@ -55,8 +55,9 @@ const VPN_REQUIRED_DOMAINS = [
   'pinterest.com',
   'flickr.com',
   'quora.com',
-  'stackoverflow.com', // 有时可能受影响
-  'github.com', // 有时可能受影响
+  'linux.do', // 需要VPN访问的论坛
+  // 'stackoverflow.com', // 大陆一般可访问，移除
+  // 'github.com', // 大陆一般可访问，移除
   'npmjs.com',
   'docker.com', 'hub.docker.com',
 ];

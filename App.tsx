@@ -2062,18 +2062,26 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被顶部区域遮挡 */}
-        {!isBatchEditMode && (link.description || link.title) && (
+        {/* 自定义多行悬停提示框 - 显示完整描述 */}
+        {!isBatchEditMode && link.description && (
           <div 
-            className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] pointer-events-none"
+            className="fixed left-0 top-0 w-full h-full pointer-events-none opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200"
             style={{ zIndex: 99999 }}
           >
-            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 shadow-xl">
-              <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
-                {link.description || link.title}
+            <div 
+              className="absolute pointer-events-none"
+              style={{
+                left: 'var(--tooltip-x, 50%)',
+                bottom: 'var(--tooltip-y, 100%)',
+              }}
+            >
+              <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg shadow-xl transform -translate-x-1/2 mb-2">
+                <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
+                  {link.description}
+                </div>
+                {/* 三角箭头 */}
+                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
               </div>
-              {/* 三角箭头 */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
             </div>
           </div>
         )}
@@ -2724,7 +2732,7 @@ function App() {
                                           onClick={() => checkCategoryAvailability(selectedCategory)}
                                           disabled={categoryCheckStatus[selectedCategory]?.checking}
                                           className="flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
-                                          title="批量检测可用性"
+                                          title="批量检测可用性&#10;🟢 绿色：可正常访问&#10;🔴 红色：不可访问&#10;🟠 橙色：需要VPN访问&#10;🟡 黄色：受Cloudflare保护"
                                         >
                                           <Globe size={10} />
                                           检测

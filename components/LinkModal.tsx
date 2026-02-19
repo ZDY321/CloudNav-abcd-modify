@@ -600,19 +600,22 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             {/* 多网址管理区域 */}
             {showMultiUrl && urls.length > 0 && (
               <div className="mt-3 space-y-2">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">备用网址列表</span>
                     <span className="text-xs text-slate-400 dark:text-slate-500">（标签如：主站、备用站、发布页）</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={checkAllUrlsConnectivity}
-                    className="text-xs flex items-center gap-1 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
-                  >
-                    <Wifi size={12} />
-                    检测所有
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={checkAllUrlsConnectivity}
+                      className="text-xs flex items-center gap-1 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                      title="批量检测可用性&#10;🟢 绿色：可正常访问&#10;🔴 红色：不可访问&#10;🟠 橙色：需要VPN访问&#10;🟡 黄色：受Cloudflare保护"
+                    >
+                      <Wifi size={12} />
+                      检测所有
+                    </button>
+                  </div>
                 </div>
                 {urls.map((urlItem, index) => {
                   const predefinedLabels = ['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
