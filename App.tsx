@@ -2153,8 +2153,8 @@ function App() {
       >
         {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
         {isBatchEditMode ? (
-          <div className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-            isDetailedView ? 'flex-col' : 'items-center'
+          <div className={`flex flex-1 min-w-0 ${
+            isDetailedView ? 'flex-col' : 'items-center overflow-hidden h-full'
           }`}>
             {/* 第一行：图标和标题水平排列 */}
             <div className={`flex items-center gap-3 w-full`}>
@@ -2188,8 +2188,8 @@ function App() {
             href={targetUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-              isDetailedView ? 'flex-col' : 'items-center'
+            className={`flex flex-1 min-w-0 ${
+              isDetailedView ? 'flex-col' : 'items-center overflow-hidden h-full'
             }`}
           >
             {/* 第一行：图标和标题水平排列 */}
@@ -2373,13 +2373,46 @@ function App() {
                    {links.filter(l => !isCategoryLocked(l.categoryId)).length}
                  </span>
                </div>
-               <button 
-                  onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsCatManagerOpen(true); }}
-                  className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  title="管理分类"
-               >
-                  <Settings size={14} />
-               </button>
+               <div className="flex items-center gap-1">
+                 {/* 展开/折叠全部二级分类按钮 */}
+                 {categories.some(c => c.subcategories && c.subcategories.length > 0) && (
+                   <button
+                     onClick={() => {
+                       const catsWithSub = categories.filter(c => c.subcategories && c.subcategories.length > 0);
+                       const allExpanded = catsWithSub.every(c => expandedCategories.has(c.id));
+                       if (allExpanded) {
+                         // 全部折叠
+                         setExpandedCategories(prev => {
+                           const newSet = new Set(prev);
+                           catsWithSub.forEach(c => newSet.delete(c.id));
+                           return newSet;
+                         });
+                       } else {
+                         // 全部展开
+                         setExpandedCategories(prev => {
+                           const newSet = new Set(prev);
+                           catsWithSub.forEach(c => newSet.add(c.id));
+                           return newSet;
+                         });
+                       }
+                     }}
+                     className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                     title={categories.filter(c => c.subcategories && c.subcategories.length > 0).every(c => expandedCategories.has(c.id)) ? '折叠全部二级分类' : '展开全部二级分类'}
+                   >
+                     {categories.filter(c => c.subcategories && c.subcategories.length > 0).every(c => expandedCategories.has(c.id))
+                       ? <ChevronDown size={14} />
+                       : <ChevronRight size={14} />
+                     }
+                   </button>
+                 )}
+                 <button 
+                    onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsCatManagerOpen(true); }}
+                    className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                    title="管理分类"
+                 >
+                    <Settings size={14} />
+                 </button>
+               </div>
             </div>
 
             {categories.map(cat => {
