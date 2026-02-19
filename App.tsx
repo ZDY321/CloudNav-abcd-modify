@@ -183,36 +183,66 @@ function App() {
   // 分类可用性检测状态
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   
-  // 使用后端API检测单个URL的连通性（更准确可靠）
+  // 并发限制常量
+  const CONCURRENT_LIMIT = 5;
+  
+  // 使用本地网络直接检测URL连通性（借鉴死链检测方法）
+  // 优点：完全本地化，无云端依赖，隐私保护，零成本
   const checkUrlWithLocalNetwork = async (url: string): Promise<boolean> => {
+    // 确保URL有协议前缀
+    let testUrl = url;
+    if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+      testUrl = 'https://' + testUrl;
+    }
+    
+    // 带超时的fetch请求
+    const tryFetch = async (targetUrl: string, timeout = 15000): Promise<boolean> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      try {
+        // 使用 mode: 'no-cors' 模式进行连通性检测
+        // 这样只检测连接是否成功，不需要服务器返回CORS头
+        await fetch(targetUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          mode: 'no-cors' // 关键：CORS无关模式，验证网站是否可达
+        });
+        clearTimeout(timeoutId);
+        return true; // 请求成功，网站可达
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error('Timeout (15s)');
+        }
+        throw error;
+      }
+    };
+    
     try {
-      // 确保URL有协议前缀
-      let testUrl = url;
-      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
-        testUrl = 'https://' + testUrl;
+      // 1️⃣ 首先尝试原始URL
+      await tryFetch(testUrl);
+      return true;
+    } catch (e) {
+      // 2️⃣ 如果是HTTPS失败（可能是证书问题），自动降级到HTTP重试
+      if (testUrl.startsWith('https://')) {
+        try {
+          const httpUrl = testUrl.replace(/^https:\/\//, 'http://');
+          await tryFetch(httpUrl);
+          return true; // HTTP重试成功
+        } catch (e2) {
+          // 两种协议都失败，标记为不可用
+          console.error('URL检测失败 (HTTPS和HTTP都失败):', testUrl);
+          return false;
+        }
       }
-      
-      // 调用后端API进行真正的HTTP请求检测
-      const response = await fetch(`/api/link?check=true&url=${encodeURIComponent(testUrl)}`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(15000) // 15秒超时
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // 检查返回的online状态
-        return data.online === true;
-      }
-      
-      // 如果API请求失败，返回false
-      return false;
-    } catch (error) {
-      console.error('URL检测失败:', error);
+      // HTTP请求失败
+      console.error('URL检测失败:', testUrl, e);
       return false;
     }
   };
 
-  // 批量检测分类下所有网站可用性（使用用户本地网络）
+  // 批量检测分类下所有网站可用性（使用用户本地网络，并发控制）
   const checkCategoryAvailability = async (categoryId: string) => {
     const categoryLinks = links.filter(l => l.categoryId === categoryId && !isCategoryLocked(l.categoryId));
     if (categoryLinks.length === 0) return;
@@ -226,26 +256,35 @@ function App() {
     let offline = 0;
     const offlineLinks: string[] = [];
     
-    for (const link of categoryLinks) {
+    // 检测单个URL的函数
+    const checkSingleUrl = async (link: LinkItem): Promise<{ linkId: string; isOnline: boolean }> => {
       try {
-        // 只检测主URL，不检测备用网址
         let testUrl = link.url;
         if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
           testUrl = 'https://' + testUrl;
         }
-        
-        // 使用用户本地网络进行检测
         const isOnline = await checkUrlWithLocalNetwork(testUrl);
-        
-        if (isOnline) {
+        return { linkId: link.id, isOnline };
+      } catch (error) {
+        return { linkId: link.id, isOnline: false };
+      }
+    };
+    
+    // 使用并发控制进行批量检测（5个并发）
+    for (let i = 0; i < categoryLinks.length; i += CONCURRENT_LIMIT) {
+      const chunk = categoryLinks.slice(i, i + CONCURRENT_LIMIT);
+      
+      // 并发执行当前批次的检测
+      const results = await Promise.all(chunk.map(link => checkSingleUrl(link)));
+      
+      // 处理检测结果
+      for (const result of results) {
+        if (result.isOnline) {
           online++;
         } else {
           offline++;
-          offlineLinks.push(link.id);
+          offlineLinks.push(result.linkId);
         }
-      } catch (error) {
-        offline++;
-        offlineLinks.push(link.id);
       }
       
       // 实时更新进度
