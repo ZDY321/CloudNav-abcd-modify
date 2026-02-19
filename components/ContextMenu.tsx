@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Copy, QrCode, Edit2, Trash2, Pin } from 'lucide-react';
+import { Copy, QrCode, Edit2, Trash2, Pin, Globe, Loader2 } from 'lucide-react';
 
 interface ContextMenuProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface ContextMenuProps {
   onEditLink: () => void;
   onDeleteLink: () => void;
   onTogglePin: () => void;
+  onCheckAvailability?: () => void;
+  isChecking?: boolean;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -20,7 +22,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onShowQRCode,
   onEditLink,
   onDeleteLink,
-  onTogglePin
+  onTogglePin,
+  onCheckAvailability,
+  isChecking = false
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +81,28 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
         top: adjustedPosition.y
       }}
     >
+      {/* 检测可用性按钮 */}
+      {onCheckAvailability && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isChecking) {
+              onCheckAvailability();
+            }
+          }}
+          disabled={isChecking}
+          className={`w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-green-600 dark:text-green-400 ${isChecking ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {isChecking ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Globe size={16} />
+          )}
+          <span>{isChecking ? '检测中...' : '检测可用性'}</span>
+        </button>
+      )}
+      
       {menuItems.map((item, index) => (
         <button
           key={index}

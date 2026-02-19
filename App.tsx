@@ -38,6 +38,7 @@ import SettingsModal from './components/SettingsModal';
 import SearchConfigModal from './components/SearchConfigModal';
 import ContextMenu from './components/ContextMenu';
 import QRCodeModal from './components/QRCodeModal';
+import Tooltip from './components/Tooltip';
 
 // --- 配置项 ---
 // 项目核心仓库地址
@@ -140,10 +141,12 @@ function App() {
     isOpen: boolean;
     position: { x: number; y: number };
     link: LinkItem | null;
+    isChecking: boolean;
   }>({
     isOpen: false,
     position: { x: 0, y: 0 },
-    link: null
+    link: null,
+    isChecking: false
   });
   
   // QR Code Modal State
@@ -387,7 +390,8 @@ function App() {
     setContextMenu({
       isOpen: true,
       position: { x: event.clientX, y: event.clientY },
-      link: link
+      link: link,
+      isChecking: false
     });
   };
 
@@ -395,8 +399,100 @@ function App() {
     setContextMenu({
       isOpen: false,
       position: { x: 0, y: 0 },
-      link: null
+      link: null,
+      isChecking: false
     });
+  };
+
+  // 单独检测链接可用性并更新分类统计
+  const checkSingleLinkAvailability = async () => {
+    if (!contextMenu.link) return;
+    
+    const link = contextMenu.link;
+    const categoryId = link.categoryId;
+    
+    // 设置检测状态
+    setContextMenu(prev => ({ ...prev, isChecking: true }));
+    
+    try {
+      let testUrl = link.url;
+      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+        testUrl = 'https://' + testUrl;
+      }
+      
+      const isOnline = await checkUrlWithLocalNetwork(testUrl);
+      
+      // 检查当前链接之前的状态
+      const wasOffline = categoryCheckStatus[categoryId]?.offlineLinks?.includes(link.id);
+      
+      // 更新分类检测状态
+      setCategoryCheckStatus(prev => {
+        const currentStatus = prev[categoryId];
+        
+        // 如果该分类还没有检测过，不更新
+        if (!currentStatus) {
+          // 创建一个新的检测状态
+          return {
+            ...prev,
+            [categoryId]: {
+              checking: false,
+              online: isOnline ? 1 : 0,
+              offline: isOnline ? 0 : 1,
+              total: 1,
+              offlineLinks: isOnline ? [] : [link.id]
+            }
+          };
+        }
+        
+        let newOnline = currentStatus.online;
+        let newOffline = currentStatus.offline;
+        let newOfflineLinks = [...currentStatus.offlineLinks];
+        
+        if (isOnline) {
+          // 链接现在可用
+          if (wasOffline) {
+            // 之前是离线的，现在在线了
+            newOnline++;
+            newOffline--;
+            newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
+          }
+          // 如果之前就是在线的，不需要改变
+        } else {
+          // 链接现在不可用
+          if (!wasOffline) {
+            // 之前是在线的，现在离线了
+            newOnline--;
+            newOffline++;
+            if (!newOfflineLinks.includes(link.id)) {
+              newOfflineLinks.push(link.id);
+            }
+          }
+          // 如果之前就是离线的，不需要改变
+        }
+        
+        return {
+          ...prev,
+          [categoryId]: {
+            ...currentStatus,
+            online: newOnline,
+            offline: newOffline,
+            offlineLinks: newOfflineLinks
+          }
+        };
+      });
+      
+      // 显示检测结果
+      const resultText = isOnline ? '可用 ✓' : '不可用 ✗';
+      alert(`"${link.title}" 检测结果: ${resultText}`);
+      
+    } catch (error) {
+      console.error('检测链接失败:', error);
+      alert('检测失败，请重试');
+    } finally {
+      // 重置检测状态并关闭菜单
+      setContextMenu(prev => ({ ...prev, isChecking: false }));
+      closeContextMenu();
+    }
   };
 
   const copyLinkToClipboard = () => {
@@ -2057,11 +2153,13 @@ function App() {
               </h3>
             </div>
             
-            {/* 第二行：描述文字 */}
+            {/* 第二行：描述文字 - 使用Tooltip显示完整描述 */}
             {isDetailedView && link.description && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
-                {link.description}
-              </p>
+              <Tooltip content={link.description} className="w-full">
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 cursor-default">
+                  {link.description}
+                </p>
+              </Tooltip>
             )}
           </div>
         ) : (
@@ -2090,11 +2188,13 @@ function App() {
                 </h3>
             </div>
             
-            {/* 第二行：描述文字 */}
+            {/* 第二行：描述文字 - 使用Tooltip显示完整描述 */}
               {isDetailedView && link.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
-                  {link.description}
-                </p>
+                <Tooltip content={link.description} className="w-full">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 cursor-default">
+                    {link.description}
+                  </p>
+                </Tooltip>
               )}
           </a>
         )}
@@ -3028,6 +3128,8 @@ function App() {
             onEditLink={editLinkFromContextMenu}
             onDeleteLink={deleteLinkFromContextMenu}
             onTogglePin={togglePinFromContextMenu}
+            onCheckAvailability={checkSingleLinkAvailability}
+            isChecking={contextMenu.isChecking}
           />
 
           {/* 二维码模态框 */}
