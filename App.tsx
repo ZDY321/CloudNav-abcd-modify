@@ -451,16 +451,12 @@ function App() {
       
       const isOnline = await checkUrlWithLocalNetwork(testUrl);
       
-      // 检查当前链接之前的状态
-      const wasOffline = categoryCheckStatus[categoryId]?.offlineLinks?.includes(link.id);
-      
-      // 更新分类检测状态
+      // 更新分类检测状态 - 在函数内部检查之前的状态以确保使用最新值
       setCategoryCheckStatus(prev => {
         const currentStatus = prev[categoryId];
         
-        // 如果该分类还没有检测过，不更新
+        // 如果该分类还没有检测过，创建一个新的检测状态
         if (!currentStatus) {
-          // 创建一个新的检测状态
           return {
             ...prev,
             [categoryId]: {
@@ -472,6 +468,10 @@ function App() {
             }
           };
         }
+        
+        // 在这里检查之前的状态，使用prev中的最新数据
+        const wasOffline = currentStatus.offlineLinks?.includes(link.id) ?? false;
+        const wasOnline = !wasOffline && currentStatus.total > 0;
         
         let newOnline = currentStatus.online;
         let newOffline = currentStatus.offline;
@@ -489,10 +489,17 @@ function App() {
         } else {
           // 链接现在不可用
           if (!wasOffline) {
-            // 之前是在线的，现在离线了
-            newOnline--;
-            newOffline++;
-            if (!newOfflineLinks.includes(link.id)) {
+            // 之前是在线的（或未被检测过但属于该分类），现在离线了
+            if (wasOnline || currentStatus.total === currentStatus.online + currentStatus.offline) {
+              // 只有当链接之前被统计为在线时才减少在线数
+              if (!newOfflineLinks.includes(link.id)) {
+                newOnline = Math.max(0, newOnline - 1);
+                newOffline++;
+                newOfflineLinks.push(link.id);
+              }
+            } else if (!newOfflineLinks.includes(link.id)) {
+              // 链接之前未被检测过
+              newOffline++;
               newOfflineLinks.push(link.id);
             }
           }
