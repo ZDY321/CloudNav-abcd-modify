@@ -135,29 +135,17 @@ const PortalTooltip = ({
 
 // --- 屏幕中央描述提示框组件 ---
 // 将提示框显示在屏幕正中央，使用 Portal 彻底解决遮挡问题
-const SmartTooltip = ({ text, parentRef }: { text: string; parentRef?: React.RefObject<HTMLElement> }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  return (
-    <>
-      {/* 悬停触发区域 - 透明层覆盖在卡片上 */}
-      <div 
-        ref={tooltipRef}
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-        className="absolute inset-0 z-10"
-      />
-      {/* 使用 Portal 将提示框渲染到 body，显示在屏幕正中央 */}
-      {isVisible && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-          <div className="bg-slate-800/95 dark:bg-slate-700/95 text-white text-sm px-4 py-3 rounded-xl shadow-2xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600 max-w-md mx-4 backdrop-blur-sm animate-fade-in">
-            {text}
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
+// 注意：此组件不再使用透明层，避免阻挡点击事件
+const SmartTooltip = ({ text, isHovered }: { text: string; isHovered: boolean; parentRef?: React.RefObject<HTMLElement> }) => {
+  if (!isHovered) return null;
+  
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+      <div className="bg-slate-800/95 dark:bg-slate-700/95 text-white text-sm px-4 py-3 rounded-xl shadow-2xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600 max-w-md mx-4 backdrop-blur-sm">
+        {text}
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -2385,10 +2373,6 @@ function App() {
           </a>
         )}
 
-        {/* 智能描述悬浮提示 - 自动感知边缘位置，避免被裁切 */}
-        {link.description && !isBatchEditMode && (
-          <SmartTooltip text={link.description} />
-        )}
 
         {/* 离线状态下的快速重试按钮 */}
         {!isBatchEditMode && isOfflineLink && (
