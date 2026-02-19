@@ -202,13 +202,26 @@ function App() {
           testUrl = 'https://' + testUrl;
         }
         
+        // 使用 GET 请求与单个检测保持一致
         const response = await fetch(`/api/link?url=${encodeURIComponent(testUrl)}&check=true`, {
-          method: 'HEAD',
-          signal: AbortSignal.timeout(8000)
+          method: 'GET',
+          signal: AbortSignal.timeout(15000) // 15秒超时，与单个检测一致
         });
         
         if (response.ok) {
-          online++;
+          try {
+            const data = await response.json();
+            // 检查详细状态：vpnRequired 和 cloudflare 也算"不可直接访问"
+            if (data.online === false || data.vpnRequired || data.cloudflare) {
+              offline++;
+              offlineLinks.push(link.id);
+            } else {
+              online++;
+            }
+          } catch {
+            // 如果无法解析JSON，但响应OK，认为在线
+            online++;
+          }
         } else {
           offline++;
           offlineLinks.push(link.id);
@@ -2065,23 +2078,15 @@ function App() {
         {/* 自定义多行悬停提示框 - 显示完整描述 */}
         {!isBatchEditMode && link.description && (
           <div 
-            className="fixed left-0 top-0 w-full h-full pointer-events-none opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200"
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200"
             style={{ zIndex: 99999 }}
           >
-            <div 
-              className="absolute pointer-events-none"
-              style={{
-                left: 'var(--tooltip-x, 50%)',
-                bottom: 'var(--tooltip-y, 100%)',
-              }}
-            >
-              <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg shadow-xl transform -translate-x-1/2 mb-2">
-                <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
-                  {link.description}
-                </div>
-                {/* 三角箭头 */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
+            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg shadow-xl">
+              <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
+                {link.description}
               </div>
+              {/* 三角箭头 */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
             </div>
           </div>
         )}
