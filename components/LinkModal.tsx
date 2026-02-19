@@ -496,24 +496,34 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                   <div key={urlItem.id} className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 space-y-2">
                     <div className="flex gap-2">
                       <div className="relative w-24">
-                        <input
-                          type="text"
-                          value={urlItem.label}
-                          onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
-                          className="w-full px-2 py-1 pr-6 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
-                          placeholder="标签"
-                          list={`label-options-${urlItem.id}`}
-                        />
-                        <datalist id={`label-options-${urlItem.id}`}>
-                          <option value="主站" />
-                          <option value="备用站" />
-                          <option value="镜像站" />
-                          <option value="发布页" />
-                          <option value="官网" />
-                          <option value="下载页" />
-                          <option value="文档" />
-                          <option value="API" />
-                        </datalist>
+                        <select
+                          value={['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'].includes(urlItem.label) ? urlItem.label : '自定义'}
+                          onChange={(e) => {
+                            if (e.target.value !== '自定义') {
+                              updateUrlItem(urlItem.id, 'label', e.target.value);
+                            }
+                          }}
+                          className="w-full px-1 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="主站">主站</option>
+                          <option value="备用站">备用站</option>
+                          <option value="镜像站">镜像站</option>
+                          <option value="发布页">发布页</option>
+                          <option value="官网">官网</option>
+                          <option value="下载页">下载页</option>
+                          <option value="文档">文档</option>
+                          <option value="API">API</option>
+                          <option value="自定义">自定义...</option>
+                        </select>
+                        {!['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'].includes(urlItem.label) && (
+                          <input
+                            type="text"
+                            value={urlItem.label}
+                            onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
+                            className="absolute inset-0 w-full px-1 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                            placeholder="自定义标签"
+                          />
+                        )}
                       </div>
                       <input
                         type="text"

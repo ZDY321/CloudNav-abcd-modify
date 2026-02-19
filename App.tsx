@@ -2687,6 +2687,34 @@ function App() {
                                     <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
                                         {displayedLinks.length}
                                     </span>
+                                    {/* 批量检测按钮和状态 */}
+                                    {!isCategoryLocked(selectedCategory) && (
+                                      <>
+                                        {categoryCheckStatus[selectedCategory]?.checking ? (
+                                          <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
+                                            <Loader2 size={10} className="animate-spin" />
+                                            检测中 {categoryCheckStatus[selectedCategory].online + categoryCheckStatus[selectedCategory].offline}/{categoryCheckStatus[selectedCategory].total}
+                                          </span>
+                                        ) : categoryCheckStatus[selectedCategory] ? (
+                                          <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700">
+                                            <Wifi size={10} className="text-green-500" />
+                                            <span className="text-green-600">{categoryCheckStatus[selectedCategory].online}</span>
+                                            <span className="text-slate-400">/</span>
+                                            <WifiOff size={10} className="text-red-500" />
+                                            <span className="text-red-600">{categoryCheckStatus[selectedCategory].offline}</span>
+                                          </span>
+                                        ) : null}
+                                        <button
+                                          onClick={() => checkCategoryAvailability(selectedCategory)}
+                                          disabled={categoryCheckStatus[selectedCategory]?.checking}
+                                          className="flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
+                                          title="批量检测可用性"
+                                        >
+                                          <Globe size={10} />
+                                          检测
+                                        </button>
+                                      </>
+                                    )}
                                 </>
                             )
                          }
