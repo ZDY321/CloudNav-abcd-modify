@@ -2115,8 +2115,8 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     
-    // 检查是否是检测失败的链接
-    const isOfflineLink = categoryCheckStatus[selectedCategory]?.offlineLinks?.includes(link.id);
+    // 检查是否是检测失败的链接（使用link.categoryId而非selectedCategory，确保search results区域也能正确显示）
+    const isOfflineLink = categoryCheckStatus[link.categoryId]?.offlineLinks?.includes(link.id);
     
     // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
     const getDefaultUrl = () => {
@@ -2188,6 +2188,7 @@ function App() {
             href={targetUrl}
             target="_blank"
             rel="noopener noreferrer"
+            title={!isDetailedView && link.description ? link.description : undefined}
             className={`flex flex-1 min-w-0 ${
               isDetailedView ? 'flex-col' : 'items-center overflow-hidden h-full'
             }`}
@@ -2209,7 +2210,7 @@ function App() {
                 </h3>
             </div>
             
-            {/* 第二行：描述文字 - 使用title属性作为悬停提示 */}
+            {/* 第二行：描述文字（仅详情视图显示）- 使用title属性作为完整内容悬停提示 */}
             {isDetailedView && link.description && (
               <p
                 className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 w-full"
