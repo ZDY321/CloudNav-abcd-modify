@@ -182,6 +182,8 @@ function App() {
   
   // 分类可用性检测状态
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
+  // 单独检测结果：linkId -> true(在线)/false(离线)，优先级高于批量检测结果
+  const [linkCheckResults, setLinkCheckResults] = useState<Record<string, boolean>>({});
   
   // 并发限制常量
   const CONCURRENT_LIMIT = 5;
@@ -450,6 +452,9 @@ function App() {
       }
       
       const isOnline = await checkUrlWithLocalNetwork(testUrl);
+
+      // 立即记录单独检测结果（优先级高于批量检测），确保卡片样式立刻更新
+      setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
       
       // 更新分类检测状态 - 在函数内部检查之前的状态以确保使用最新值
       setCategoryCheckStatus(prev => {
@@ -2115,8 +2120,11 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     
-    // 检查是否是检测失败的链接（使用link.categoryId而非selectedCategory，确保search results区域也能正确显示）
-    const isOfflineLink = categoryCheckStatus[link.categoryId]?.offlineLinks?.includes(link.id);
+    // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
+    const individualResult = linkCheckResults[link.id];
+    const isOfflineLink = individualResult !== undefined
+      ? !individualResult  // 单独检测有结果：true=在线->非离线, false=离线->是离线
+      : (categoryCheckStatus[link.categoryId]?.offlineLinks?.includes(link.id) ?? false);
     
     // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
     const getDefaultUrl = () => {
@@ -2222,7 +2230,14 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述（使用title属性作为简单方案） */}
+        {/* 描述悬浮提示 - 简约视图和详情视图超长描述均适用，鼠标悬停时显示在卡片下方 */}
+        {link.description && !isBatchEditMode && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl break-words leading-relaxed whitespace-pre-wrap">
+              {link.description}
+            </div>
+          </div>
+        )}
 
         {/* Hover Actions (Absolute Right) - 在批量编辑模式下隐藏 */}
         {!isBatchEditMode && (
