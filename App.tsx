@@ -133,56 +133,31 @@ const PortalTooltip = ({
   );
 };
 
-// --- 旧版智能描述提示框组件 (保留作为备用) ---
-// 自动检测边缘位置，避免提示框被裁切
+// --- 屏幕中央描述提示框组件 ---
+// 将提示框显示在屏幕正中央，使用 Portal 彻底解决遮挡问题
 const SmartTooltip = ({ text, parentRef }: { text: string; parentRef?: React.RefObject<HTMLElement> }) => {
-  const [positionClass, setPositionClass] = useState("left-1/2 -translate-x-1/2 top-full mt-2");
+  const [isVisible, setIsVisible] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const adjustPosition = () => {
-    const el = tooltipRef.current;
-    if (!el) return;
-
-    // 获取父元素(卡片)的位置信息
-    const parentRect = el.parentElement?.getBoundingClientRect();
-    if (!parentRect) return;
-
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight;
-    
-    // 阈值设置
-    const safeRight = 300; // 如果距离右边小于300px
-    const safeBottom = 150; // 如果距离底部小于150px
-    const safeLeft = 100;
-
-    let hClass = "left-1/2 -translate-x-1/2"; // 默认水平居中
-    let vClass = "top-full mt-2";             // 默认在下方
-
-    // 水平方向判断
-    if (screenW - parentRect.right < safeRight) {
-      hClass = "right-0"; // 靠右对齐
-    } else if (parentRect.left < safeLeft) {
-      hClass = "left-0";  // 靠左对齐
-    }
-
-    // 垂直方向判断
-    if (screenH - parentRect.bottom < safeBottom) {
-      vClass = "bottom-full mb-2"; // 显示在上方
-    }
-
-    setPositionClass(`${hClass} ${vClass}`);
-  };
-
   return (
-    <div 
-      ref={tooltipRef}
-      onMouseEnter={adjustPosition} // 鼠标进入时计算一次位置
-      className={`absolute z-[999] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 w-72 max-w-[90vw] ${positionClass}`}
-    >
-      <div className="bg-slate-800 dark:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600">
-        {text}
-      </div>
-    </div>
+    <>
+      {/* 悬停触发区域 - 透明层覆盖在卡片上 */}
+      <div 
+        ref={tooltipRef}
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        className="absolute inset-0 z-10"
+      />
+      {/* 使用 Portal 将提示框渲染到 body，显示在屏幕正中央 */}
+      {isVisible && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+          <div className="bg-slate-800/95 dark:bg-slate-700/95 text-white text-sm px-4 py-3 rounded-xl shadow-2xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600 max-w-md mx-4 backdrop-blur-sm animate-fade-in">
+            {text}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
 
