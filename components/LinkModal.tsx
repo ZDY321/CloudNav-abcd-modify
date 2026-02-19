@@ -226,7 +226,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     const newUrlItem: UrlItem = {
       id: Date.now().toString(),
       url: '',
-      label: urls.length === 0 ? '主站' : `备用站${urls.length}`,
+      label: urls.length === 0 ? '主站' : '备用站',
       isDefault: urls.length === 0, // 第一个网址默认为默认
       status: 'unknown'
     };

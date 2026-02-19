@@ -455,7 +455,7 @@ function App() {
       setCategoryCheckStatus(prev => {
         const currentStatus = prev[categoryId];
         
-        // 如果该分类还没有检测过，创建一个新的检测状态
+        // 如果该分类还没有检测过，创建初始状态
         if (!currentStatus) {
           return {
             ...prev,
@@ -469,49 +469,33 @@ function App() {
           };
         }
         
-        // 在这里检查之前的状态，使用prev中的最新数据
-        const wasOffline = currentStatus.offlineLinks?.includes(link.id) ?? false;
-        const wasOnline = !wasOffline && currentStatus.total > 0;
+        // 使用 prev 中的最新数据判断该链接之前的状态
+        const wasOffline = currentStatus.offlineLinks.includes(link.id);
         
         let newOnline = currentStatus.online;
         let newOffline = currentStatus.offline;
         let newOfflineLinks = [...currentStatus.offlineLinks];
         
-        if (isOnline) {
-          // 链接现在可用
-          if (wasOffline) {
-            // 之前是离线的，现在在线了
-            newOnline++;
-            newOffline--;
-            newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
-          }
-          // 如果之前就是在线的，不需要改变
-        } else {
-          // 链接现在不可用
-          if (!wasOffline) {
-            // 之前是在线的（或未被检测过但属于该分类），现在离线了
-            if (wasOnline || currentStatus.total === currentStatus.online + currentStatus.offline) {
-              // 只有当链接之前被统计为在线时才减少在线数
-              if (!newOfflineLinks.includes(link.id)) {
-                newOnline = Math.max(0, newOnline - 1);
-                newOffline++;
-                newOfflineLinks.push(link.id);
-              }
-            } else if (!newOfflineLinks.includes(link.id)) {
-              // 链接之前未被检测过
-              newOffline++;
-              newOfflineLinks.push(link.id);
-            }
-          }
-          // 如果之前就是离线的，不需要改变
+        if (isOnline && wasOffline) {
+          // 之前离线 → 现在在线：online+1, offline-1, 从 offlineLinks 中移除
+          newOnline++;
+          newOffline--;
+          newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
+        } else if (!isOnline && !wasOffline) {
+          // 之前在线（或未检测过）→ 现在离线：offline+1, online-1, 加入 offlineLinks
+          newOffline++;
+          if (newOnline > 0) newOnline--;
+          newOfflineLinks.push(link.id);
         }
+        // isOnline && !wasOffline → 之前在线，现在还是在线，无变化
+        // !isOnline && wasOffline → 之前离线，现在还是离线，无变化
         
         return {
           ...prev,
           [categoryId]: {
             ...currentStatus,
-            online: newOnline,
-            offline: newOffline,
+            online: Math.max(0, newOnline),
+            offline: Math.max(0, newOffline),
             offlineLinks: newOfflineLinks
           }
         };
@@ -2189,13 +2173,14 @@ function App() {
               </h3>
             </div>
             
-            {/* 第二行：描述文字 - 使用Tooltip显示完整描述 */}
+            {/* 第二行：描述文字 - 使用title属性作为悬停提示 */}
             {isDetailedView && link.description && (
-              <Tooltip content={link.description} className="w-full">
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 cursor-default">
-                  {link.description}
-                </p>
-              </Tooltip>
+              <p
+                className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 cursor-default w-full"
+                title={link.description}
+              >
+                {link.description}
+              </p>
             )}
           </div>
         ) : (
@@ -2224,14 +2209,15 @@ function App() {
                 </h3>
             </div>
             
-            {/* 第二行：描述文字 - 使用Tooltip显示完整描述 */}
-              {isDetailedView && link.description && (
-                <Tooltip content={link.description} className="w-full">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 cursor-default">
-                    {link.description}
-                  </p>
-                </Tooltip>
-              )}
+            {/* 第二行：描述文字 - 使用title属性作为悬停提示 */}
+            {isDetailedView && link.description && (
+              <p
+                className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 w-full"
+                title={link.description}
+              >
+                {link.description}
+              </p>
+            )}
           </a>
         )}
 
