@@ -183,43 +183,33 @@ function App() {
   // 分类可用性检测状态
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   
-  // 使用用户本地网络检测单个URL的连通性
+  // 使用后端API检测单个URL的连通性（更准确可靠）
   const checkUrlWithLocalNetwork = async (url: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      // 方法1：使用 img 标签加载 favicon（最可靠的跨域检测方式）
-      const img = new Image();
-      const timeoutId = setTimeout(() => {
-        img.onload = null;
-        img.onerror = null;
-        resolve(false);
-      }, 8000); // 8秒超时
-      
-      img.onload = () => {
-        clearTimeout(timeoutId);
-        resolve(true);
-      };
-      
-      img.onerror = () => {
-        clearTimeout(timeoutId);
-        // favicon 加载失败，尝试使用 fetch with no-cors 作为备用方案
-        fetch(url, { 
-          method: 'HEAD', 
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(5000)
-        })
-        .then(() => resolve(true)) // no-cors 模式下，只要没抛出异常就认为成功
-        .catch(() => resolve(false));
-      };
-      
-      // 尝试加载网站的 favicon
-      try {
-        const urlObj = new URL(url);
-        img.src = `${urlObj.origin}/favicon.ico?_t=${Date.now()}`;
-      } catch {
-        clearTimeout(timeoutId);
-        resolve(false);
+    try {
+      // 确保URL有协议前缀
+      let testUrl = url;
+      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+        testUrl = 'https://' + testUrl;
       }
-    });
+      
+      // 调用后端API进行真正的HTTP请求检测
+      const response = await fetch(`/api/link?check=true&url=${encodeURIComponent(testUrl)}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(15000) // 15秒超时
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // 检查返回的online状态
+        return data.online === true;
+      }
+      
+      // 如果API请求失败，返回false
+      return false;
+    } catch (error) {
+      console.error('URL检测失败:', error);
+      return false;
+    }
   };
 
   // 批量检测分类下所有网站可用性（使用用户本地网络）
