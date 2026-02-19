@@ -180,7 +180,46 @@ function App() {
   // 分类可用性检测状态
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   
-  // 批量检测分类下所有网站可用性
+  // 使用用户本地网络检测单个URL的连通性
+  const checkUrlWithLocalNetwork = async (url: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      // 方法1：使用 img 标签加载 favicon（最可靠的跨域检测方式）
+      const img = new Image();
+      const timeoutId = setTimeout(() => {
+        img.onload = null;
+        img.onerror = null;
+        resolve(false);
+      }, 8000); // 8秒超时
+      
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        resolve(true);
+      };
+      
+      img.onerror = () => {
+        clearTimeout(timeoutId);
+        // favicon 加载失败，尝试使用 fetch with no-cors 作为备用方案
+        fetch(url, { 
+          method: 'HEAD', 
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(5000)
+        })
+        .then(() => resolve(true)) // no-cors 模式下，只要没抛出异常就认为成功
+        .catch(() => resolve(false));
+      };
+      
+      // 尝试加载网站的 favicon
+      try {
+        const urlObj = new URL(url);
+        img.src = `${urlObj.origin}/favicon.ico?_t=${Date.now()}`;
+      } catch {
+        clearTimeout(timeoutId);
+        resolve(false);
+      }
+    });
+  };
+
+  // 批量检测分类下所有网站可用性（使用用户本地网络）
   const checkCategoryAvailability = async (categoryId: string) => {
     const categoryLinks = links.filter(l => l.categoryId === categoryId && !isCategoryLocked(l.categoryId));
     if (categoryLinks.length === 0) return;
@@ -196,32 +235,17 @@ function App() {
     
     for (const link of categoryLinks) {
       try {
-        // 只检测主URL，不检测备用网址（因为批量检测主要是快速检测可用性）
+        // 只检测主URL，不检测备用网址
         let testUrl = link.url;
         if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
           testUrl = 'https://' + testUrl;
         }
         
-        // 使用 GET 请求与单个检测保持一致
-        const response = await fetch(`/api/link?url=${encodeURIComponent(testUrl)}&check=true`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(15000) // 15秒超时，与单个检测一致
-        });
+        // 使用用户本地网络进行检测
+        const isOnline = await checkUrlWithLocalNetwork(testUrl);
         
-        if (response.ok) {
-          try {
-            const data = await response.json();
-            // 检查详细状态：vpnRequired 和 cloudflare 也算"不可直接访问"
-            if (data.online === false || data.vpnRequired || data.cloudflare) {
-              offline++;
-              offlineLinks.push(link.id);
-            } else {
-              online++;
-            }
-          } catch {
-            // 如果无法解析JSON，但响应OK，认为在线
-            online++;
-          }
+        if (isOnline) {
+          online++;
         } else {
           offline++;
           offlineLinks.push(link.id);
@@ -2075,21 +2099,7 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 */}
-        {!isBatchEditMode && link.description && (
-          <div 
-            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200"
-            style={{ zIndex: 99999 }}
-          >
-            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg shadow-xl">
-              <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
-                {link.description}
-              </div>
-              {/* 三角箭头 */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-            </div>
-          </div>
-        )}
+        {/* 自定义多行悬停提示框 - 显示完整描述（使用title属性作为简单方案） */}
 
         {/* Hover Actions (Absolute Right) - 在批量编辑模式下隐藏 */}
         {!isBatchEditMode && (
