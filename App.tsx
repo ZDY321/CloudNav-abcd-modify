@@ -178,7 +178,7 @@ function App() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // 分类可用性检测状态
-  const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number }>>({});
+  const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   
   // 批量检测分类下所有网站可用性
   const checkCategoryAvailability = async (categoryId: string) => {
@@ -187,14 +187,16 @@ function App() {
     
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [categoryId]: { checking: true, online: 0, offline: 0, total: categoryLinks.length }
+      [categoryId]: { checking: true, online: 0, offline: 0, total: categoryLinks.length, offlineLinks: [] }
     }));
     
     let online = 0;
     let offline = 0;
+    const offlineLinks: string[] = [];
     
     for (const link of categoryLinks) {
       try {
+        // 只检测主URL，不检测备用网址（因为批量检测主要是快速检测可用性）
         let testUrl = link.url;
         if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
           testUrl = 'https://' + testUrl;
@@ -209,22 +211,24 @@ function App() {
           online++;
         } else {
           offline++;
+          offlineLinks.push(link.id);
         }
       } catch (error) {
         offline++;
+        offlineLinks.push(link.id);
       }
       
       // 实时更新进度
       setCategoryCheckStatus(prev => ({
         ...prev,
-        [categoryId]: { checking: true, online, offline, total: categoryLinks.length }
+        [categoryId]: { checking: true, online, offline, total: categoryLinks.length, offlineLinks: [...offlineLinks] }
       }));
     }
     
     // 检测完成
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [categoryId]: { checking: false, online, offline, total: categoryLinks.length }
+      [categoryId]: { checking: false, online, offline, total: categoryLinks.length, offlineLinks }
     }));
   };
   
@@ -1958,6 +1962,9 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     
+    // 检查是否是检测失败的链接
+    const isOfflineLink = categoryCheckStatus[selectedCategory]?.offlineLinks?.includes(link.id);
+    
     // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
     const getDefaultUrl = () => {
       if (link.urls && link.urls.length > 0) {
@@ -1973,14 +1980,20 @@ function App() {
     return (
       <div
         key={link.id}
-        className={`group relative transition-all duration-200 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-blue-900/20 ${
+        className={`group relative transition-all duration-200 hover:shadow-lg ${
+          isOfflineLink 
+            ? 'hover:shadow-red-100/50 dark:hover:shadow-red-900/20' 
+            : 'hover:shadow-blue-100/50 dark:hover:shadow-blue-900/20'
+        } ${
           isSelected 
             ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800' 
-            : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
+            : isOfflineLink
+              ? 'bg-red-50/50 dark:bg-red-900/20 border-red-300 dark:border-red-700 hover:bg-red-100/50 dark:hover:bg-red-900/30'
+              : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
         } ${isBatchEditMode ? 'cursor-pointer' : ''} ${
           isDetailedView 
-            ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-blue-400 dark:hover:border-blue-500' 
-            : 'flex items-center justify-between rounded-xl border shadow-sm p-3 hover:border-blue-300 dark:hover:border-blue-600'
+            ? `flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
+            : `flex items-center justify-between rounded-xl border shadow-sm p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
         }`}
         onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
         onContextMenu={(e) => handleContextMenu(e, link)}
@@ -2049,16 +2062,18 @@ function App() {
           </a>
         )}
 
-        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用absolute定位相对于卡片 */}
+        {/* 自定义多行悬停提示框 - 显示完整描述 - 使用fixed定位避免被侧边栏遮挡 */}
         {!isBatchEditMode && (link.description || link.title) && (
           <div 
-            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 z-[9999] pointer-events-none shadow-xl"
+            className="absolute left-0 right-0 bottom-full mb-2 flex justify-center pointer-events-none z-[9999]"
           >
-            <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
-              {link.description || link.title}
+            <div className="relative w-max max-w-[280px] bg-slate-900 dark:bg-slate-700 text-white text-xs p-3 rounded-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all duration-200 shadow-xl ml-auto mr-auto">
+              <div className="whitespace-pre-wrap break-words leading-relaxed max-h-[200px] overflow-y-auto">
+                {link.description || link.title}
+              </div>
+              {/* 三角箭头 */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
             </div>
-            {/* 三角箭头 */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-slate-900 dark:border-t-slate-700"></div>
           </div>
         )}
 

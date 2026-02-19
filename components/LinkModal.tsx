@@ -31,6 +31,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   // 多网址相关状态
   const [urls, setUrls] = useState<UrlItem[]>([]);
   const [showMultiUrl, setShowMultiUrl] = useState(false);
+  const [customLabelId, setCustomLabelId] = useState<string | null>(null); // 正在编辑自定义标签的URL ID
   
   // 获取当前选中的分类对象
   const currentCategory = categories.find(cat => cat.id === categoryId);
@@ -492,37 +493,55 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                     检测所有
                   </button>
                 </div>
-                {urls.map((urlItem, index) => (
+                {urls.map((urlItem, index) => {
+                  const predefinedLabels = ['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
+                  const isCustomLabel = !predefinedLabels.includes(urlItem.label) || customLabelId === urlItem.id;
+                  
+                  return (
                   <div key={urlItem.id} className="p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 space-y-2">
                     <div className="flex gap-2">
                       <div className="relative w-24">
-                        <select
-                          value={['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'].includes(urlItem.label) ? urlItem.label : '自定义'}
-                          onChange={(e) => {
-                            if (e.target.value !== '自定义') {
-                              updateUrlItem(urlItem.id, 'label', e.target.value);
-                            }
-                          }}
-                          className="w-full px-1 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="主站">主站</option>
-                          <option value="备用站">备用站</option>
-                          <option value="镜像站">镜像站</option>
-                          <option value="发布页">发布页</option>
-                          <option value="官网">官网</option>
-                          <option value="下载页">下载页</option>
-                          <option value="文档">文档</option>
-                          <option value="API">API</option>
-                          <option value="自定义">自定义...</option>
-                        </select>
-                        {!['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'].includes(urlItem.label) && (
+                        {isCustomLabel ? (
                           <input
                             type="text"
                             value={urlItem.label}
                             onChange={(e) => updateUrlItem(urlItem.id, 'label', e.target.value)}
-                            className="absolute inset-0 w-full px-1 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
-                            placeholder="自定义标签"
+                            onBlur={() => {
+                              // 如果输入为空或是预定义标签，退出自定义模式
+                              if (!urlItem.label.trim()) {
+                                updateUrlItem(urlItem.id, 'label', '备用站');
+                                setCustomLabelId(null);
+                              } else if (predefinedLabels.includes(urlItem.label)) {
+                                setCustomLabelId(null);
+                              }
+                            }}
+                            autoFocus={customLabelId === urlItem.id}
+                            className="w-full px-1 py-1 text-xs rounded border border-blue-400 dark:border-blue-500 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                            placeholder="输入自定义标签"
                           />
+                        ) : (
+                          <select
+                            value={urlItem.label}
+                            onChange={(e) => {
+                              if (e.target.value === '自定义') {
+                                setCustomLabelId(urlItem.id);
+                                updateUrlItem(urlItem.id, 'label', '');
+                              } else {
+                                updateUrlItem(urlItem.id, 'label', e.target.value);
+                              }
+                            }}
+                            className="w-full px-1 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="主站">主站</option>
+                            <option value="备用站">备用站</option>
+                            <option value="镜像站">镜像站</option>
+                            <option value="发布页">发布页</option>
+                            <option value="官网">官网</option>
+                            <option value="下载页">下载页</option>
+                            <option value="文档">文档</option>
+                            <option value="API">API</option>
+                            <option value="自定义">自定义...</option>
+                          </select>
                         )}
                       </div>
                       <input
@@ -577,7 +596,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
