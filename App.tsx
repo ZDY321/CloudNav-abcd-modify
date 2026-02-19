@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
@@ -40,7 +41,99 @@ import ContextMenu from './components/ContextMenu';
 import QRCodeModal from './components/QRCodeModal';
 import Tooltip from './components/Tooltip';
 
-// --- 智能描述提示框组件 ---
+// --- 智能传送门提示框组件 ---
+// 解决所有遮挡问题的终极方案：将元素渲染到 body 根节点，脱离原有文档流
+const PortalTooltip = ({ 
+  content, 
+  visible, 
+  parentRef 
+}: { 
+  content: string; 
+  visible: boolean; 
+  parentRef: React.RefObject<HTMLElement | null>;
+}) => {
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
+  
+  useEffect(() => {
+    if (visible && parentRef.current) {
+      const updatePosition = () => {
+        const rect = parentRef.current!.getBoundingClientRect();
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        const tooltipW = 300; // 预设最大宽度
+        const tooltipH = 100; // 预估高度
+        const gap = 10; // 间距
+
+        let top = 0;
+        let left = 0;
+
+        // 1. 垂直定位逻辑：默认在下方，如果底部空间不足则翻转到上方
+        if (rect.bottom + tooltipH + gap > screenH) {
+          // 翻转到上方
+          top = rect.top - gap; 
+          // 此时需要配合 CSS transform: translateY(-100%) 实现向上对齐
+        } else {
+          // 显示在下方
+          top = rect.bottom + gap;
+        }
+
+        // 2. 水平定位逻辑：默认居中
+        left = rect.left + rect.width / 2;
+
+        // 检查右边缘
+        if (left + tooltipW / 2 > screenW) {
+          left = screenW - tooltipW / 2 - 20; // 靠右贴边，留出20px安全距离
+        }
+        // 检查左边缘
+        if (left - tooltipW / 2 < 0) {
+          left = tooltipW / 2 + 20; // 靠左贴边
+        }
+
+        // 决定是否向上翻转的样式标记
+        const isFlipped = rect.bottom + tooltipH + gap > screenH;
+
+        setStyle({
+          position: 'fixed',
+          top: `${top}px`,
+          left: `${left}px`,
+          transform: `translateX(-50%) ${isFlipped ? 'translateY(-100%)' : ''}`,
+          zIndex: 9999,
+          opacity: 1,
+          maxWidth: '90vw',
+          width: '300px'
+        });
+      };
+
+      updatePosition();
+      // 监听滚动和调整大小，保持位置准确
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setStyle(prev => ({ ...prev, opacity: 0 }));
+    }
+  }, [visible, parentRef]);
+
+  if (!visible) return null;
+
+  return createPortal(
+    <div 
+      style={style} 
+      className="pointer-events-none transition-opacity duration-200"
+    >
+      <div className="bg-slate-800 dark:bg-slate-700 text-slate-50 border border-slate-600 px-3 py-2 rounded-lg shadow-2xl text-xs leading-relaxed break-words whitespace-pre-wrap">
+        {content}
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// --- 旧版智能描述提示框组件 (保留作为备用) ---
 // 自动检测边缘位置，避免提示框被裁切
 const SmartTooltip = ({ text, parentRef }: { text: string; parentRef?: React.RefObject<HTMLElement> }) => {
   const [positionClass, setPositionClass] = useState("left-1/2 -translate-x-1/2 top-full mt-2");
