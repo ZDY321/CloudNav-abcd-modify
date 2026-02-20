@@ -295,6 +295,8 @@ function App() {
   const [linkCheckResults, setLinkCheckResults] = useState<Record<string, boolean>>({});
   // 正在检测中的链接ID集合
   const [checkingLinkIds, setCheckingLinkIds] = useState<Set<string>>(new Set());
+  // 全站查重标注：linkId -> 颜色与分组信息
+  const [duplicateHighlights, setDuplicateHighlights] = useState<Record<string, { color: string; groupKey: string; groupSize: number }>>({});
 
   const normalizeUrlForDuplicate = (rawUrl: string): string => {
     if (!rawUrl) return '';
@@ -328,6 +330,10 @@ function App() {
   };
 
   const checkAllDuplicateUrls = () => {
+    const duplicateColorPalette = [
+      '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
+      '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'
+    ];
     const urlGroups = new Map<string, LinkItem[]>();
 
     links.forEach(link => {
@@ -349,9 +355,23 @@ function App() {
       .sort((a, b) => b[1].length - a[1].length);
 
     if (duplicateGroups.length === 0) {
+      setDuplicateHighlights({});
       alert(`未发现重复网址（已扫描 ${links.length} 个网站）`);
       return;
     }
+
+    const nextHighlights: Record<string, { color: string; groupKey: string; groupSize: number }> = {};
+    duplicateGroups.forEach(([groupKey, groupedLinks], index) => {
+      const color = duplicateColorPalette[index % duplicateColorPalette.length];
+      groupedLinks.forEach(link => {
+        const current = nextHighlights[link.id];
+        // 如果一个卡片命中多个重复组，优先展示规模更大的那组颜色
+        if (!current || groupedLinks.length > current.groupSize) {
+          nextHighlights[link.id] = { color, groupKey, groupSize: groupedLinks.length };
+        }
+      });
+    });
+    setDuplicateHighlights(nextHighlights);
 
     const involvedLinkIds = new Set<string>();
     duplicateGroups.forEach(([, groupedLinks]) => groupedLinks.forEach(link => involvedLinkIds.add(link.id)));
@@ -369,7 +389,8 @@ function App() {
     }).join('\n');
 
     alert(
-      `发现 ${duplicateGroups.length} 组重复网址，涉及 ${involvedLinkIds.size} 个网站：\n\n` +
+      `发现 ${duplicateGroups.length} 组重复网址，涉及 ${involvedLinkIds.size} 个网站。\n` +
+      `已对重复卡片进行同组同色标注。\n\n` +
       `${preview}` +
       `${duplicateGroups.length > 10 ? `\n\n... 另有 ${duplicateGroups.length - 10} 组` : ''}`
     );
@@ -441,6 +462,11 @@ function App() {
   const resetAllSingleCheckResults = () => {
     setLinkCheckResults({});
   };
+
+  // 数据发生变化后清除旧的查重标注，避免展示过期颜色
+  useEffect(() => {
+    setDuplicateHighlights({});
+  }, [links]);
   
   // 并发限制常量
   const CONCURRENT_LIMIT = 5;
@@ -2320,12 +2346,17 @@ function App() {
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
+    const duplicateInfo = duplicateHighlights[link.id];
     
     const style = {
       transform: CSS.Transform.toString(transform),
       transition: isDragging ? 'none' : transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 'auto',
+      ...(duplicateInfo ? {
+        borderColor: duplicateInfo.color,
+        boxShadow: `0 0 0 1px ${duplicateInfo.color}`
+      } : {})
     };
 
     return (
@@ -2336,7 +2367,7 @@ function App() {
           isSortingMode || isSortingPinned
             ? 'bg-green-20 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-        } ${isDragging ? 'shadow-2xl scale-105' : ''} ${
+        } ${isDragging ? 'shadow-2xl scale-105' : ''} ${duplicateInfo ? 'border-2' : ''} ${
           isDetailedView 
             ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-green-400 dark:hover:border-green-500' 
             : 'flex items-center rounded-xl border shadow-sm hover:border-green-300 dark:hover:border-green-600'
@@ -2344,6 +2375,15 @@ function App() {
         {...attributes}
         {...listeners}
       >
+        {duplicateInfo && (
+          <div
+            className="absolute left-2 top-2 z-20 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white shadow-sm"
+            style={{ backgroundColor: duplicateInfo.color }}
+            title={`重复组: ${duplicateInfo.groupKey}（${duplicateInfo.groupSize}项）`}
+          >
+            重复
+          </div>
+        )}
         {/* 链接内容 - 移除a标签，改为div防止点击跳转 */}
         <div className={`flex flex-1 min-w-0 overflow-hidden ${
           isDetailedView ? 'flex-col' : 'items-center gap-3'
@@ -2383,6 +2423,7 @@ function App() {
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
+    const duplicateInfo = duplicateHighlights[link.id];
     
     // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
     const individualResult = linkCheckResults[link.id];
@@ -2401,10 +2442,14 @@ function App() {
       return link.url;
     };
     const targetUrl = getDefaultUrl();
-    
+
     return (
-      <div
+      <Tooltip
         key={link.id}
+        content={!isBatchEditMode ? (link.description || '') : ''}
+        className="block w-full"
+      >
+      <div
         className={`group relative transition-all duration-200 hover:shadow-lg ${
           isOfflineLink 
             ? 'hover:shadow-red-100/50 dark:hover:shadow-red-900/20' 
@@ -2415,14 +2460,27 @@ function App() {
             : isOfflineLink
               ? 'bg-red-50/50 dark:bg-red-900/20 border-red-300 dark:border-red-700 hover:bg-red-100/50 dark:hover:bg-red-900/30'
               : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
-        } ${isBatchEditMode ? 'cursor-pointer' : ''} ${
+        } ${isBatchEditMode ? 'cursor-pointer' : ''} ${duplicateInfo ? 'border-2' : ''} ${
           isDetailedView 
             ? `flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
             : `flex items-center justify-between rounded-xl border shadow-sm p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
         }`}
+        style={duplicateInfo ? {
+          borderColor: duplicateInfo.color,
+          boxShadow: `0 0 0 1px ${duplicateInfo.color}`
+        } : undefined}
         onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
         onContextMenu={(e) => handleContextMenu(e, link)}
       >
+        {duplicateInfo && (
+          <div
+            className="absolute left-2 top-2 z-20 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white shadow-sm"
+            style={{ backgroundColor: duplicateInfo.color }}
+            title={`重复组: ${duplicateInfo.groupKey}（${duplicateInfo.groupSize}项）`}
+          >
+            重复
+          </div>
+        )}
         {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
         {isBatchEditMode ? (
           <div className={`flex flex-1 min-w-0 ${
@@ -2460,7 +2518,6 @@ function App() {
             href={targetUrl}
             target="_blank"
             rel="noopener noreferrer"
-            title={!isDetailedView && link.description ? link.description : undefined}
             className={`flex flex-1 min-w-0 ${
               isDetailedView ? 'flex-col' : 'items-center overflow-hidden h-full'
             }`}
@@ -2482,11 +2539,10 @@ function App() {
                 </h3>
             </div>
             
-            {/* 第二行：描述文字（仅详情视图显示）- 使用title属性作为完整内容悬停提示 */}
+            {/* 第二行：描述文字（仅详情视图显示） */}
             {isDetailedView && link.description && (
               <p
                 className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2 w-full"
-                title={link.description}
               >
                 {link.description}
               </p>
@@ -2549,6 +2605,7 @@ function App() {
           </div>
         )}
       </div>
+      </Tooltip>
     );
   };
 
