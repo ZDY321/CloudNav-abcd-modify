@@ -327,6 +327,54 @@ function App() {
     });
   };
 
+  const checkAllDuplicateUrls = () => {
+    const urlGroups = new Map<string, LinkItem[]>();
+
+    links.forEach(link => {
+      const perLinkUniqueUrls = new Set(
+        [link.url, ...(link.urls?.map(u => u.url).filter(Boolean) || [])]
+          .map(normalizeUrlForDuplicate)
+          .filter(Boolean)
+      );
+
+      perLinkUniqueUrls.forEach(normalizedUrl => {
+        const current = urlGroups.get(normalizedUrl) || [];
+        current.push(link);
+        urlGroups.set(normalizedUrl, current);
+      });
+    });
+
+    const duplicateGroups = Array.from(urlGroups.entries())
+      .filter(([, groupedLinks]) => groupedLinks.length > 1)
+      .sort((a, b) => b[1].length - a[1].length);
+
+    if (duplicateGroups.length === 0) {
+      alert(`未发现重复网址（已扫描 ${links.length} 个网站）`);
+      return;
+    }
+
+    const involvedLinkIds = new Set<string>();
+    duplicateGroups.forEach(([, groupedLinks]) => groupedLinks.forEach(link => involvedLinkIds.add(link.id)));
+
+    const preview = duplicateGroups.slice(0, 10).map(([normalizedUrl, groupedLinks], index) => {
+      const linkText = groupedLinks
+        .slice(0, 4)
+        .map(link => {
+          const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
+          return `${link.title}（${categoryName}）`;
+        })
+        .join('、');
+      const remains = groupedLinks.length > 4 ? ` 等 ${groupedLinks.length} 项` : '';
+      return `${index + 1}. ${normalizedUrl}\n   ${linkText}${remains}`;
+    }).join('\n');
+
+    alert(
+      `发现 ${duplicateGroups.length} 组重复网址，涉及 ${involvedLinkIds.size} 个网站：\n\n` +
+      `${preview}` +
+      `${duplicateGroups.length > 10 ? `\n\n... 另有 ${duplicateGroups.length - 10} 组` : ''}`
+    );
+  };
+
   const applySingleCheckResult = (link: LinkItem, isOnline: boolean) => {
     const categoryId = link.categoryId;
     setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
@@ -3181,90 +3229,100 @@ function App() {
                             )
                          }
                      </h2>
-                     {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && (
-                         isSortingMode === selectedCategory ? (
-                             <div className="flex gap-2">
-                                 <button 
-                                     onClick={saveSorting}
-                                     className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
-                                     title="保存顺序"
-                                 >
-                                     <Save size={14} />
-                                     <span>保存顺序</span>
-                                 </button>
-                                 <button 
-                                     onClick={cancelSorting}
-                                     className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
-                                     title="取消排序"
-                                 >
-                                     取消
-                                 </button>
-                             </div>
-                         ) : (
-                             <div className="flex gap-2">
-                                 <button 
-                                     onClick={toggleBatchEditMode}
-                                     className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors ${
-                                         isBatchEditMode 
-                                             ? 'bg-red-600 hover:bg-red-700' 
-                                             : 'bg-blue-600 hover:bg-blue-700'
-                                     }`}
-                                     title={isBatchEditMode ? "退出批量编辑" : "批量编辑"}
-                                 >
-                                     {isBatchEditMode ? '取消' : '批量编辑'}
-                                 </button>
-                                 {isBatchEditMode ? (
-                                     <>
-                                         <button 
-                                             onClick={handleBatchDelete}
-                                             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-full transition-colors"
-                                             title="批量删除"
-                                         >
-                                             <Trash2 size={14} />
-                                             <span>批量删除</span>
-                                         </button>
-                                         <button 
-                                             onClick={handleSelectAll}
-                                             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
-                                             title="全选/取消全选"
-                                         >
-                                             <CheckSquare size={14} />
-                                             <span>{selectedLinks.size === displayedLinks.length ? '取消全选' : '全选'}</span>
-                                         </button>
-                                         <div className="relative group">
-                                              <button 
-                                                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
-                                                  title="批量移动"
-                                              >
-                                                  <Upload size={14} />
-                                                  <span>批量移动</span>
-                                              </button>
-                                              <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                                                  {categories.filter(cat => cat.id !== selectedCategory).map(cat => (
-                                                      <button
-                                                          key={cat.id}
-                                                          onClick={() => handleBatchMove(cat.id)}
-                                                          className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 first:rounded-t-lg last:rounded-b-lg"
-                                                      >
-                                                          {cat.name}
-                                                      </button>
-                                                  ))}
-                                              </div>
-                                          </div>
-                                     </>
-                                 ) : (
+                     <div className="flex gap-2">
+                         <button
+                             onClick={checkAllDuplicateUrls}
+                             className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-full transition-colors"
+                             title="扫描全部分类的主网址和备用网址，显示重复项"
+                         >
+                             <Search size={14} />
+                             <span>全站查重</span>
+                         </button>
+                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && (
+                             isSortingMode === selectedCategory ? (
+                                 <div className="flex gap-2">
                                      <button 
-                                         onClick={() => startSorting(selectedCategory)}
-                                         className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
-                                         title="排序"
+                                         onClick={saveSorting}
+                                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                                         title="保存顺序"
                                      >
-                                         <GripVertical size={14} />
-                                         <span>排序</span>
+                                         <Save size={14} />
+                                         <span>保存顺序</span>
                                      </button>
-                                 )}
-                             </div>
-                         )
-                     )}
+                                     <button 
+                                         onClick={cancelSorting}
+                                         className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                                         title="取消排序"
+                                     >
+                                         取消
+                                     </button>
+                                 </div>
+                             ) : (
+                                 <div className="flex gap-2">
+                                     <button 
+                                         onClick={toggleBatchEditMode}
+                                         className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors ${
+                                             isBatchEditMode 
+                                                 ? 'bg-red-600 hover:bg-red-700' 
+                                                 : 'bg-blue-600 hover:bg-blue-700'
+                                         }`}
+                                         title={isBatchEditMode ? "退出批量编辑" : "批量编辑"}
+                                     >
+                                         {isBatchEditMode ? '取消' : '批量编辑'}
+                                     </button>
+                                     {isBatchEditMode ? (
+                                         <>
+                                             <button 
+                                                 onClick={handleBatchDelete}
+                                                 className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                 title="批量删除"
+                                             >
+                                                 <Trash2 size={14} />
+                                                 <span>批量删除</span>
+                                             </button>
+                                             <button 
+                                                 onClick={handleSelectAll}
+                                                 className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                 title="全选/取消全选"
+                                             >
+                                                 <CheckSquare size={14} />
+                                                 <span>{selectedLinks.size === displayedLinks.length ? '取消全选' : '全选'}</span>
+                                             </button>
+                                             <div className="relative group">
+                                                  <button 
+                                                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                      title="批量移动"
+                                                  >
+                                                      <Upload size={14} />
+                                                      <span>批量移动</span>
+                                                  </button>
+                                                  <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                                      {categories.filter(cat => cat.id !== selectedCategory).map(cat => (
+                                                          <button
+                                                              key={cat.id}
+                                                              onClick={() => handleBatchMove(cat.id)}
+                                                              className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 first:rounded-t-lg last:rounded-b-lg"
+                                                          >
+                                                              {cat.name}
+                                                          </button>
+                                                      ))}
+                                                  </div>
+                                              </div>
+                                         </>
+                                     ) : (
+                                         <button 
+                                             onClick={() => startSorting(selectedCategory)}
+                                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
+                                             title="排序"
+                                         >
+                                             <GripVertical size={14} />
+                                             <span>排序</span>
+                                         </button>
+                                     )}
+                                 </div>
+                             )
+                         )}
+                     </div>
                  </div>
 
                  {/* 二级分类标签栏 */}
