@@ -8,13 +8,14 @@ interface LinkModalProps {
   onClose: () => void;
   onSave: (link: Omit<LinkItem, 'id' | 'createdAt'>) => void;
   onDelete?: (id: string) => void;
+  onMainUrlCheckResult?: (linkId: string, isOnline: boolean) => void;
   categories: Category[];
   initialData?: LinkItem;
   aiConfig: AIConfig;
   defaultCategoryId?: string;
 }
 
-const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete, categories, initialData, aiConfig, defaultCategoryId }) => {
+const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete, onMainUrlCheckResult, categories, initialData, aiConfig, defaultCategoryId }) => {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -355,18 +356,27 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
               lastChecked: Date.now(),
               responseTime
             });
+            if (initialData?.id) {
+              onMainUrlCheckResult?.(initialData.id, true);
+            }
           } else if (data.cloudflare) {
             setMainUrlStatus({
               status: 'cloudflare',
               lastChecked: Date.now(),
               responseTime
             });
+            if (initialData?.id) {
+              onMainUrlCheckResult?.(initialData.id, true);
+            }
           } else {
             setMainUrlStatus({
               status: 'online',
               lastChecked: Date.now(),
               responseTime
             });
+            if (initialData?.id) {
+              onMainUrlCheckResult?.(initialData.id, true);
+            }
           }
         } catch {
           setMainUrlStatus({
@@ -374,18 +384,27 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             lastChecked: Date.now(),
             responseTime
           });
+          if (initialData?.id) {
+            onMainUrlCheckResult?.(initialData.id, true);
+          }
         }
       } else {
         setMainUrlStatus({
           status: 'offline',
           lastChecked: Date.now()
         });
+        if (initialData?.id) {
+          onMainUrlCheckResult?.(initialData.id, false);
+        }
       }
     } catch (error) {
       setMainUrlStatus({
         status: 'offline',
         lastChecked: Date.now()
       });
+      if (initialData?.id) {
+        onMainUrlCheckResult?.(initialData.id, false);
+      }
     }
   };
 

@@ -296,6 +296,82 @@ function App() {
   // 正在检测中的链接ID集合
   const [checkingLinkIds, setCheckingLinkIds] = useState<Set<string>>(new Set());
 
+  const normalizeUrlForDuplicate = (rawUrl: string): string => {
+    if (!rawUrl) return '';
+    let normalized = rawUrl.trim();
+    if (!normalized) return '';
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      normalized = `https://${normalized}`;
+    }
+    try {
+      const parsed = new URL(normalized);
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+      return `${host}${pathname}`;
+    } catch {
+      return normalized.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+    }
+  };
+
+  const findDuplicateLinks = (urls: string[], excludeLinkId?: string): LinkItem[] => {
+    const normalizedTargets = new Set(urls.map(normalizeUrlForDuplicate).filter(Boolean));
+    if (normalizedTargets.size === 0) return [];
+
+    return links.filter(link => {
+      if (excludeLinkId && link.id === excludeLinkId) return false;
+      const allUrls = [
+        link.url,
+        ...(link.urls?.map(u => u.url).filter(Boolean) || [])
+      ];
+      return allUrls.some(u => normalizedTargets.has(normalizeUrlForDuplicate(u)));
+    });
+  };
+
+  const applySingleCheckResult = (link: LinkItem, isOnline: boolean) => {
+    const categoryId = link.categoryId;
+    setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
+    setCategoryCheckStatus(prev => {
+      const currentStatus = prev[categoryId];
+      if (!currentStatus) {
+        return {
+          ...prev,
+          [categoryId]: {
+            checking: false,
+            online: isOnline ? 1 : 0,
+            offline: isOnline ? 0 : 1,
+            total: 1,
+            offlineLinks: isOnline ? [] : [link.id]
+          }
+        };
+      }
+
+      const wasOffline = currentStatus.offlineLinks.includes(link.id);
+      let newOnline = currentStatus.online;
+      let newOffline = currentStatus.offline;
+      let newOfflineLinks = [...currentStatus.offlineLinks];
+
+      if (isOnline && wasOffline) {
+        newOnline++;
+        newOffline--;
+        newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
+      } else if (!isOnline && !wasOffline) {
+        newOffline++;
+        if (newOnline > 0) newOnline--;
+        newOfflineLinks.push(link.id);
+      }
+
+      return {
+        ...prev,
+        [categoryId]: {
+          ...currentStatus,
+          online: Math.max(0, newOnline),
+          offline: Math.max(0, newOffline),
+          offlineLinks: newOfflineLinks
+        }
+      };
+    });
+  };
+
   // 单独检测结果重置：按分类重置
   const resetCategorySingleCheckResults = (categoryId: string) => {
     const categoryLinkIds = new Set(
@@ -570,8 +646,6 @@ function App() {
 
   // 1. 提取核心检测逻辑为通用函数（支持右键菜单和卡片按钮调用）
   const runLinkCheck = async (link: LinkItem, showAlert: boolean = false) => {
-    const categoryId = link.categoryId;
-    
     // 标记该链接为检测中
     setCheckingLinkIds(prev => new Set(prev).add(link.id));
     
@@ -582,60 +656,7 @@ function App() {
       }
       
       const isOnline = await checkUrlWithLocalNetwork(testUrl);
-
-      // A. 更新单项检测结果状态 (用于卡片变色)
-      setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
-      
-      // B. 核心：同步更新批量检测的统计数据 (categoryCheckStatus)
-      setCategoryCheckStatus(prev => {
-        const currentStatus = prev[categoryId];
-        
-        // 如果该分类还没有进行过批量检测，创建初始状态
-        if (!currentStatus) {
-          return {
-            ...prev,
-            [categoryId]: {
-              checking: false,
-              online: isOnline ? 1 : 0,
-              offline: isOnline ? 0 : 1,
-              total: 1,
-              offlineLinks: isOnline ? [] : [link.id]
-            }
-          };
-        }
-        
-        // 判断之前的状态：如果在 offlineLinks 数组里，说明之前是离线的
-        const wasOffline = currentStatus.offlineLinks.includes(link.id);
-        
-        let newOnline = currentStatus.online;
-        let newOffline = currentStatus.offline;
-        let newOfflineLinks = [...currentStatus.offlineLinks];
-        
-        // 状态变更逻辑：
-        if (isOnline && wasOffline) {
-          // 修正：从离线变在线 -> 在线数+1，离线数-1，移除ID
-          newOnline++;
-          newOffline--;
-          newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
-        } else if (!isOnline && !wasOffline) {
-          // 修正：从在线(或未知)变离线 -> 离线数+1，在线数-1，添加ID
-          newOffline++;
-          if (newOnline > 0) newOnline--;
-          newOfflineLinks.push(link.id);
-        }
-        // isOnline && !wasOffline → 之前在线，现在还是在线，无变化
-        // !isOnline && wasOffline → 之前离线，现在还是离线，无变化
-        
-        return {
-          ...prev,
-          [categoryId]: {
-            ...currentStatus,
-            online: Math.max(0, newOnline),
-            offline: Math.max(0, newOffline),
-            offlineLinks: newOfflineLinks
-          }
-        };
-      });
+      applySingleCheckResult(link, isOnline);
       
       // 只有通过右键菜单调用时才显示弹窗
       if (showAlert) {
@@ -1367,6 +1388,23 @@ function App() {
     if (processedUrl && !processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
       processedUrl = 'https://' + processedUrl;
     }
+
+    const processedUrls = (data.urls || []).map(item => {
+      let candidate = item.url || '';
+      if (candidate && !candidate.startsWith('http://') && !candidate.startsWith('https://')) {
+        candidate = `https://${candidate}`;
+      }
+      return candidate;
+    });
+    const duplicates = findDuplicateLinks([processedUrl, ...processedUrls]);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.slice(0, 5).map(link => {
+        const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
+        return `${link.title}（${categoryName}）`;
+      }).join('\n');
+      alert(`检测到重复网址（跨全部分类）:\n${duplicateNames}${duplicates.length > 5 ? `\n... 另有 ${duplicates.length - 5} 项` : ''}`);
+      return;
+    }
     
     // 获取当前分类下的所有链接（不包括置顶链接）
     const categoryLinks = links.filter(link => 
@@ -1429,10 +1467,33 @@ function App() {
     if (processedUrl && !processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
       processedUrl = 'https://' + processedUrl;
     }
+
+    const processedUrls = (data.urls || []).map(item => {
+      let candidate = item.url || '';
+      if (candidate && !candidate.startsWith('http://') && !candidate.startsWith('https://')) {
+        candidate = `https://${candidate}`;
+      }
+      return candidate;
+    });
+    const duplicates = findDuplicateLinks([processedUrl, ...processedUrls], editingLink.id);
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.slice(0, 5).map(link => {
+        const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
+        return `${link.title}（${categoryName}）`;
+      }).join('\n');
+      alert(`检测到重复网址（跨全部分类）:\n${duplicateNames}${duplicates.length > 5 ? `\n... 另有 ${duplicates.length - 5} 项` : ''}`);
+      return;
+    }
     
     const updated = links.map(l => l.id === editingLink.id ? { ...l, ...data, url: processedUrl } : l);
     updateData(updated, categories);
     setEditingLink(undefined);
+  };
+
+  const handleModalMainUrlCheckResult = (linkId: string, isOnline: boolean) => {
+    const targetLink = links.find(link => link.id === linkId);
+    if (!targetLink) return;
+    applySingleCheckResult(targetLink, isOnline);
   };
 
   // 拖拽结束事件处理函数
@@ -3378,6 +3439,7 @@ function App() {
             initialData={editingLink || (prefillLink as LinkItem)}
             aiConfig={aiConfig}
             defaultCategoryId={selectedCategory !== 'all' ? selectedCategory : undefined}
+            onMainUrlCheckResult={handleModalMainUrlCheckResult}
           />
 
           {/* 右键菜单 */}
