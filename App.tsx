@@ -293,6 +293,8 @@ function App() {
   const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
   // 单独检测结果：linkId -> true(在线)/false(离线)，优先级高于批量检测结果
   const [linkCheckResults, setLinkCheckResults] = useState<Record<string, boolean>>({});
+  // 正在检测中的链接ID集合
+  const [checkingLinkIds, setCheckingLinkIds] = useState<Set<string>>(new Set());
 
   // 单独检测结果重置：按分类重置
   const resetCategorySingleCheckResults = (categoryId: string) => {
@@ -570,6 +572,9 @@ function App() {
   const runLinkCheck = async (link: LinkItem, showAlert: boolean = false) => {
     const categoryId = link.categoryId;
     
+    // 标记该链接为检测中
+    setCheckingLinkIds(prev => new Set(prev).add(link.id));
+    
     try {
       let testUrl = link.url;
       if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
@@ -646,6 +651,13 @@ function App() {
         alert('检测失败，请重试');
       }
       return false;
+    } finally {
+      // 无论成功还是失败，都要清除检测状态
+      setCheckingLinkIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(link.id);
+        return newSet;
+      });
     }
   };
 
@@ -2374,19 +2386,36 @@ function App() {
         )}
 
 
-        {/* 离线状态下的快速重试按钮 */}
-        {!isBatchEditMode && isOfflineLink && (
+        {/* 离线状态下的快速重试按钮 - 检测中时显示旋转动画 */}
+        {!isBatchEditMode && (isOfflineLink || checkingLinkIds.has(link.id)) && (
           <div className="absolute top-1 right-1 z-20">
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                runLinkCheck(link); // 点击直接调用通用检测函数
+                if (!checkingLinkIds.has(link.id)) {
+                  runLinkCheck(link); // 点击直接调用通用检测函数
+                }
               }}
-              className="p-1 bg-white/90 dark:bg-slate-800/90 text-red-500 hover:text-white hover:bg-red-500 rounded-full shadow-sm border border-red-200 dark:border-red-900 transition-all"
-              title="检测到连接失败，点击重试"
+              disabled={checkingLinkIds.has(link.id)}
+              className={`p-1.5 rounded-full shadow-sm border transition-all ${
+                checkingLinkIds.has(link.id)
+                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-500 border-blue-200 dark:border-blue-800 cursor-wait'
+                  : 'bg-white/90 dark:bg-slate-800/90 text-red-500 hover:text-white hover:bg-red-500 border-red-200 dark:border-red-900'
+              }`}
+              title={checkingLinkIds.has(link.id) ? "检测中..." : "检测到连接失败，点击重试"}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className={checkingLinkIds.has(link.id) ? 'animate-spin' : ''}
+              >
                 <path d="M23 4v6h-6"></path>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
               </svg>
