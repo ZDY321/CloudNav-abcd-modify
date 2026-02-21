@@ -35,9 +35,13 @@ const resolveLucideIcon = (rawName: string) => {
   ];
 
   for (const candidate of candidates) {
-    // @ts-ignore - 动态读取 lucide 图标组件
-    const icon = LucideIcons[candidate];
-    if (typeof icon === 'function') {
+    const icon = (LucideIcons as Record<string, unknown>)[candidate];
+    // lucide-react 图标在 React 19 下通常是 forwardRef 对象，不一定是 function
+    const isComponent =
+      typeof icon === 'function' ||
+      (typeof icon === 'object' && icon !== null && '$$typeof' in icon);
+
+    if (isComponent) {
       return icon as React.ComponentType<{ size?: number; className?: string }>;
     }
   }
