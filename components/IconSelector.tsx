@@ -304,7 +304,7 @@ const IconSelector: React.FC<IconSelectorProps> = ({
               className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
             >
               <ExternalLink size={12} />
-              查看所有图标
+              查看所有 Lucide 图标
             </a>
           </div>
           <div className="relative">

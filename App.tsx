@@ -2890,27 +2890,27 @@ function App() {
                 
                 return (
                   <div key={cat.id}>
-                    <div className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
+                    <div className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all group ${
                       selectedCategory === cat.id 
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
                         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}>
-                      {/* 展开/折叠按钮 */}
-                      {hasSubCategories && (
-                        <button
-                          onClick={(e) => toggleCategoryExpansion(cat.id, e)}
-                          className="p-0.5 text-slate-400 hover:text-blue-500 transition-colors"
-                        >
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
-                      )}
-                      {!hasSubCategories && <div className="w-[18px]" />}
+                      <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                        {hasSubCategories && (
+                          <button
+                            onClick={(e) => toggleCategoryExpansion(cat.id, e)}
+                            className="text-slate-400 hover:text-blue-500 transition-colors"
+                          >
+                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
+                        )}
+                      </div>
                       
                       <button
                         onClick={() => handleCategoryClick(cat)}
-                        className="flex items-center gap-3 flex-1 text-left"
+                        className="flex items-center gap-2 flex-1 text-left"
                       >
-                        <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                        <div className={`p-1 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
                           {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
                         </div>
                         <span className="truncate flex-1 text-left">{cat.name}</span>
@@ -2923,14 +2923,14 @@ function App() {
                     
                     {/* 二级分类列表 */}
                     {hasSubCategories && isExpanded && (
-                      <div className="ml-8 mt-1 space-y-1">
+                      <div className="ml-6 mt-1 space-y-1">
                         {cat.subcategories!.map(subCat => {
                           const isSubSelected = selectedCategory === cat.id && selectedSubCategory === subCat.id;
                           return (
                             <button
                               key={subCat.id}
                               onClick={() => handleSubCategoryClick(cat.id, subCat.id)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all ${
                                 isSubSelected
                                   ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-600 dark:text-blue-400 font-medium'
                                   : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
