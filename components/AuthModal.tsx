@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { Lock, ArrowRight, Loader2 } from 'lucide-react';
 
+export interface LoginResult {
+  success: boolean;
+  status?: number;
+  message?: string;
+}
+
 interface AuthModalProps {
   isOpen: boolean;
-  onLogin: (password: string) => Promise<boolean>;
+  onLogin: (password: string) => Promise<LoginResult>;
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin }) => {
@@ -18,9 +24,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin }) => {
     setIsLoading(true);
     setError('');
     
-    const success = await onLogin(password);
-    if (!success) {
-      setError('密码错误或无法连接服务器');
+    const result = await onLogin(password);
+    if (!result.success) {
+      setError(result.message || '登录失败，请稍后重试');
     }
     setIsLoading(false);
   };

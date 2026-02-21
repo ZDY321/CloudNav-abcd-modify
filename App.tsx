@@ -40,6 +40,7 @@ import SearchConfigModal from './components/SearchConfigModal';
 import ContextMenu from './components/ContextMenu';
 import QRCodeModal from './components/QRCodeModal';
 import Tooltip from './components/Tooltip';
+import { LoginResult } from './components/AuthModal';
 
 // --- 智能传送门提示框组件 ---
 // 解决所有遮挡问题的终极方案：将元素渲染到 body 根节点，脱离原有文档流
@@ -1089,8 +1090,9 @@ function App() {
         // 获取数据
         let hasCloudData = false;
         try {
+            const requestToken = savedToken || authToken;
             const res = await fetch('/api/storage', {
-                headers: authToken ? { 'x-auth-password': authToken } : {}
+                headers: requestToken ? { 'x-auth-password': requestToken } : {}
             });
             if (res.ok) {
                 const data = await res.json();
@@ -1109,6 +1111,7 @@ function App() {
                 if (errorData.error && errorData.error.includes('过期')) {
                     setAuthToken(null);
                     localStorage.removeItem(AUTH_KEY);
+                    localStorage.removeItem('lastLoginTime');
                     setIsAuthOpen(true);
                     setIsCheckingAuth(false);
                     return;
@@ -1357,7 +1360,29 @@ function App() {
 
   // --- Actions ---
 
-  const handleLogin = async (password: string): Promise<boolean> => {
+  const handleLogin = async (password: string): Promise<LoginResult> => {
+      const buildLoginErrorMessage = (status: number, serverError?: string): string => {
+        if (status === 401) {
+          if (serverError?.includes('过期')) {
+            return '401：密码已过期，请重新输入';
+          }
+          return '401：密码错误，请确认与 Cloudflare 的 PASSWORD 完全一致';
+        }
+
+        if (status === 500) {
+          if (serverError) {
+            return `500：服务器错误（${serverError}）`;
+          }
+          return '500：服务器错误，请检查 Cloudflare 环境变量和 KV 绑定';
+        }
+
+        if (serverError) {
+          return `${status}：${serverError}`;
+        }
+
+        return `${status}：登录请求失败`;
+      };
+
       try {
         // 首先验证密码
         const authResponse = await fetch('/api/storage', {
@@ -1395,30 +1420,16 @@ function App() {
                 console.warn("Failed to fetch website config after login.", e);
             }
             
-            // 检查密码是否过期
-            const lastLoginTime = localStorage.getItem('lastLoginTime');
-            const currentTime = Date.now();
-            
-            if (lastLoginTime) {
-                const lastLogin = parseInt(lastLoginTime);
-                const timeDiff = currentTime - lastLogin;
-                
-                const expiryTimeMs = (siteSettings.passwordExpiryDays || 7) > 0 ? (siteSettings.passwordExpiryDays || 7) * 24 * 60 * 60 * 1000 : 0;
-                
-                if (expiryTimeMs > 0 && timeDiff > expiryTimeMs) {
-                    setAuthToken(null);
-                    localStorage.removeItem(AUTH_KEY);
-                    setIsAuthOpen(true);
-                    alert('您的密码已过期，请重新登录');
-                    return false;
-                }
-            }
-            
-            localStorage.setItem('lastLoginTime', currentTime.toString());
+            // 手动输入密码验证成功后，直接刷新登录时间
+            localStorage.setItem('lastLoginTime', Date.now().toString());
             
             // 登录成功后，从服务器获取数据
             try {
-                const res = await fetch('/api/storage');
+                const res = await fetch('/api/storage', {
+                    headers: {
+                        'x-auth-password': password
+                    }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     // 如果服务器有数据，使用服务器数据
@@ -1460,17 +1471,36 @@ function App() {
                 console.warn("Failed to fetch AI config after login.", e);
             }
             
-            return true;
+            return { success: true };
         }
-        return false;
+
+        let serverError = '';
+        try {
+          const errorData = await authResponse.json();
+          if (errorData?.error) {
+            serverError = String(errorData.error);
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+
+        return {
+          success: false,
+          status: authResponse.status,
+          message: buildLoginErrorMessage(authResponse.status, serverError)
+        };
       } catch (e) {
-          return false;
+          return {
+            success: false,
+            message: '无法连接服务器：请检查网络、域名或 Cloudflare Functions 状态'
+          };
       }
   };
 
   const handleLogout = () => {
       setAuthToken(null);
       localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem('lastLoginTime');
       setSyncStatus('offline');
       // 退出后重新加载本地数据
       loadFromLocal();

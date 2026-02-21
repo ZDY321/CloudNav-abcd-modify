@@ -85,13 +85,11 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
       });
     }
     
-    // 从 KV 中读取数据
-    const data = await env.CLOUDNAV_KV.get('app_data');
-    
-    // 如果是获取数据请求，需要密码验证
-    if (url.searchParams.get('getConfig') === 'true') {
+    // 获取应用数据时，如果服务端设置了密码则必须验证
+    const serverPassword = env.PASSWORD;
+    if (serverPassword) {
       const password = request.headers.get('x-auth-password');
-      if (!password || password !== env.PASSWORD) {
+      if (!password || password !== serverPassword) {
         return new Response(JSON.stringify({ error: '密码错误' }), {
           status: 401,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -124,6 +122,9 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
       // 更新最后认证时间
       await env.CLOUDNAV_KV.put('last_auth_time', Date.now().toString());
     }
+    
+    // 从 KV 中读取数据
+    const data = await env.CLOUDNAV_KV.get('app_data');
     
     if (!data) {
       // 如果没有数据，返回空结构
