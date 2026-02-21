@@ -2448,6 +2448,7 @@ function App() {
         key={link.id}
         content={!isBatchEditMode ? (link.description || '') : ''}
         className="block w-full"
+        centered
       >
       <div
         className={`group relative transition-all duration-200 hover:shadow-lg ${

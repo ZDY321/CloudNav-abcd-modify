@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TooltipProps {
   content: string;
   children: React.ReactNode;
   className?: string;
+  centered?: boolean;
 }
 
 type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 
-const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) => {
+const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '', centered = false }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState<TooltipPosition>('top');
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
@@ -139,8 +141,10 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
     }
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
-      // 在下一帧计算位置，确保tooltip已经渲染
-      requestAnimationFrame(calculatePosition);
+      if (!centered) {
+        // 在下一帧计算位置，确保tooltip已经渲染
+        requestAnimationFrame(calculatePosition);
+      }
     }, 300); // 300ms 延迟显示
   };
 
@@ -153,7 +157,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
 
   // 窗口滚动或调整大小时重新计算位置
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !centered) {
       const handleScroll = () => calculatePosition();
       const handleResize = () => calculatePosition();
       
@@ -165,7 +169,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
         window.removeEventListener('resize', handleResize);
       };
     }
-  }, [isVisible, calculatePosition]);
+  }, [isVisible, centered, calculatePosition]);
 
   // 清理定时器
   useEffect(() => {
@@ -204,7 +208,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
       onMouseLeave={handleMouseLeave}
     >
       {children}
-      {isVisible && (
+      {!centered && isVisible && (
         <div
           ref={tooltipRef}
           className="absolute z-[100] px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg whitespace-pre-wrap max-w-[250px] pointer-events-none"
@@ -216,6 +220,17 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
             className={`absolute w-0 h-0 border-[6px] ${getArrowStyle()}`}
           />
         </div>
+      )}
+      {centered && isVisible && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none px-4">
+          <div
+            ref={tooltipRef}
+            className="px-4 py-3 text-sm text-white bg-slate-800/95 dark:bg-slate-700/95 rounded-xl shadow-2xl whitespace-pre-wrap max-w-[min(680px,90vw)] max-h-[70vh] overflow-auto"
+          >
+            {content}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
