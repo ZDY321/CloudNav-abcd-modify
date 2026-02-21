@@ -297,6 +297,34 @@ function App() {
   const [checkingLinkIds, setCheckingLinkIds] = useState<Set<string>>(new Set());
   // 全站查重标注：linkId -> 颜色与分组信息
   const [duplicateHighlights, setDuplicateHighlights] = useState<Record<string, { color: string; groupKey: string; groupSize: number }>>({});
+  // 全站查重结果弹窗
+  const [duplicateCheckModal, setDuplicateCheckModal] = useState<{
+    isOpen: boolean;
+    scannedTotal: number;
+    involvedTotal: number;
+    groups: Array<{ normalizedUrl: string; links: LinkItem[]; color: string }>;
+  }>({
+    isOpen: false,
+    scannedTotal: 0,
+    involvedTotal: 0,
+    groups: []
+  });
+  // 新增/编辑保存前重复提示弹窗
+  const [saveDuplicateModal, setSaveDuplicateModal] = useState<{
+    isOpen: boolean;
+    action: 'add' | 'edit';
+    targetTotal: number;
+    involvedTotal: number;
+    groups: Array<{ normalizedUrl: string; links: LinkItem[] }>;
+  }>({
+    isOpen: false,
+    action: 'add',
+    targetTotal: 0,
+    involvedTotal: 0,
+    groups: []
+  });
+  // 直达后临时高亮卡片
+  const [focusedLinkId, setFocusedLinkId] = useState<string | null>(null);
 
   const normalizeUrlForDuplicate = (rawUrl: string): string => {
     if (!rawUrl) return '';
@@ -315,18 +343,30 @@ function App() {
     }
   };
 
-  const findDuplicateLinks = (urls: string[], excludeLinkId?: string): LinkItem[] => {
+  const getDuplicateGroupsByUrls = (urls: string[], excludeLinkId?: string): Array<{ normalizedUrl: string; links: LinkItem[] }> => {
     const normalizedTargets = new Set(urls.map(normalizeUrlForDuplicate).filter(Boolean));
     if (normalizedTargets.size === 0) return [];
 
-    return links.filter(link => {
-      if (excludeLinkId && link.id === excludeLinkId) return false;
-      const allUrls = [
-        link.url,
-        ...(link.urls?.map(u => u.url).filter(Boolean) || [])
-      ];
-      return allUrls.some(u => normalizedTargets.has(normalizeUrlForDuplicate(u)));
+    const targetGroups = new Map<string, LinkItem[]>();
+    links.forEach(link => {
+      if (excludeLinkId && link.id === excludeLinkId) return;
+      const perLinkUniqueUrls = new Set(
+        [link.url, ...(link.urls?.map(u => u.url).filter(Boolean) || [])]
+          .map(normalizeUrlForDuplicate)
+          .filter(Boolean)
+      );
+
+      perLinkUniqueUrls.forEach(normalizedUrl => {
+        if (!normalizedTargets.has(normalizedUrl)) return;
+        const current = targetGroups.get(normalizedUrl) || [];
+        current.push(link);
+        targetGroups.set(normalizedUrl, current);
+      });
     });
+
+    return Array.from(targetGroups.entries())
+      .map(([normalizedUrl, groupedLinks]) => ({ normalizedUrl, links: groupedLinks }))
+      .sort((a, b) => b.links.length - a.links.length || a.normalizedUrl.localeCompare(b.normalizedUrl));
   };
 
   const checkAllDuplicateUrls = () => {
@@ -356,44 +396,85 @@ function App() {
 
     if (duplicateGroups.length === 0) {
       setDuplicateHighlights({});
-      alert(`未发现重复网址（已扫描 ${links.length} 个网站）`);
+      setDuplicateCheckModal({
+        isOpen: true,
+        scannedTotal: links.length,
+        involvedTotal: 0,
+        groups: []
+      });
       return;
     }
 
+    const groupedResults = duplicateGroups.map(([normalizedUrl, groupedLinks], index) => ({
+      normalizedUrl,
+      links: groupedLinks,
+      color: duplicateColorPalette[index % duplicateColorPalette.length]
+    }));
+
     const nextHighlights: Record<string, { color: string; groupKey: string; groupSize: number }> = {};
-    duplicateGroups.forEach(([groupKey, groupedLinks], index) => {
-      const color = duplicateColorPalette[index % duplicateColorPalette.length];
+    groupedResults.forEach(({ normalizedUrl, links: groupedLinks, color }) => {
       groupedLinks.forEach(link => {
         const current = nextHighlights[link.id];
         // 如果一个卡片命中多个重复组，优先展示规模更大的那组颜色
         if (!current || groupedLinks.length > current.groupSize) {
-          nextHighlights[link.id] = { color, groupKey, groupSize: groupedLinks.length };
+          nextHighlights[link.id] = { color, groupKey: normalizedUrl, groupSize: groupedLinks.length };
         }
       });
     });
     setDuplicateHighlights(nextHighlights);
 
     const involvedLinkIds = new Set<string>();
-    duplicateGroups.forEach(([, groupedLinks]) => groupedLinks.forEach(link => involvedLinkIds.add(link.id)));
+    groupedResults.forEach(group => group.links.forEach(link => involvedLinkIds.add(link.id)));
+    setDuplicateCheckModal({
+      isOpen: true,
+      scannedTotal: links.length,
+      involvedTotal: involvedLinkIds.size,
+      groups: groupedResults
+    });
+  };
 
-    const preview = duplicateGroups.slice(0, 10).map(([normalizedUrl, groupedLinks], index) => {
-      const linkText = groupedLinks
-        .slice(0, 4)
-        .map(link => {
-          const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
-          return `${link.title}（${categoryName}）`;
-        })
-        .join('、');
-      const remains = groupedLinks.length > 4 ? ` 等 ${groupedLinks.length} 项` : '';
-      return `${index + 1}. ${normalizedUrl}\n   ${linkText}${remains}`;
-    }).join('\n');
+  const clearDuplicateHighlights = () => {
+    setDuplicateHighlights({});
+  };
 
-    alert(
-      `发现 ${duplicateGroups.length} 组重复网址，涉及 ${involvedLinkIds.size} 个网站。\n` +
-      `已对重复卡片进行同组同色标注。\n\n` +
-      `${preview}` +
-      `${duplicateGroups.length > 10 ? `\n\n... 另有 ${duplicateGroups.length - 10} 组` : ''}`
-    );
+  const closeDuplicateModals = () => {
+    setDuplicateCheckModal(prev => ({ ...prev, isOpen: false }));
+    setSaveDuplicateModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const jumpToDuplicateCard = (link: LinkItem) => {
+    const targetCategory = link.categoryId;
+    const targetCategoryMeta = categories.find(cat => cat.id === targetCategory) || null;
+    // 直达前关闭编辑弹窗，避免遮挡目标卡片
+    setIsModalOpen(false);
+    setEditingLink(undefined);
+    setPrefillLink(undefined);
+
+    // 锁定目录先引导解锁
+    if (isCategoryLocked(targetCategory)) {
+      setSelectedCategory(targetCategory);
+      closeDuplicateModals();
+      if (targetCategoryMeta) {
+        setCatAuthModalData(targetCategoryMeta);
+      }
+      return;
+    }
+
+    setSearchQuery('');
+    setSelectedSubCategory(null);
+    setSelectedCategory(targetCategory);
+    setSidebarOpen(false);
+    closeDuplicateModals();
+
+    setTimeout(() => {
+      const card = document.querySelector(`[data-link-id="${link.id}"]`) as HTMLElement | null;
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setFocusedLinkId(link.id);
+      setTimeout(() => {
+        setFocusedLinkId(prev => (prev === link.id ? null : prev));
+      }, 2000);
+    }, 220);
   };
 
   const applySingleCheckResult = (link: LinkItem, isOnline: boolean) => {
@@ -466,6 +547,8 @@ function App() {
   // 数据发生变化后清除旧的查重标注，避免展示过期颜色
   useEffect(() => {
     setDuplicateHighlights({});
+    setDuplicateCheckModal(prev => ({ ...prev, isOpen: false, groups: [], involvedTotal: 0 }));
+    setSaveDuplicateModal(prev => ({ ...prev, isOpen: false, targetTotal: 0, involvedTotal: 0, groups: [] }));
   }, [links]);
   
   // 并发限制常量
@@ -1454,8 +1537,8 @@ function App() {
       alert(`成功导入 ${newLinks.length} 个新书签!`);
   };
 
-  const handleAddLink = (data: Omit<LinkItem, 'id' | 'createdAt'>) => {
-    if (!authToken) { setIsAuthOpen(true); return; }
+  const handleAddLink = (data: Omit<LinkItem, 'id' | 'createdAt'>): boolean => {
+    if (!authToken) { setIsAuthOpen(true); return false; }
     
     // 处理URL，确保有协议前缀
     let processedUrl = data.url;
@@ -1470,15 +1553,21 @@ function App() {
       }
       return candidate;
     });
-    const duplicates = findDuplicateLinks([processedUrl, ...processedUrls]);
-    if (duplicates.length > 0) {
-      const duplicateNames = duplicates.slice(0, 5).map(link => {
-        const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
-        return `${link.title}（${categoryName}）`;
-      }).join('\n');
-      alert(`检测到重复网址（跨全部分类）:\n${duplicateNames}${duplicates.length > 5 ? `\n... 另有 ${duplicates.length - 5} 项` : ''}`);
-      return;
+    const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls]);
+    if (duplicateGroups.length > 0) {
+      const involvedLinkIds = new Set<string>();
+      duplicateGroups.forEach(group => group.links.forEach(link => involvedLinkIds.add(link.id)));
+      setSaveDuplicateModal({
+        isOpen: true,
+        action: 'add',
+        targetTotal: duplicateGroups.length,
+        involvedTotal: involvedLinkIds.size,
+        groups: duplicateGroups
+      });
+      return false;
     }
+
+    setSaveDuplicateModal(prev => ({ ...prev, isOpen: false, targetTotal: 0, involvedTotal: 0, groups: [] }));
     
     // 获取当前分类下的所有链接（不包括置顶链接）
     const categoryLinks = links.filter(link => 
@@ -1530,11 +1619,12 @@ function App() {
     
     // Clear prefill if any
     setPrefillLink(undefined);
+    return true;
   };
 
-  const handleEditLink = (data: Omit<LinkItem, 'id' | 'createdAt'>) => {
-    if (!authToken) { setIsAuthOpen(true); return; }
-    if (!editingLink) return;
+  const handleEditLink = (data: Omit<LinkItem, 'id' | 'createdAt'>): boolean => {
+    if (!authToken) { setIsAuthOpen(true); return false; }
+    if (!editingLink) return false;
     
     // 处理URL，确保有协议前缀
     let processedUrl = data.url;
@@ -1549,19 +1639,25 @@ function App() {
       }
       return candidate;
     });
-    const duplicates = findDuplicateLinks([processedUrl, ...processedUrls], editingLink.id);
-    if (duplicates.length > 0) {
-      const duplicateNames = duplicates.slice(0, 5).map(link => {
-        const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
-        return `${link.title}（${categoryName}）`;
-      }).join('\n');
-      alert(`检测到重复网址（跨全部分类）:\n${duplicateNames}${duplicates.length > 5 ? `\n... 另有 ${duplicates.length - 5} 项` : ''}`);
-      return;
+    const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls], editingLink.id);
+    if (duplicateGroups.length > 0) {
+      const involvedLinkIds = new Set<string>();
+      duplicateGroups.forEach(group => group.links.forEach(link => involvedLinkIds.add(link.id)));
+      setSaveDuplicateModal({
+        isOpen: true,
+        action: 'edit',
+        targetTotal: duplicateGroups.length,
+        involvedTotal: involvedLinkIds.size,
+        groups: duplicateGroups
+      });
+      return false;
     }
-    
+
+    setSaveDuplicateModal(prev => ({ ...prev, isOpen: false, targetTotal: 0, involvedTotal: 0, groups: [] }));
     const updated = links.map(l => l.id === editingLink.id ? { ...l, ...data, url: processedUrl } : l);
     updateData(updated, categories);
     setEditingLink(undefined);
+    return true;
   };
 
   const handleModalMainUrlCheckResult = (linkId: string, isOnline: boolean) => {
@@ -2347,6 +2443,7 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     const duplicateInfo = duplicateHighlights[link.id];
+    const isFocusedLink = focusedLinkId === link.id;
     
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -2362,6 +2459,7 @@ function App() {
     return (
       <div
         ref={setNodeRef}
+        data-link-id={link.id}
         style={style}
         className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
           isSortingMode || isSortingPinned
@@ -2371,7 +2469,7 @@ function App() {
           isDetailedView 
             ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-green-400 dark:hover:border-green-500' 
             : 'flex items-center rounded-xl border shadow-sm hover:border-green-300 dark:hover:border-green-600'
-        }`}
+        } ${isFocusedLink ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-900 animate-pulse' : ''}`}
         {...attributes}
         {...listeners}
       >
@@ -2424,6 +2522,7 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     const duplicateInfo = duplicateHighlights[link.id];
+    const isFocusedLink = focusedLinkId === link.id;
     
     // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
     const individualResult = linkCheckResults[link.id];
@@ -2451,6 +2550,7 @@ function App() {
         centered
       >
       <div
+        data-link-id={link.id}
         className={`group relative transition-all duration-200 hover:shadow-lg ${
           isOfflineLink 
             ? 'hover:shadow-red-100/50 dark:hover:shadow-red-900/20' 
@@ -2465,7 +2565,7 @@ function App() {
           isDetailedView 
             ? `flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
             : `flex items-center justify-between rounded-xl border shadow-sm p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
-        }`}
+        } ${isFocusedLink ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-900 animate-pulse' : ''}`}
         style={duplicateInfo ? {
           borderColor: duplicateInfo.color,
           boxShadow: `0 0 0 1px ${duplicateInfo.color}`
@@ -3545,6 +3645,180 @@ function App() {
             )}
         </div>
       </main>
+
+          {/* 全站查重结果弹窗 */}
+          {duplicateCheckModal.isOpen && (
+            <div
+              className="fixed inset-0 z-[1100] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setDuplicateCheckModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <div
+                className="w-full max-w-4xl max-h-[85vh] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">全站查重结果</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      扫描 {duplicateCheckModal.scannedTotal} 个网站 · 重复组 {duplicateCheckModal.groups.length} · 涉及 {duplicateCheckModal.involvedTotal} 个网站
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={clearDuplicateHighlights}
+                      className="px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                    >
+                      清除标注
+                    </button>
+                    <button
+                      onClick={() => setDuplicateCheckModal(prev => ({ ...prev, isOpen: false }))}
+                      className="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                      title="关闭"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {duplicateCheckModal.groups.length === 0 ? (
+                    <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
+                      <CheckCircle2 className="w-10 h-10 text-green-500 mb-3" />
+                      <p className="text-sm">未发现重复网址</p>
+                    </div>
+                  ) : (
+                    duplicateCheckModal.groups.map((group, idx) => (
+                      <div
+                        key={`${group.normalizedUrl}-${idx}`}
+                        className="rounded-xl border p-3"
+                        style={{
+                          borderColor: `${group.color}80`,
+                          boxShadow: `inset 3px 0 0 ${group.color}`
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono text-slate-700 dark:text-slate-300 break-all">{group.normalizedUrl}</p>
+                          </div>
+                          <span
+                            className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white"
+                            style={{ backgroundColor: group.color }}
+                          >
+                            {group.links.length} 项
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {group.links.map(link => {
+                            const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
+                            const locked = isCategoryLocked(link.categoryId);
+                            return (
+                              <div key={`${group.normalizedUrl}-${link.id}`} className="flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-700/40 rounded-lg px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{link.title}</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">{categoryName}</p>
+                                </div>
+                                <button
+                                  onClick={() => jumpToDuplicateCard(link)}
+                                  className={`shrink-0 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                    locked
+                                      ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                  title={locked ? '该分类已锁定，点击后将打开解锁窗口' : '切换到对应分类并定位到卡片'}
+                                >
+                                  {locked ? '解锁并直达' : '直达'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 新增/编辑保存前重复提示弹窗 */}
+          {saveDuplicateModal.isOpen && (
+            <div
+              className="fixed inset-0 z-[1200] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setSaveDuplicateModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <div
+                className="w-full max-w-3xl max-h-[80vh] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                      <h3 className="text-base font-semibold">检测到重复网址</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      {saveDuplicateModal.action === 'add' ? '新增' : '编辑'}时命中 {saveDuplicateModal.targetTotal} 个重复网址 · 涉及 {saveDuplicateModal.involvedTotal} 个网站
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSaveDuplicateModal(prev => ({ ...prev, isOpen: false }))}
+                    className="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                    title="关闭"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {saveDuplicateModal.groups.map(group => (
+                    <div key={`save-${group.normalizedUrl}`} className="rounded-xl border border-amber-200 dark:border-amber-700/40 bg-amber-50/40 dark:bg-amber-900/10 p-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="text-xs font-mono text-slate-700 dark:text-slate-300 break-all min-w-0">{group.normalizedUrl}</p>
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500 text-white">
+                          {group.links.length} 项
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.links.map(link => {
+                          const categoryName = categories.find(c => c.id === link.categoryId)?.name || link.categoryId;
+                          const locked = isCategoryLocked(link.categoryId);
+                          return (
+                            <div key={`save-${group.normalizedUrl}-${link.id}`} className="flex items-center justify-between gap-2 bg-white/80 dark:bg-slate-700/40 rounded-lg px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{link.title}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{categoryName}</p>
+                              </div>
+                              <button
+                                onClick={() => jumpToDuplicateCard(link)}
+                                className={`shrink-0 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                  locked
+                                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
+                                title={locked ? '该分类已锁定，点击后将打开解锁窗口' : '切换到对应分类并定位到卡片'}
+                              >
+                                {locked ? '解锁并直达' : '直达'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end">
+                  <button
+                    onClick={() => setSaveDuplicateModal(prev => ({ ...prev, isOpen: false }))}
+                    className="px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                  >
+                    继续编辑
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <LinkModal
             isOpen={isModalOpen}

@@ -6,7 +6,7 @@ import { generateLinkDescription, suggestCategory } from '../services/geminiServ
 interface LinkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (link: Omit<LinkItem, 'id' | 'createdAt'>) => void;
+  onSave: (link: Omit<LinkItem, 'id' | 'createdAt'>) => boolean | void;
   onDelete?: (id: string) => void;
   onMainUrlCheckResult?: (linkId: string, isOnline: boolean) => void;
   categories: Category[];
@@ -161,7 +161,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     });
 
     // 保存链接数据
-    onSave({
+    const saveResult = onSave({
       id: initialData?.id || '',
       title,
       url: finalUrl,
@@ -172,6 +172,10 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       subCategoryId: subCategoryId || undefined,
       pinned
     });
+
+    if (saveResult === false) {
+      return;
+    }
     
     // 如果有自定义图标URL，缓存到KV空间
     if (icon && !icon.includes('faviconextractor.com')) {
