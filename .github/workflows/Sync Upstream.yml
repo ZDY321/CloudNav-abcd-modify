@@ -33,6 +33,18 @@ jobs:
 
           git fetch upstream main
 
+          # No shared history: normal merge will always fail with
+          # "refusing to merge unrelated histories".
+          if ! git merge-base HEAD upstream/main >/dev/null 2>&1; then
+            {
+              echo "⚠️ 当前仓库与 upstream 无共同历史，已跳过自动同步。"
+              echo ""
+              echo "如需首次对齐，请手动执行一次并处理冲突："
+              echo "\`git merge upstream/main --allow-unrelated-histories\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           if git merge upstream/main --no-edit; then
             git push origin main
             echo "✅ 同步成功！" >> $GITHUB_STEP_SUMMARY
