@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -479,48 +479,55 @@ function App() {
   };
 
   const applySingleCheckResult = (link: LinkItem, isOnline: boolean) => {
-    const categoryId = link.categoryId;
     setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
-    setCategoryCheckStatus(prev => {
-      const currentStatus = prev[categoryId];
-      if (!currentStatus) {
-        return {
-          ...prev,
-          [categoryId]: {
-            checking: false,
-            online: isOnline ? 1 : 0,
-            offline: isOnline ? 0 : 1,
-            total: 1,
-            offlineLinks: isOnline ? [] : [link.id]
-          }
-        };
-      }
+  };
 
-      const wasOffline = currentStatus.offlineLinks.includes(link.id);
-      let newOnline = currentStatus.online;
-      let newOffline = currentStatus.offline;
-      let newOfflineLinks = [...currentStatus.offlineLinks];
+  const getEffectiveCategoryCheckStatus = (categoryId: string) => {
+    const baseStatus = categoryCheckStatus[categoryId];
+    const categoryLinks = links.filter(link => link.categoryId === categoryId && !isCategoryLocked(link.categoryId));
+    const overrideLinks = categoryLinks.filter(link => Object.prototype.hasOwnProperty.call(linkCheckResults, link.id));
 
-      if (isOnline && wasOffline) {
-        newOnline++;
-        newOffline--;
-        newOfflineLinks = newOfflineLinks.filter(id => id !== link.id);
-      } else if (!isOnline && !wasOffline) {
-        newOffline++;
-        if (newOnline > 0) newOnline--;
-        newOfflineLinks.push(link.id);
-      }
+    if (!baseStatus && overrideLinks.length === 0) {
+      return undefined;
+    }
 
-      return {
-        ...prev,
-        [categoryId]: {
-          ...currentStatus,
-          online: Math.max(0, newOnline),
-          offline: Math.max(0, newOffline),
-          offlineLinks: newOfflineLinks
+    let online = baseStatus?.online ?? 0;
+    let offline = baseStatus?.offline ?? 0;
+    const offlineLinkSet = new Set(baseStatus?.offlineLinks ?? []);
+    const baseOfflineLinkSet = new Set(baseStatus?.offlineLinks ?? []);
+
+    overrideLinks.forEach(link => {
+      const isOnline = linkCheckResults[link.id];
+
+      if (!baseStatus) {
+        if (isOnline) {
+          online += 1;
+        } else {
+          offline += 1;
+          offlineLinkSet.add(link.id);
         }
-      };
+        return;
+      }
+
+      const wasOffline = baseOfflineLinkSet.has(link.id);
+      if (isOnline && wasOffline) {
+        online += 1;
+        offline = Math.max(0, offline - 1);
+        offlineLinkSet.delete(link.id);
+      } else if (!isOnline && !wasOffline) {
+        offline += 1;
+        online = Math.max(0, online - 1);
+        offlineLinkSet.add(link.id);
+      }
     });
+
+    return {
+      checking: baseStatus?.checking ?? false,
+      online,
+      offline,
+      total: baseStatus?.total ?? overrideLinks.length,
+      offlineLinks: Array.from(offlineLinkSet)
+    };
   };
 
   // 单独检测结果重置：按分类重置
@@ -1128,7 +1135,7 @@ function App() {
                 const searchConfigData = await searchConfigRes.json();
                 // 检查搜索配置是否有效（包含必要的字段）
                 if (searchConfigData && (searchConfigData.mode || searchConfigData.externalSources || searchConfigData.selectedSource)) {
-                    setSearchMode(searchConfigData.mode || 'external');
+                    setSearchMode('external');
                     setExternalSearchSources(searchConfigData.externalSources || []);
                     // 加载已保存的选中搜索源
                     if (searchConfigData.selectedSource) {
@@ -1999,7 +2006,45 @@ function App() {
 
   const handleUpdateCategories = (newCats: Category[]) => {
       if (!authToken) { setIsAuthOpen(true); return; }
-      updateData(links, newCats);
+
+      const removedSubCategoryIdsByCategory = categories.reduce((acc, category) => {
+        const nextCategory = newCats.find(item => item.id === category.id);
+        if (!nextCategory) {
+          return acc;
+        }
+
+        const previousIds = new Set((category.subcategories || []).map(sub => sub.id));
+        const nextIds = new Set((nextCategory.subcategories || []).map(sub => sub.id));
+        const removedIds = [...previousIds].filter(id => !nextIds.has(id));
+
+        if (removedIds.length > 0) {
+          acc[category.id] = new Set(removedIds);
+        }
+
+        return acc;
+      }, {} as Record<string, Set<string>>);
+
+      const newLinks = links.map(link => {
+        const removedIds = removedSubCategoryIdsByCategory[link.categoryId];
+        if (!removedIds || !link.subCategoryId || !removedIds.has(link.subCategoryId)) {
+          return link;
+        }
+
+        return {
+          ...link,
+          subCategoryId: undefined
+        };
+      });
+
+      if (
+        selectedCategory !== 'all' &&
+        selectedSubCategory &&
+        removedSubCategoryIdsByCategory[selectedCategory]?.has(selectedSubCategory)
+      ) {
+        setSelectedSubCategory(null);
+      }
+
+      updateData(newLinks, newCats);
   };
 
   const handleDeleteCategory = (catId: string) => {
@@ -2088,14 +2133,15 @@ function App() {
 
   // --- Search Config ---
   const handleSaveSearchConfig = async (sources: ExternalSearchSource[], mode: SearchMode, selectedSource?: ExternalSearchSource | null) => {
+      const mergedMode: SearchMode = 'external';
       const searchConfig: SearchConfig = {
-          mode,
+          mode: mergedMode,
           externalSources: sources,
           selectedSource: selectedSource !== undefined ? selectedSource : selectedSearchSource
       };
       
       setExternalSearchSources(sources);
-      setSearchMode(mode);
+      setSearchMode(mergedMode);
       if (selectedSource !== undefined) {
           setSelectedSearchSource(selectedSource);
       }
@@ -2224,7 +2270,7 @@ function App() {
   };
 
   const handleExternalSearch = () => {
-      if (searchQuery.trim() && searchMode === 'external') {
+      if (searchQuery.trim()) {
           // 如果搜索源列表为空，自动加载默认搜索源
           if (externalSearchSources.length === 0) {
               const defaultSources: ExternalSearchSource[] = [
@@ -2555,10 +2601,8 @@ function App() {
     const isFocusedLink = focusedLinkId === link.id;
     
     // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
-    const individualResult = linkCheckResults[link.id];
-    const isOfflineLink = individualResult !== undefined
-      ? !individualResult  // 单独检测有结果：true=在线->非离线, false=离线->是离线
-      : (categoryCheckStatus[link.categoryId]?.offlineLinks?.includes(link.id) ?? false);
+    const effectiveCategoryStatus = getEffectiveCategoryCheckStatus(link.categoryId);
+    const isOfflineLink = effectiveCategoryStatus?.offlineLinks?.includes(link.id) ?? false;
     
     // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
     const getDefaultUrl = () => {
@@ -2684,7 +2728,11 @@ function App() {
 
         {/* 离线状态下的快速重试按钮 - 检测中时显示旋转动画 */}
         {!isBatchEditMode && (isOfflineLink || checkingLinkIds.has(link.id)) && (
-          <div className="absolute top-1 right-1 z-20">
+          <div className={`absolute z-20 ${
+            isDetailedView
+              ? 'top-1/2 right-3 -translate-y-1/2'
+              : 'top-1/2 right-12 -translate-y-1/2'
+          }`}>
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -3053,10 +3101,6 @@ function App() {
               <button 
                 onClick={() => {
                   setIsMobileSearchOpen(!isMobileSearchOpen);
-                  // 手机端点击搜索图标时默认使用站外搜索
-                  if (searchMode !== 'external') {
-                    handleSearchModeChange('external');
-                  }
                 }}
                 className="sm:flex md:hidden lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
                 title="搜索"
@@ -3066,7 +3110,7 @@ function App() {
 
               {/* 搜索模式切换 - 平板端和桌面端显示，手机端隐藏 */}
               <div className="hidden sm:hidden md:flex lg:flex items-center gap-2 flex-shrink-0">
-                <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-full p-1">
+                <div className="hidden">
                   <button
                     onClick={() => handleSearchModeChange('internal')}
                     className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center justify-center min-h-[24px] min-w-[40px] ${
@@ -3106,7 +3150,7 @@ function App() {
               {/* 搜索框 */}
               <div className={`relative w-full max-w-lg ${isMobileSearchOpen ? 'block' : 'hidden'} sm:block`}>
                 {/* 搜索源选择弹出窗口 */}
-                {searchMode === 'external' && showSearchSourcePopup && (
+                {showSearchSourcePopup && (
                   <div 
                     className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 z-50"
                     onMouseEnter={() => setIsPopupHovered(true)}
@@ -3142,7 +3186,7 @@ function App() {
                 {/* 搜索图标 */}
                 <div 
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
-                  onMouseEnter={() => searchMode === 'external' && setIsIconHovered(true)}
+                  onMouseEnter={() => setIsIconHovered(true)}
                   onMouseLeave={() => setIsIconHovered(false)}
                   onClick={() => {
                     // 移动端点击事件：显示搜索源选择窗口
@@ -3173,13 +3217,7 @@ function App() {
                 
                 <input
                   type="text"
-                  placeholder={
-                    searchMode === 'internal' 
-                      ? "搜索站内内容..." 
-                      : selectedSearchSource 
-                        ? `在${selectedSearchSource.name}搜索内容` 
-                        : "搜索站外内容..."
-                  }
+                  placeholder={selectedSearchSource ? `搜索站内内容，也可在${selectedSearchSource.name}站外搜索` : "搜索站内内容，也可站外搜索..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -3367,60 +3405,58 @@ function App() {
                     </div>
                  )}
 
-                 <div className="flex items-center justify-between mb-4">
-                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                         {selectedCategory === 'all' 
-                            ? (searchQuery ? '搜索结果' : '所有链接') 
-                            : (
-                                <>
-                                    {categories.find(c => c.id === selectedCategory)?.name}
-                                    {isCategoryLocked(selectedCategory) && <Lock size={14} className="text-amber-500" />}
-                                    <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
-                                        {displayedLinks.length}
-                                    </span>
-                                    {/* 批量检测按钮和状态 */}
-                                    {!isCategoryLocked(selectedCategory) && (
-                                      <>
-                                        {categoryCheckStatus[selectedCategory]?.checking ? (
-                                          <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
-                                            <Loader2 size={10} className="animate-spin" />
-                                            检测中 {categoryCheckStatus[selectedCategory].online + categoryCheckStatus[selectedCategory].offline}/{categoryCheckStatus[selectedCategory].total}
-                                          </span>
-                                        ) : categoryCheckStatus[selectedCategory] ? (
-                                          <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700">
-                                            <Wifi size={10} className="text-green-500" />
-                                            <span className="text-green-600">{categoryCheckStatus[selectedCategory].online}</span>
-                                            <span className="text-slate-400">/</span>
-                                            <WifiOff size={10} className="text-red-500" />
-                                            <span className="text-red-600">{categoryCheckStatus[selectedCategory].offline}</span>
-                                          </span>
-                                        ) : null}
-                                        <button
-                                          onClick={() => checkCategoryAvailability(selectedCategory)}
-                                          disabled={categoryCheckStatus[selectedCategory]?.checking}
-                                          className="flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
-                                          title="批量检测可用性&#10;🟢 绿色：可正常访问&#10;🔴 红色：不可访问&#10;🟠 橙色：需要VPN访问&#10;🟡 黄色：受Cloudflare保护"
-                                        >
-                                          <Globe size={10} />
-                                          检测
-                                        </button>
-                                        <button
-                                          onClick={() => resetCategorySingleCheckResults(selectedCategory)}
-                                          className="flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-                                          title="清除当前分类的单独检测结果，恢复以批量检测结果为准"
-                                        >
-                                          重置检测
-                                        </button>
-                                      </>
-                                    )}
-                                </>
-                            )
-                         }
-                     </h2>
-                     <div className="flex gap-2">
+                 <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                     <div className="min-w-0">
+                         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                             {selectedCategory === 'all' ? (searchQuery ? '搜索结果' : '所有链接') : categories.find(c => c.id === selectedCategory)?.name}
+                         </h2>
+                         {selectedCategory !== 'all' && (
+                           <div className="mt-2 flex flex-wrap items-center gap-2">
+                             {isCategoryLocked(selectedCategory) && <Lock size={14} className="text-amber-500 shrink-0" />}
+                             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
+                               {displayedLinks.length}
+                             </span>
+                             {!isCategoryLocked(selectedCategory) && (
+                               <>
+                                 {getEffectiveCategoryCheckStatus(selectedCategory)?.checking ? (
+                                   <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
+                                     <Loader2 size={10} className="animate-spin" />
+                                     检测中 {getEffectiveCategoryCheckStatus(selectedCategory)!.online + getEffectiveCategoryCheckStatus(selectedCategory)!.offline}/{getEffectiveCategoryCheckStatus(selectedCategory)!.total}
+                                   </span>
+                                 ) : getEffectiveCategoryCheckStatus(selectedCategory) ? (
+                                   <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap">
+                                     <Wifi size={10} className="text-green-500" />
+                                     <span className="text-green-600">{getEffectiveCategoryCheckStatus(selectedCategory)!.online}</span>
+                                     <span className="text-slate-400">/</span>
+                                     <WifiOff size={10} className="text-red-500" />
+                                     <span className="text-red-600">{getEffectiveCategoryCheckStatus(selectedCategory)!.offline}</span>
+                                   </span>
+                                 ) : null}
+                                 <button
+                                   onClick={() => checkCategoryAvailability(selectedCategory)}
+                                   disabled={getEffectiveCategoryCheckStatus(selectedCategory)?.checking}
+                                   className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+                                   title="批量检测可用性&#10;🟢 绿色：可正常访问&#10;🔴 红色：不可访问&#10;🟠 橙色：需要VPN访问&#10;🟡 黄色：受Cloudflare保护"
+                                 >
+                                   <Globe size={10} />
+                                   检测
+                                 </button>
+                                 <button
+                                   onClick={() => resetCategorySingleCheckResults(selectedCategory)}
+                                   className="flex items-center gap-1 px-2.5 py-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap shrink-0"
+                                   title="清除当前分类的单独检测结果，恢复以批量检测结果为准"
+                                 >
+                                   重置检测
+                                 </button>
+                               </>
+                             )}
+                           </div>
+                         )}
+                     </div>
+                     <div className="flex flex-wrap items-center gap-2 md:justify-end">
                          <button
                              onClick={checkAllDuplicateUrls}
-                             className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-full transition-colors"
+                             className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0"
                              title="扫描全部分类的主网址和备用网址，显示重复项"
                          >
                              <Search size={14} />
@@ -3428,10 +3464,10 @@ function App() {
                          </button>
                          {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && (
                              isSortingMode === selectedCategory ? (
-                                 <div className="flex gap-2">
+                                 <div className="flex flex-wrap items-center gap-2">
                                      <button 
                                          onClick={saveSorting}
-                                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0"
                                          title="保存顺序"
                                      >
                                          <Save size={14} />
@@ -3439,17 +3475,17 @@ function App() {
                                      </button>
                                      <button 
                                          onClick={cancelSorting}
-                                         className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                                         className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all whitespace-nowrap shrink-0"
                                          title="取消排序"
                                      >
                                          取消
                                      </button>
                                  </div>
                              ) : (
-                                 <div className="flex gap-2">
+                                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
                                      <button 
                                          onClick={toggleBatchEditMode}
-                                         className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors ${
+                                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0 ${
                                              isBatchEditMode 
                                                  ? 'bg-red-600 hover:bg-red-700' 
                                                  : 'bg-blue-600 hover:bg-blue-700'
@@ -3462,7 +3498,7 @@ function App() {
                                          <>
                                              <button 
                                                  onClick={handleBatchDelete}
-                                                 className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                  className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0"
                                                  title="批量删除"
                                              >
                                                  <Trash2 size={14} />
@@ -3470,15 +3506,15 @@ function App() {
                                              </button>
                                              <button 
                                                  onClick={handleSelectAll}
-                                                 className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                  className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0"
                                                  title="全选/取消全选"
                                              >
                                                  <CheckSquare size={14} />
                                                  <span>{selectedLinks.size === displayedLinks.length ? '取消全选' : '全选'}</span>
                                              </button>
-                                             <div className="relative group">
+                                              <div className="relative group shrink-0">
                                                   <button 
-                                                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
+                                                       className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap"
                                                       title="批量移动"
                                                   >
                                                       <Upload size={14} />
@@ -3500,7 +3536,7 @@ function App() {
                                      ) : (
                                          <button 
                                              onClick={() => startSorting(selectedCategory)}
-                                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
+                                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0"
                                              title="排序"
                                          >
                                              <GripVertical size={14} />
@@ -3890,4 +3926,5 @@ function App() {
 }
 
 export default App;
+
 
