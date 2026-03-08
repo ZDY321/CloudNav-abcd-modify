@@ -530,28 +530,6 @@ function App() {
     };
   };
 
-  // 单独检测结果重置：按分类重置
-  const resetCategorySingleCheckResults = (categoryId: string) => {
-    const categoryLinkIds = new Set(
-      links.filter(l => l.categoryId === categoryId).map(l => l.id)
-    );
-
-    setLinkCheckResults(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(id => {
-        if (categoryLinkIds.has(id)) {
-          delete next[id];
-        }
-      });
-      return next;
-    });
-  };
-
-  // 单独检测结果重置：全部重置
-  const resetAllSingleCheckResults = () => {
-    setLinkCheckResults({});
-  };
-
   // 数据发生变化后清除旧的查重标注，避免展示过期颜色
   useEffect(() => {
     setDuplicateHighlights({});
@@ -3441,15 +3419,8 @@ function App() {
                                    <Globe size={10} />
                                    检测
                                  </button>
-                                 <button
-                                   onClick={() => resetCategorySingleCheckResults(selectedCategory)}
-                                   className="flex items-center gap-1 px-2.5 py-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap shrink-0"
-                                   title="清除当前分类的单独检测结果，恢复以批量检测结果为准"
-                                 >
-                                   重置检测
-                                 </button>
-                               </>
-                             )}
+                              </>
+                            )}
                            </div>
                          )}
                      </div>
