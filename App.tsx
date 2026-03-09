@@ -721,12 +721,11 @@ function App() {
     if (!lastSyncedAt) return '';
 
     const syncedDate = new Date(lastSyncedAt);
-    const now = new Date();
-    const isSameDay = syncedDate.toDateString() === now.toDateString();
 
     return new Intl.DateTimeFormat('zh-CN', {
-      month: isSameDay ? undefined : '2-digit',
-      day: isSameDay ? undefined : '2-digit',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
