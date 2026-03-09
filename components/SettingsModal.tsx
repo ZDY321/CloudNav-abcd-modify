@@ -467,55 +467,75 @@ function notify(title, message) {
     <style>
         :root {
             --bg: #ffffff;
+            --panel: #f8fafc;
             --text: #1e293b;
             --border: #e2e8f0;
             --hover: #f1f5f9;
-            --accent: #3b82f6;
+            --accent: #2563eb;
+            --accent-soft: rgba(37, 99, 235, 0.08);
             --muted: #64748b;
+            --success: #15803d;
+            --warn: #b45309;
+            --danger: #dc2626;
         }
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg: #0f172a;
+                --panel: #111c33;
                 --text: #f1f5f9;
                 --border: #334155;
                 --hover: #1e293b;
                 --accent: #60a5fa;
+                --accent-soft: rgba(96, 165, 250, 0.12);
                 --muted: #94a3b8;
+                --success: #4ade80;
+                --warn: #f59e0b;
+                --danger: #f87171;
             }
         }
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 20px; width: 100%; box-sizing: border-box; }
-        
-        .header { position: sticky; top: 0; padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10; display: flex; gap: 8px; }
-        .search-input { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--hover); color: var(--text); outline: none; box-sizing: border-box; font-size: 13px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 20px; width: 100%; }
+        .header { position: sticky; top: 0; padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--border); z-index: 20; display: flex; gap: 8px; }
+        .search-input { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--hover); color: var(--text); outline: none; font-size: 13px; }
         .search-input:focus { border-color: var(--accent); }
-        
-        .refresh-btn { width: 30px; display: flex; items-center; justify-content: center; border: 1px solid var(--border); background: var(--hover); border-radius: 6px; color: var(--muted); cursor: pointer; transition: all 0.2s; }
+        .refresh-btn { width: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--hover); border-radius: 8px; color: var(--muted); cursor: pointer; transition: all 0.2s; }
         .refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
-        .refresh-btn:active { transform: scale(0.95); }
+        .refresh-btn:active { transform: scale(0.96); }
         .rotating { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        .content { padding: 4px; }
-        .cat-group { margin-bottom: 2px; }
-        .cat-header { 
-            padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); 
-            cursor: pointer; display: flex; items-center; gap: 8px; border-radius: 6px;
-            user-select: none; transition: background 0.1s;
-        }
+        .page-editor { margin: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(180deg, var(--accent-soft), transparent 72%), var(--panel); }
+        .editor-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+        .editor-title { font-size: 14px; font-weight: 700; }
+        .editor-status { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+        .editor-status[data-tone="success"] { color: var(--success); }
+        .editor-status[data-tone="warn"] { color: var(--warn); }
+        .editor-status[data-tone="error"] { color: var(--danger); }
+        .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: var(--warn); background: rgba(180, 83, 9, 0.12); }
+        .form-row { margin-bottom: 8px; }
+        .form-input, .form-select, .form-textarea { width: 100%; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+        .form-textarea { min-height: 64px; resize: vertical; }
+        .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .primary-btn, .secondary-btn { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .primary-btn { background: var(--accent); color: white; border-color: transparent; }
+        .primary-btn:hover { filter: brightness(1.05); }
+        .primary-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+        .secondary-btn { background: var(--bg); color: var(--text); }
+        .secondary-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .content { padding: 0 8px; }
+        .cat-group { margin-bottom: 4px; }
+        .cat-header { padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 8px; user-select: none; transition: background 0.1s; }
         .cat-header:hover { background: var(--hover); }
         .cat-arrow { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s; }
         .cat-header.active .cat-arrow { transform: rotate(90deg); color: var(--accent); }
-        
         .cat-links { display: none; padding-left: 8px; margin-bottom: 8px; }
         .cat-header.active + .cat-links { display: block; }
-        
-        .link-item { display: flex; items-center; gap: 8px; padding: 6px 8px; border-radius: 6px; text-decoration: none; color: var(--text); transition: background 0.1s; border-left: 2px solid transparent; }
+        .link-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; text-decoration: none; color: var(--text); transition: background 0.1s; border-left: 2px solid transparent; }
         .link-item:hover { background: var(--hover); border-left-color: var(--accent); }
-        .link-icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; items-center; justify-content: center; overflow: hidden; }
+        .link-icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .link-icon img { width: 100%; height: 100%; object-fit: contain; }
         .link-info { min-width: 0; flex: 1; }
         .link-title { font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-        
         .empty { text-align: center; padding: 20px; color: var(--muted); font-size: 12px; }
         .loading { display: flex; justify-content: center; padding: 40px; color: var(--accent); font-size: 12px; }
     </style>
@@ -526,6 +546,25 @@ function notify(title, message) {
         <button id="refresh" class="refresh-btn" title="同步最新数据">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
         </button>
+    </div>
+    <div class="page-editor">
+        <div class="editor-head">
+            <div>
+                <div class="editor-title">保存当前网页</div>
+                <div id="pageStatus" class="editor-status">准备读取当前标签页...</div>
+            </div>
+            <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
+        </div>
+        <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
+        <div class="form-row"><input id="pageUrl" class="form-input" type="text" placeholder="网页地址"></div>
+        <div class="form-row"><textarea id="pageDescription" class="form-textarea" placeholder="网页描述（可选）"></textarea></div>
+        <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
+        <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
+        <div class="form-row"><input id="pageIcon" class="form-input" type="text" placeholder="图标地址（可选）"></div>
+        <div class="form-actions">
+            <button id="fillCurrent" class="secondary-btn" type="button">读取当前页</button>
+            <button id="saveCurrent" class="primary-btn" type="button">保存到分类</button>
+        </div>
     </div>
     <div id="content" class="content">
         <div class="loading">初始化...</div>
@@ -562,60 +601,220 @@ document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('content');
     const searchInput = document.getElementById('search');
     const refreshBtn = document.getElementById('refresh');
-    
+    const pageStatus = document.getElementById('pageStatus');
+    const duplicateNote = document.getElementById('duplicateNote');
+    const titleInput = document.getElementById('pageTitle');
+    const urlInput = document.getElementById('pageUrl');
+    const descriptionInput = document.getElementById('pageDescription');
+    const categorySelect = document.getElementById('pageCategory');
+    const subCategoryWrap = document.getElementById('subCategoryWrap');
+    const subCategorySelect = document.getElementById('pageSubCategory');
+    const iconInput = document.getElementById('pageIcon');
+    const fillCurrentBtn = document.getElementById('fillCurrent');
+    const saveCurrentBtn = document.getElementById('saveCurrent');
+
     let allLinks = [];
     let allCategories = [];
-    let expandedCats = new Set(); 
+    let expandedCats = new Set();
+    let isSavingCurrent = false;
 
-    const getArrowIcon = () => {
-        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cat-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+    const escapeHtml = (value = '') => String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const ensureProtocol = (value = '') => {
+        const trimmed = String(value || '').trim();
+        if (!trimmed) return '';
+        if (/^https?:\\/\\//i.test(trimmed)) return trimmed;
+        return 'https://' + trimmed;
     };
 
-    const getFaviconUrl = (pageUrl) => {
+    const normalizeUrl = (value = '') => {
+        const safeValue = ensureProtocol(value);
+        if (!safeValue) return '';
         try {
-            const url = new URL(chrome.runtime.getURL("/_favicon/"));
-            url.searchParams.set("pageUrl", pageUrl);
-            url.searchParams.set("size", "32");
+            const parsed = new URL(safeValue);
+            const pathname = (parsed.pathname || '/').replace(/\\/$/, '') || '/';
+            return \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`;
+        } catch (e) {
+            return safeValue.replace(/\\/$/, '').toLowerCase();
+        }
+    };
+
+    const setStatus = (text, tone = 'muted') => {
+        pageStatus.textContent = text;
+        pageStatus.dataset.tone = tone;
+    };
+
+    const getArrowIcon = () => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cat-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+
+    const getDisplayIconUrl = (pageUrl) => {
+        try {
+            const url = new URL(chrome.runtime.getURL('/_favicon/'));
+            url.searchParams.set('pageUrl', pageUrl);
+            url.searchParams.set('size', '32');
             return url.toString();
         } catch (e) {
             return '';
         }
     };
 
-    const toggleCat = (id) => {
-        const header = document.querySelector(\`.cat-header[data-id="\${id}"]\`);
-        if (header) {
-            header.classList.toggle('active');
-            if (header.classList.contains('active')) {
-                expandedCats.add(id);
-            } else {
-                expandedCats.delete(id);
-            }
+    const getCloudNavIconUrl = (pageUrl) => {
+        try {
+            const parsed = new URL(ensureProtocol(pageUrl));
+            return \`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=\${encodeURIComponent(parsed.origin)}&size=128\`;
+        } catch (e) {
+            return '';
         }
     };
 
-    container.addEventListener('click', (e) => {
-        const header = e.target.closest('.cat-header');
-        if (header) {
-            toggleCat(header.dataset.id);
+    const findCategory = (categoryId) => allCategories.find(cat => cat.id === categoryId) || null;
+    const findSubCategory = (categoryId, subCategoryId) => {
+        const category = findCategory(categoryId);
+        if (!category || !Array.isArray(category.subcategories)) return null;
+        return category.subcategories.find(sub => sub.id === subCategoryId) || null;
+    };
+
+    const findExistingLink = (pageUrl) => {
+        const normalized = normalizeUrl(pageUrl);
+        if (!normalized) return null;
+        return allLinks.find(link => normalizeUrl(link.url) === normalized) || null;
+    };
+
+    const renderCategoryOptions = (selectedCategoryId) => {
+        const fallbackId = selectedCategoryId || categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
+        if (allCategories.length === 0) {
+            categorySelect.innerHTML = '<option value="common">常用推荐</option>';
+            categorySelect.value = 'common';
+            return;
         }
-    });
+
+        categorySelect.innerHTML = allCategories
+            .map(cat => \`<option value="\${escapeHtml(cat.id)}">\${escapeHtml(cat.name)}</option>\`)
+            .join('');
+
+        categorySelect.value = allCategories.some(cat => cat.id === fallbackId)
+            ? fallbackId
+            : allCategories[0].id;
+    };
+
+    const renderSubCategoryOptions = (selectedCategoryId, selectedSubCategoryId = '') => {
+        const category = findCategory(selectedCategoryId);
+        const subcategories = category && Array.isArray(category.subcategories) ? category.subcategories : [];
+
+        if (subcategories.length === 0) {
+            subCategoryWrap.style.display = 'none';
+            subCategorySelect.innerHTML = '<option value="">-- 不选择 --</option>';
+            return;
+        }
+
+        subCategoryWrap.style.display = 'block';
+        subCategorySelect.innerHTML = '<option value="">-- 不选择 --</option>' + subcategories
+            .map(sub => \`<option value="\${escapeHtml(sub.id)}">\${escapeHtml(sub.name)}</option>\`)
+            .join('');
+        subCategorySelect.value = subcategories.some(sub => sub.id === selectedSubCategoryId)
+            ? selectedSubCategoryId
+            : '';
+    };
+
+    const updateDuplicateState = () => {
+        const existing = findExistingLink(urlInput.value);
+        if (!existing) {
+            duplicateNote.style.display = 'none';
+            duplicateNote.textContent = '';
+            return;
+        }
+
+        const category = findCategory(existing.categoryId);
+        const subCategory = findSubCategory(existing.categoryId, existing.subCategoryId);
+        const locationText = [category ? category.name : existing.categoryId, subCategory ? subCategory.name : '']
+            .filter(Boolean)
+            .join(' / ');
+
+        duplicateNote.textContent = locationText ? \`已存在：\${locationText}\` : '该网页已存在';
+        duplicateNote.style.display = 'inline-flex';
+    };
+
+    const toggleCat = (id) => {
+        const header = document.querySelector(\`.cat-header[data-id="\${id}"]\`);
+        if (!header) return;
+
+        header.classList.toggle('active');
+        if (header.classList.contains('active')) {
+            expandedCats.add(id);
+        } else {
+            expandedCats.delete(id);
+        }
+    };
+
+    const getActiveTab = async () => {
+        let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tabs || tabs.length === 0) {
+            tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        }
+        return tabs && tabs[0] ? tabs[0] : null;
+    };
+
+    const fillCurrentTab = async (reuseExisting = true) => {
+        try {
+            const tab = await getActiveTab();
+            if (!tab || !tab.url) {
+                setStatus('未找到当前标签页，请手动填写网址。', 'error');
+                return;
+            }
+
+            if (/^(chrome|edge|about):\\/\\//i.test(tab.url)) {
+                setStatus('当前页面不支持直接保存，请切换到普通网页。', 'error');
+                return;
+            }
+
+            const existing = reuseExisting ? findExistingLink(tab.url) : null;
+            const safeIcon = tab.favIconUrl && /^(https?:|data:)/i.test(tab.favIconUrl)
+                ? tab.favIconUrl
+                : getCloudNavIconUrl(tab.url);
+
+            if (existing) {
+                titleInput.value = existing.title || tab.title || '';
+                urlInput.value = existing.url || tab.url;
+                descriptionInput.value = existing.description || '';
+                iconInput.value = existing.icon || safeIcon;
+                renderCategoryOptions(existing.categoryId);
+                renderSubCategoryOptions(existing.categoryId, existing.subCategoryId || '');
+                setStatus('已读取当前页，CloudNav 中已有同网址记录。可修改后再次保存。', 'warn');
+            } else {
+                titleInput.value = tab.title || '';
+                urlInput.value = tab.url;
+                descriptionInput.value = '';
+                iconInput.value = safeIcon;
+                const nextCategoryId = categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
+                renderCategoryOptions(nextCategoryId);
+                renderSubCategoryOptions(categorySelect.value, '');
+                setStatus('已读取当前页，可编辑后保存到指定分类。', 'success');
+            }
+
+            updateDuplicateState();
+        } catch (e) {
+            setStatus('读取当前标签页失败，请点击“读取当前页”重试。', 'error');
+        }
+    };
 
     const render = (filter = '') => {
-        const q = filter.toLowerCase();
+        const q = String(filter || '').toLowerCase();
+        const isSearching = q.length > 0;
         let html = '';
         let hasContent = false;
-        
-        const isSearching = q.length > 0;
 
         allCategories.forEach(cat => {
-            const catLinks = allLinks.filter(l => {
-                const inCat = l.categoryId === cat.id;
-                if (!inCat) return false;
+            const catLinks = allLinks.filter(link => {
+                if (link.categoryId !== cat.id) return false;
                 if (!q) return true;
-                return l.title.toLowerCase().includes(q) || 
-                       l.url.toLowerCase().includes(q) || 
-                       (l.description && l.description.toLowerCase().includes(q));
+
+                return String(link.title || '').toLowerCase().includes(q) ||
+                    String(link.url || '').toLowerCase().includes(q) ||
+                    String(link.description || '').toLowerCase().includes(q);
             });
 
             if (catLinks.length === 0) return;
@@ -626,36 +825,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             html += \`
             <div class="cat-group">
-                <div class="cat-header \${activeClass}" data-id="\${cat.id}">
+                <div class="cat-header \${activeClass}" data-id="\${escapeHtml(cat.id)}">
                     \${getArrowIcon()}
-                    <span>\${cat.name}</span>
+                    <span>\${escapeHtml(cat.name)}</span>
                 </div>
                 <div class="cat-links">
             \`;
-            
+
             catLinks.forEach(link => {
-                const iconSrc = getFaviconUrl(link.url);
+                const iconSrc = getDisplayIconUrl(link.url);
                 html += \`
-                    <a href="\${link.url}" target="_blank" class="link-item">
-                        <div class="link-icon"><img src="\${iconSrc}" /></div>
+                    <a href="\${escapeHtml(link.url)}" target="_blank" class="link-item">
+                        <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
-                            <div class="link-title">\${link.title}</div>
+                            <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
                         </div>
                     </a>
                 \`;
             });
 
-            html += \`</div></div>\`;
+            html += '</div></div>';
         });
 
-        if (!hasContent) {
-            container.innerHTML = filter ? '<div class="empty">无搜索结果</div>' : '<div class="empty">暂无数据</div>';
-        } else {
-            container.innerHTML = html;
-        }
+        container.innerHTML = hasContent
+            ? html
+            : (filter ? '<div class="empty">无搜索结果</div>' : '<div class="empty">暂无数据</div>');
+    };
+
+    const syncLocalCache = async () => {
+        await chrome.storage.local.set({
+            [CACHE_KEY]: {
+                links: allLinks,
+                categories: allCategories
+            }
+        });
     };
 
     const loadData = async (forceRefresh = false) => {
+        const keepCategoryId = categorySelect.value;
+        const keepSubCategoryId = subCategorySelect.value;
+
         try {
             if (!forceRefresh) {
                 const cached = await chrome.storage.local.get(CACHE_KEY);
@@ -663,38 +872,120 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const data = cached[CACHE_KEY];
                     allLinks = data.links || [];
                     allCategories = data.categories || [];
+                    renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
+                    renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
                     render(searchInput.value);
+                    updateDuplicateState();
                     return;
                 }
             }
 
             refreshBtn.classList.add('rotating');
-            container.innerHTML = '<div class="loading">同步数据中...</div>';
-            
+            if (!allLinks.length) {
+                container.innerHTML = '<div class="loading">同步数据中...</div>';
+            }
+
             const res = await fetch(\`\${CONFIG.apiBase}/api/storage\`, {
                 headers: { 'x-auth-password': CONFIG.password }
             });
-            
-            if (!res.ok) throw new Error("Sync failed");
-            
+
+            if (!res.ok) throw new Error('Sync failed');
+
             const data = await res.json();
             allLinks = data.links || [];
             allCategories = data.categories || [];
-            
-            await chrome.storage.local.set({ [CACHE_KEY]: data });
-            
+            await syncLocalCache();
+
+            renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
+            renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
             render(searchInput.value);
+            updateDuplicateState();
         } catch (e) {
-            container.innerHTML = \`<div class="empty" style="color:#ef4444">加载失败: \${e.message}<br>请点击右上角刷新</div>\`;
+            if (!allLinks.length) {
+                container.innerHTML = \`<div class="empty" style="color:#ef4444">加载失败: \${e.message}<br>请点击右上角刷新</div>\`;
+            }
         } finally {
             refreshBtn.classList.remove('rotating');
         }
     };
 
-    loadData();
+    const saveCurrentPage = async () => {
+        if (isSavingCurrent) return;
+
+        if (!CONFIG.password) {
+            setStatus('未检测到登录密码，请重新在 CloudNav 设置中生成扩展。', 'error');
+            return;
+        }
+
+        const title = titleInput.value.trim();
+        const finalUrl = ensureProtocol(urlInput.value);
+        const description = descriptionInput.value.trim();
+        const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
+        const subCategoryId = subCategorySelect.value || '';
+        const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
+
+        if (!title || !finalUrl) {
+            setStatus('标题和网址不能为空。', 'error');
+            return;
+        }
+
+        isSavingCurrent = true;
+        saveCurrentBtn.disabled = true;
+        saveCurrentBtn.textContent = '保存中...';
+        setStatus('正在保存当前网页...', 'muted');
+
+        try {
+            const res = await fetch(\`\${CONFIG.apiBase}/api/link\`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-auth-password': CONFIG.password
+                },
+                body: JSON.stringify({
+                    title,
+                    url: finalUrl,
+                    description,
+                    categoryId,
+                    subCategoryId: subCategoryId || undefined,
+                    icon
+                })
+            });
+
+            if (!res.ok) {
+                throw new Error(\`服务器错误: \${res.status}\`);
+            }
+
+            await loadData(true);
+            setStatus('当前网页已保存到所选分类。', 'success');
+            updateDuplicateState();
+        } catch (e) {
+            setStatus(e && e.message ? e.message : '保存失败，请稍后重试。', 'error');
+        } finally {
+            isSavingCurrent = false;
+            saveCurrentBtn.disabled = false;
+            saveCurrentBtn.textContent = '保存到分类';
+        }
+    };
+
+    container.addEventListener('click', (e) => {
+        const header = e.target.closest('.cat-header');
+        if (header) {
+            toggleCat(header.dataset.id);
+        }
+    });
+
+    await loadData();
+    await fillCurrentTab();
 
     searchInput.addEventListener('input', (e) => render(e.target.value));
-    refreshBtn.addEventListener('click', () => loadData(true));
+    refreshBtn.addEventListener('click', async () => {
+        await loadData(true);
+        updateDuplicateState();
+    });
+    fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
+    saveCurrentBtn.addEventListener('click', saveCurrentPage);
+    categorySelect.addEventListener('change', () => renderSubCategoryOptions(categorySelect.value, ''));
+    urlInput.addEventListener('input', updateDuplicateState);
 
     chrome.runtime.onMessage.addListener((msg) => {
         if (msg.type === 'refresh') {
