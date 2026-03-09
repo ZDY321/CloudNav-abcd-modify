@@ -617,6 +617,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allCategories = [];
     let expandedCats = new Set();
     let isSavingCurrent = false;
+    let lastSavedFeedback = null;
 
     const escapeHtml = (value = '') => String(value)
         .replace(/&/g, '&amp;')
@@ -684,6 +685,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return allLinks.find(link => normalizeUrl(link.url) === normalized) || null;
     };
 
+    const getLocationText = (categoryId, subCategoryId) => {
+        const category = findCategory(categoryId);
+        const subCategory = findSubCategory(categoryId, subCategoryId);
+        return [category ? category.name : categoryId, subCategory ? subCategory.name : '']
+            .filter(Boolean)
+            .join(' / ');
+    };
+
     const renderCategoryOptions = (selectedCategoryId) => {
         const fallbackId = selectedCategoryId || categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
         if (allCategories.length === 0) {
@@ -721,6 +730,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateDuplicateState = () => {
+        const normalizedUrl = normalizeUrl(urlInput.value);
+        if (lastSavedFeedback && lastSavedFeedback.normalizedUrl === normalizedUrl) {
+            const locationText = getLocationText(lastSavedFeedback.categoryId, lastSavedFeedback.subCategoryId);
+            duplicateNote.textContent = lastSavedFeedback.isNew
+                ? (locationText ? \`已添加：\${locationText}\` : '已添加')
+                : (locationText ? \`已存在：\${locationText}\` : '该网页已存在');
+            duplicateNote.style.display = 'inline-flex';
+            return;
+        }
+
         const existing = findExistingLink(urlInput.value);
         if (!existing) {
             duplicateNote.style.display = 'none';
@@ -728,11 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const category = findCategory(existing.categoryId);
-        const subCategory = findSubCategory(existing.categoryId, existing.subCategoryId);
-        const locationText = [category ? category.name : existing.categoryId, subCategory ? subCategory.name : '']
-            .filter(Boolean)
-            .join(' / ');
+        const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
 
         duplicateNote.textContent = locationText ? \`已存在：\${locationText}\` : '该网页已存在';
         duplicateNote.style.display = 'inline-flex';
@@ -923,6 +938,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         const subCategoryId = subCategorySelect.value || '';
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
+        const normalizedUrl = normalizeUrl(finalUrl);
+        const existedBeforeSave = !!findExistingLink(finalUrl);
 
         if (!title || !finalUrl) {
             setStatus('标题和网址不能为空。', 'error');
@@ -955,8 +972,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error(\`服务器错误: \${res.status}\`);
             }
 
+            lastSavedFeedback = {
+                normalizedUrl,
+                isNew: !existedBeforeSave,
+                categoryId,
+                subCategoryId
+            };
             await loadData(true);
-            setStatus('当前网页已保存到所选分类。', 'success');
+            setStatus(existedBeforeSave ? '当前网页已更新到所选分类。' : '当前网页已添加到所选分类。', 'success');
             updateDuplicateState();
         } catch (e) {
             setStatus(e && e.message ? e.message : '保存失败，请稍后重试。', 'error');
@@ -985,7 +1008,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
     saveCurrentBtn.addEventListener('click', saveCurrentPage);
     categorySelect.addEventListener('change', () => renderSubCategoryOptions(categorySelect.value, ''));
-    urlInput.addEventListener('input', updateDuplicateState);
+    urlInput.addEventListener('input', () => {
+        if (lastSavedFeedback && lastSavedFeedback.normalizedUrl !== normalizeUrl(urlInput.value)) {
+            lastSavedFeedback = null;
+        }
+        updateDuplicateState();
+    });
 
     chrome.runtime.onMessage.addListener((msg) => {
         if (msg.type === 'refresh') {
