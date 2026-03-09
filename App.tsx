@@ -159,6 +159,7 @@ const AUTH_KEY = 'cloudnav_auth_token';
 const WEBDAV_CONFIG_KEY = 'cloudnav_webdav_config';
 const AI_CONFIG_KEY = 'cloudnav_ai_config';
 const SEARCH_CONFIG_KEY = 'cloudnav_search_config';
+const LAST_SYNC_TIME_KEY = 'cloudnav_last_sync_time';
 
 function App() {
   // --- State ---
@@ -233,7 +234,13 @@ function App() {
   const [prefillLink, setPrefillLink] = useState<Partial<LinkItem> | undefined>(undefined);
   
   // Sync State
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'offline'>('idle');
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
+    const saved = localStorage.getItem(LAST_SYNC_TIME_KEY);
+    if (!saved) return null;
+    const parsed = Number(saved);
+    return Number.isFinite(parsed) ? parsed : null;
+  });
   const [authToken, setAuthToken] = useState<string>('');
   const [requiresAuth, setRequiresAuth] = useState<boolean | null>(null); // null表示未检查，true表示需要认证，false表示不需要
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -705,6 +712,42 @@ function App() {
     }
   };
 
+  const markSynced = (timestamp: number = Date.now()) => {
+    setLastSyncedAt(timestamp);
+    localStorage.setItem(LAST_SYNC_TIME_KEY, timestamp.toString());
+  };
+
+  const formattedLastSyncedAt = useMemo(() => {
+    if (!lastSyncedAt) return '';
+
+    const syncedDate = new Date(lastSyncedAt);
+    const now = new Date();
+    const isSameDay = syncedDate.toDateString() === now.toDateString();
+
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: isSameDay ? undefined : '2-digit',
+      day: isSameDay ? undefined : '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(syncedDate);
+  }, [lastSyncedAt]);
+
+  const syncStatusLabel = useMemo(() => {
+    if (!authToken) return '离线';
+    if (syncStatus === 'saving') return '同步中';
+    if (syncStatus === 'error') return '同步失败';
+    if (formattedLastSyncedAt) return `已同步 ${formattedLastSyncedAt}`;
+    return '已同步';
+  }, [authToken, syncStatus, formattedLastSyncedAt]);
+
+  const syncStatusTextClass = useMemo(() => {
+    if (!authToken) return 'text-amber-500';
+    if (syncStatus === 'saving') return 'text-blue-500';
+    if (syncStatus === 'error') return 'text-red-500';
+    return 'text-green-600';
+  }, [authToken, syncStatus]);
+
   const syncToCloud = async (newLinks: LinkItem[], newCategories: Category[], token: string) => {
     setSyncStatus('saving');
     try {
@@ -739,6 +782,7 @@ function App() {
         if (!response.ok) throw new Error('Network response was not ok');
         
         setSyncStatus('saved');
+        markSynced();
         setTimeout(() => setSyncStatus('idle'), 2000);
         return true;
     } catch (error) {
@@ -1080,6 +1124,9 @@ function App() {
                 headers: requestToken ? { 'x-auth-password': requestToken } : {}
             });
             if (res.ok) {
+                if (requestToken) {
+                    markSynced();
+                }
                 const data = await res.json();
                 if (data.links && data.links.length > 0) {
                     setLinks(data.links);
@@ -1416,6 +1463,7 @@ function App() {
                     }
                 });
                 if (res.ok) {
+                    markSynced();
                     const data = await res.json();
                     // 如果服务器有数据，使用服务器数据
                     if (data.links && data.links.length > 0) {
@@ -3046,7 +3094,7 @@ function App() {
                  {syncStatus === 'saving' && <Loader2 className="animate-spin w-3 h-3 text-blue-500" />}
                  {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
                  {syncStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
-                 {authToken ? <span className="text-green-600">已同步</span> : <span className="text-amber-500">离线</span>}
+                 <span className={syncStatusTextClass}>{syncStatusLabel}</span>
                </div>
 
                <a 
