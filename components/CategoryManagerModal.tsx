@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, Lock, Unlock, Palette, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { X, ArrowUp, ArrowDown, Trash2, Edit2, Plus, Check, Lock, Palette, ChevronDown, ChevronRight, GripVertical, ArrowDownAZ, ArrowUpDown, ArrowRightLeft } from 'lucide-react';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Category, SubCategory } from '../types';
 import Icon from './Icon';
 import IconSelector from './IconSelector';
@@ -11,6 +14,7 @@ interface CategoryManagerModalProps {
   categories: Category[];
   onUpdateCategories: (newCategories: Category[]) => void;
   onDeleteCategory: (id: string) => void;
+  onMoveSubCategory?: (fromCategoryId: string, subCategoryId: string, toCategoryId: string) => void;
   onVerifyPassword?: (password: string) => Promise<boolean>;
 }
 
@@ -20,6 +24,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   categories, 
   onUpdateCategories,
   onDeleteCategory,
+  onMoveSubCategory,
   onVerifyPassword
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,6 +47,9 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [newSubCatName, setNewSubCatName] = useState('');
   const [newSubCatIcon, setNewSubCatIcon] = useState('Tag');
   const [addingSubToCatId, setAddingSubToCatId] = useState<string | null>(null);
+  const [sortingSubCatId, setSortingSubCatId] = useState<string | null>(null);
+  const [movingSub, setMovingSub] = useState<{ fromCatId: string; subId: string } | null>(null);
+  const [moveTargetCatId, setMoveTargetCatId] = useState<string>('');
   
   // 分类操作验证相关状态
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -52,6 +60,18 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   } | null>(null);
 
   if (!isOpen) return null;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 }
+    })
+  );
+
+  const categoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach(c => map.set(c.id, c.name));
+    return map;
+  }, [categories]);
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const newCats = [...categories];
@@ -285,6 +305,164 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     
     onUpdateCategories(newCats);
   };
+
+  const startMoveSubCategory = (fromCatId: string, subId: string) => {
+    const firstOther = categories.find(c => c.id !== fromCatId)?.id || '';
+    setMovingSub({ fromCatId, subId });
+    setMoveTargetCatId(firstOther);
+  };
+
+  const cancelMoveSubCategory = () => {
+    setMovingSub(null);
+    setMoveTargetCatId('');
+  };
+
+  const confirmMoveSubCategory = () => {
+    if (!movingSub || !moveTargetCatId || movingSub.fromCatId === moveTargetCatId) return;
+    if (!onMoveSubCategory) return;
+    onMoveSubCategory(movingSub.fromCatId, movingSub.subId, moveTargetCatId);
+    cancelMoveSubCategory();
+  };
+
+  const toggleSubCategorySorting = (catId: string) => {
+    setSortingSubCatId(prev => (prev === catId ? null : catId));
+  };
+
+  const autoSortSubCategories = (catId: string) => {
+    const newCats = categories.map(c => {
+      if (c.id !== catId) return c;
+      const subcategories = [...(c.subcategories || [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+      return { ...c, subcategories };
+    });
+    onUpdateCategories(newCats);
+  };
+
+  const handleSubCategoryDragEnd = (catId: string, event: DragEndEvent) => {
+    if (sortingSubCatId !== catId) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const newCats = categories.map(c => {
+      if (c.id !== catId) return c;
+      const current = c.subcategories || [];
+      const activeIndex = current.findIndex(s => s.id === active.id);
+      const overIndex = current.findIndex(s => s.id === over.id);
+      if (activeIndex < 0 || overIndex < 0) return c;
+      return { ...c, subcategories: arrayMove(current, activeIndex, overIndex) };
+    });
+
+    onUpdateCategories(newCats);
+  };
+
+  const SortableSubCategoryRow: React.FC<{
+    catId: string;
+    sub: SubCategory;
+    isSorting: boolean;
+    onStartEdit: (sub: SubCategory) => void;
+    onDelete: (catId: string, subId: string, subName: string) => void;
+  }> = ({ catId, sub, isSorting, onStartEdit, onDelete }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      setActivatorNodeRef,
+      transform,
+      transition
+    } = useSortable({ id: sub.id, disabled: !isSorting });
+
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`flex items-center gap-2 py-1.5 px-2 rounded-md border ${
+          isSorting
+            ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600'
+            : 'bg-white dark:bg-slate-800 border-transparent'
+        }`}
+      >
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
+            isSorting ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
+          }`}
+          title={isSorting ? '拖拽排序' : '开启手动排序后可拖拽'}
+          {...(isSorting ? attributes : {})}
+          {...(isSorting ? listeners : {})}
+          onClick={(e) => e.preventDefault()}
+        >
+          <GripVertical size={14} />
+        </button>
+
+        {editingSubId === sub.id ? (
+          <>
+            <Icon name={editSubIcon} size={14} />
+            <input
+              type="text"
+              value={editSubName}
+              onChange={(e) => setEditSubName(e.target.value)}
+              className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
+              placeholder="二级分类名称"
+              autoFocus
+            />
+            <button
+              onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
+              className="p-1 text-slate-400 hover:text-blue-500"
+              title="选择图标"
+            >
+              <Palette size={12} />
+            </button>
+            <button
+              onClick={() => saveEditSubCategory(catId)}
+              className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
+            >
+              <Check size={14} />
+            </button>
+            <button
+              onClick={() => setEditingSubId(null)}
+              className="p-1 text-slate-400 hover:text-red-500"
+            >
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <Icon name={sub.icon} size={14} />
+            <span className="flex-1 text-sm dark:text-slate-300">{sub.name}</span>
+            {onMoveSubCategory && (
+              <button
+                type="button"
+                onClick={() => startMoveSubCategory(catId, sub.id)}
+                className="p-1 text-slate-400 hover:text-purple-500"
+                title="移动到其他一级分类"
+              >
+                <ArrowRightLeft size={12} />
+              </button>
+            )}
+            <button
+              onClick={() => onStartEdit(sub)}
+              className="p-1 text-slate-400 hover:text-blue-500"
+              title="编辑"
+            >
+              <Edit2 size={12} />
+            </button>
+            <button
+              onClick={() => onDelete(catId, sub.id, sub.name)}
+              className="p-1 text-slate-400 hover:text-red-500"
+              title="删除"
+            >
+              <Trash2 size={12} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
   
   const cancelIconSelector = () => {
     setIsIconSelectorOpen(false);
@@ -428,61 +606,96 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               {/* 二级分类列表 */}
               {expandedCatIds.has(cat.id) && (
                 <div className="ml-8 mt-2 space-y-1 border-l-2 border-slate-200 dark:border-slate-600 pl-3">
-                  {cat.subcategories && cat.subcategories.map(sub => (
-                    <div key={sub.id} className="flex items-center gap-2 py-1.5 px-2 bg-white dark:bg-slate-800 rounded-md">
-                      {editingSubId === sub.id ? (
-                        <>
-                          <Icon name={editSubIcon} size={14} />
-                          <input
-                            type="text"
-                            value={editSubName}
-                            onChange={(e) => setEditSubName(e.target.value)}
-                            className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
-                            placeholder="二级分类名称"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
-                            className="p-1 text-slate-400 hover:text-blue-500"
-                            title="选择图标"
-                          >
-                            <Palette size={12} />
-                          </button>
-                          <button
-                            onClick={() => saveEditSubCategory(cat.id)}
-                            className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
-                          >
-                            <Check size={14} />
-                          </button>
-                          <button
-                            onClick={() => setEditingSubId(null)}
-                            className="p-1 text-slate-400 hover:text-red-500"
-                          >
-                            <X size={14} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <Icon name={sub.icon} size={14} />
-                          <span className="flex-1 text-sm dark:text-slate-300">{sub.name}</span>
-                          <button
-                            onClick={() => startEditSubCategory(sub)}
-                            className="p-1 text-slate-400 hover:text-blue-500"
-                            title="编辑"
-                          >
-                            <Edit2 size={12} />
-                          </button>
-                          <button
-                            onClick={() => deleteSubCategory(cat.id, sub.id, sub.name)}
-                            className="p-1 text-slate-400 hover:text-red-500"
-                            title="删除"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-slate-400">
+                      二级分类{cat.subcategories && cat.subcategories.length > 0 ? `（${cat.subcategories.length}）` : ''}
                     </div>
-                  ))}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleSubCategorySorting(cat.id)}
+                        className={`px-2 py-1 text-xs rounded border transition-colors ${
+                          sortingSubCatId === cat.id
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                            : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
+                        }`}
+                        title="开启/关闭手动排序（拖拽）"
+                      >
+                        <ArrowUpDown size={12} className="inline-block mr-1" />
+                        手动
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => autoSortSubCategories(cat.id)}
+                        disabled={!cat.subcategories || cat.subcategories.length < 2}
+                        className="px-2 py-1 text-xs rounded border bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                        title={`自动按名称排序（${categoryNameMap.get(cat.id) || cat.id}）`}
+                      >
+                        <ArrowDownAZ size={12} className="inline-block mr-1" />
+                        A-Z
+                      </button>
+                    </div>
+                  </div>
+
+                  {cat.subcategories && cat.subcategories.length > 0 && (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(e) => handleSubCategoryDragEnd(cat.id, e)}
+                    >
+                      <SortableContext items={cat.subcategories.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-1 mt-1">
+                          {movingSub && movingSub.fromCatId === cat.id && (
+                            <div className="flex items-center gap-2 py-2 px-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900">
+                              <span className="text-xs text-purple-700 dark:text-purple-300">
+                                移动“{cat.subcategories.find(s => s.id === movingSub.subId)?.name || '未命名'}”到：
+                              </span>
+                              <select
+                                value={moveTargetCatId}
+                                onChange={(e) => setMoveTargetCatId(e.target.value)}
+                                className="flex-1 p-1.5 text-sm rounded border border-purple-300 dark:border-purple-800 dark:bg-slate-800 dark:text-white outline-none"
+                              >
+                                {categories
+                                  .filter(c => c.id !== cat.id)
+                                  .map(c => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={confirmMoveSubCategory}
+                                disabled={!moveTargetCatId}
+                                className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-slate-700 rounded disabled:opacity-50"
+                                title="确认移动"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelMoveSubCategory}
+                                className="p-1.5 text-slate-400 hover:text-red-500 rounded"
+                                title="取消"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          )}
+                          {cat.subcategories.map(sub => (
+                            <SortableSubCategoryRow
+                              key={sub.id}
+                              catId={cat.id}
+                              sub={sub}
+                              isSorting={sortingSubCatId === cat.id}
+                              onStartEdit={startEditSubCategory}
+                              onDelete={deleteSubCategory}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
                   
                   {/* 添加新二级分类输入框 */}
                   {addingSubToCatId === cat.id && (

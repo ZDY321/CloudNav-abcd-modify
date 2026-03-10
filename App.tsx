@@ -2072,6 +2072,45 @@ function App() {
       updateData(newLinks, newCats);
   };
 
+  const handleMoveSubCategory = (fromCategoryId: string, subCategoryId: string, toCategoryId: string) => {
+      if (!authToken) { setIsAuthOpen(true); return; }
+      if (fromCategoryId === toCategoryId) return;
+
+      const fromCat = categories.find(c => c.id === fromCategoryId);
+      const toCat = categories.find(c => c.id === toCategoryId);
+      const sub = fromCat?.subcategories?.find(s => s.id === subCategoryId);
+
+      if (!fromCat || !toCat || !sub) return;
+
+      if (toCat.subcategories?.some(s => s.id === subCategoryId)) {
+        alert('目标分类已存在同ID的二级分类，无法移动。');
+        return;
+      }
+
+      const newCats = categories.map(c => {
+        if (c.id === fromCategoryId) {
+          return { ...c, subcategories: (c.subcategories || []).filter(s => s.id !== subCategoryId) };
+        }
+        if (c.id === toCategoryId) {
+          return { ...c, subcategories: [...(c.subcategories || []), sub] };
+        }
+        return c;
+      });
+
+      const newLinks = links.map(l =>
+        l.categoryId === fromCategoryId && l.subCategoryId === subCategoryId
+          ? { ...l, categoryId: toCategoryId }
+          : l
+      );
+
+      if (selectedCategory === fromCategoryId && selectedSubCategory === subCategoryId) {
+        setSelectedCategory(toCategoryId);
+        setSelectedSubCategory(subCategoryId);
+      }
+
+      updateData(newLinks, newCats);
+  };
+
   const handleDeleteCategory = (catId: string) => {
       if (!authToken) { setIsAuthOpen(true); return; }
       
@@ -2853,6 +2892,7 @@ function App() {
         categories={categories}
         onUpdateCategories={handleUpdateCategories}
         onDeleteCategory={handleDeleteCategory}
+        onMoveSubCategory={handleMoveSubCategory}
         onVerifyPassword={handleCategoryActionAuth}
       />
 
@@ -2990,13 +3030,26 @@ function App() {
                 const hasSubCategories = cat.subcategories && cat.subcategories.length > 0;
                 const isExpanded = expandedCategories.has(cat.id);
                 const isSelected = selectedCategory === cat.id && !selectedSubCategory;
+                const isChildSelected = selectedCategory === cat.id && !!selectedSubCategory;
+                const isGroupExpanded = hasSubCategories && isExpanded;
                 
                 return (
-                  <div key={cat.id}>
+                  <div
+                    key={cat.id}
+                    className={
+                      isGroupExpanded
+                        ? 'rounded-2xl bg-slate-50 dark:bg-slate-700/20 p-1 ring-1 ring-slate-200/70 dark:ring-slate-600/40'
+                        : ''
+                    }
+                  >
                     <div className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all group ${
-                      selectedCategory === cat.id 
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      isSelected
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium ring-2 ring-blue-200/80 dark:ring-blue-800/50'
+                        : isChildSelected
+                          ? 'bg-blue-50/60 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 ring-1 ring-blue-200/70 dark:ring-blue-800/40'
+                          : isGroupExpanded
+                            ? 'bg-white/70 dark:bg-slate-800/40 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800/60'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}>
                       <div className="w-4 h-4 shrink-0 flex items-center justify-center">
                         {hasSubCategories && (
@@ -3013,7 +3066,13 @@ function App() {
                         onClick={() => handleCategoryClick(cat)}
                         className="flex items-center gap-2 flex-1 text-left"
                       >
-                        <div className={`p-1 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                        <div className={`p-1 rounded-lg transition-colors flex items-center justify-center ${
+                          isSelected || isChildSelected
+                            ? 'bg-blue-100 dark:bg-blue-800'
+                            : isGroupExpanded
+                              ? 'bg-slate-200/70 dark:bg-slate-700/60'
+                              : 'bg-slate-100 dark:bg-slate-800'
+                        }`}>
                           {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
                         </div>
                         <span className="truncate flex-1 text-left">{cat.name}</span>
@@ -3026,7 +3085,7 @@ function App() {
                     
                     {/* 二级分类列表 */}
                     {hasSubCategories && isExpanded && (
-                      <div className="ml-6 mt-1 space-y-1">
+                      <div className="ml-6 mt-1 space-y-1 rounded-xl bg-white/60 dark:bg-slate-800/20 p-1">
                         {cat.subcategories!.map(subCat => {
                           const isSubSelected = selectedCategory === cat.id && selectedSubCategory === subCat.id;
                           return (
@@ -3035,12 +3094,14 @@ function App() {
                               onClick={() => handleSubCategoryClick(cat.id, subCat.id)}
                               className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all ${
                                 isSubSelected
-                                  ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-600 dark:text-blue-400 font-medium'
-                                  : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                  ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-600 dark:text-blue-400 font-medium ring-2 ring-blue-200/70 dark:ring-blue-800/50'
+                                  : 'bg-white/70 dark:bg-slate-800/30 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
                               }`}
                             >
                               <div className={`p-1 rounded flex items-center justify-center ${
-                                isSubSelected ? 'bg-blue-200 dark:bg-blue-700' : 'bg-slate-200 dark:bg-slate-700'
+                                isSubSelected
+                                  ? 'bg-blue-200 dark:bg-blue-700'
+                                  : 'bg-slate-200/80 dark:bg-slate-700/70'
                               }`}>
                                 <Icon name={subCat.icon} size={12} />
                               </div>
