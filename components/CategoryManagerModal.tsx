@@ -58,9 +58,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     categoryId: string;
     categoryName: string;
   } | null>(null);
-
-  if (!isOpen) return null;
-
+  
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 }
@@ -72,6 +70,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     categories.forEach(c => map.set(c.id, c.name));
     return map;
   }, [categories]);
+
+  if (!isOpen) return null;
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const newCats = [...categories];
