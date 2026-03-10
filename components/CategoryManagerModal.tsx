@@ -49,7 +49,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [newSubCatName, setNewSubCatName] = useState('');
   const [newSubCatIcon, setNewSubCatIcon] = useState('Tag');
   const [addingSubToCatId, setAddingSubToCatId] = useState<string | null>(null);
-  const [isCategorySorting, setIsCategorySorting] = useState(false);
+  const [isCategorySorting, setIsCategorySorting] = useState(true);
   const [sortingSubCatId, setSortingSubCatId] = useState<string | null>(null);
   const [movingSub, setMovingSub] = useState<{ fromCatId: string; subId: string } | null>(null);
   const [moveTargetCatId, setMoveTargetCatId] = useState<string>('');
@@ -96,6 +96,13 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
     const el = document.getElementById(`cat-card-${catId}`);
     el?.scrollIntoView({ block: 'nearest' });
+
+    setTimeout(() => {
+      if (!listScrollRef.current) return;
+      listScrollRef.current.scrollTop = scrollTop;
+      const elAfter = document.getElementById(`cat-card-${catId}`);
+      elAfter?.scrollIntoView({ block: 'nearest' });
+    }, 0);
   }, [expandedCatIds, editingId, editingSubId, addingSubToCatId, movingSub, demotingCatId, demoteConfirm]);
 
   if (!isOpen) return null;
@@ -446,6 +453,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     onStartEdit: (catId: string, sub: SubCategory) => void;
     onDelete: (catId: string, subId: string, subName: string) => void;
   }> = ({ catId, sub, isSorting, onStartEdit, onDelete }) => {
+    const editInputRef = useRef<HTMLInputElement | null>(null);
+
     const {
       attributes,
       listeners,
@@ -459,6 +468,18 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       transform: CSS.Transform.toString(transform),
       transition
     };
+
+    useLayoutEffect(() => {
+      if (editingSubId !== sub.id) return;
+      const input = editInputRef.current;
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch {
+        input.focus();
+      }
+      input.select?.();
+    }, [editingSubId, sub.id]);
 
     return (
       <div
@@ -488,12 +509,12 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           <>
             <Icon name={editSubIcon} size={14} />
             <input
+              ref={editInputRef}
               type="text"
               value={editSubName}
               onChange={(e) => setEditSubName(e.target.value)}
               className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
               placeholder="二级分类名称"
-              autoFocus
             />
             <button
               onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
@@ -551,6 +572,9 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   const SortableCategoryCard: React.FC<{ cat: Category }> = ({ cat }) => {
     const isSortableEnabled = isCategorySorting && cat.id !== 'common';
+    const editNameInputRef = useRef<HTMLInputElement | null>(null);
+    const addSubInputRef = useRef<HTMLInputElement | null>(null);
+
     const {
       attributes,
       listeners,
@@ -564,6 +588,32 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       transform: CSS.Transform.toString(transform),
       transition
     };
+
+    useLayoutEffect(() => {
+      if (editingId !== cat.id || cat.id === 'common') return;
+      const input = editNameInputRef.current;
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch {
+        input.focus();
+      }
+      input.select?.();
+    }, [editingId, cat.id]);
+
+    useLayoutEffect(() => {
+      if (addingSubToCatId !== cat.id) return;
+      const input = addSubInputRef.current;
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch {
+        input.focus();
+      }
+      input.select?.();
+    }, [addingSubToCatId, cat.id]);
+
+    const subCount = cat.subcategories?.length ?? 0;
 
     return (
       <div
@@ -593,12 +643,12 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Icon name={editIcon} size={16} />
                   <input
+                    ref={editNameInputRef}
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
                     placeholder="分类名称"
-                    autoFocus
                   />
                   <button
                     type="button"
@@ -629,6 +679,14 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     <span className="ml-2 text-xs text-slate-400">(默认分类，不可编辑)</span>
                   )}
                 </span>
+                {subCount > 0 && (
+                  <span
+                    className="px-1.5 py-0.5 text-xs font-medium bg-white/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-300 rounded-full border border-slate-200 dark:border-slate-600"
+                    title="二级分类数量"
+                  >
+                    {subCount}
+                  </span>
+                )}
                 {cat.password && <Lock size={12} className="text-slate-400" />}
               </div>
             )}
@@ -825,13 +883,13 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               <div className="flex items-center gap-2 py-1.5 px-2 bg-blue-50 dark:bg-blue-900/30 rounded-md">
                 <Icon name={newSubCatIcon} size={14} />
                 <input
+                  ref={addSubInputRef}
                   type="text"
                   value={newSubCatName}
                   onChange={(e) => setNewSubCatName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory(cat.id)}
                   className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
                   placeholder="新二级分类名称"
-                  autoFocus
                 />
                 <button
                   onClick={() => { setIconSelectorTarget('subNew'); setIsIconSelectorOpen(true); }}
