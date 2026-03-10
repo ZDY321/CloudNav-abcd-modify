@@ -2111,6 +2111,55 @@ function App() {
       updateData(newLinks, newCats);
   };
 
+  const handleDemoteCategoryToSubCategory = (fromCategoryId: string, toCategoryId: string) => {
+      if (!authToken) { setIsAuthOpen(true); return; }
+      if (fromCategoryId === 'common') {
+        alert('"常用推荐"不能被移动为二级分类');
+        return;
+      }
+      if (fromCategoryId === toCategoryId) return;
+
+      const fromCat = categories.find(c => c.id === fromCategoryId);
+      const toCat = categories.find(c => c.id === toCategoryId);
+      if (!fromCat || !toCat) return;
+
+      const existingSubIds = new Set((toCat.subcategories || []).map(s => s.id));
+      let newSubId = `demoted-${fromCategoryId}`;
+      if (existingSubIds.has(newSubId)) {
+        newSubId = `demoted-${fromCategoryId}-${Date.now()}`;
+      }
+
+      const newSub = { id: newSubId, name: fromCat.name, icon: fromCat.icon };
+
+      const newCats = categories
+        .filter(c => c.id !== fromCategoryId)
+        .map(c => {
+          if (c.id !== toCategoryId) return c;
+          return { ...c, subcategories: [...(c.subcategories || []), newSub] };
+        });
+
+      const newLinks = links.map(l => {
+        if (l.categoryId !== fromCategoryId) return l;
+        return { ...l, categoryId: toCategoryId, subCategoryId: newSubId };
+      });
+
+      setUnlockedCategoryIds(prev => {
+        if (!prev.has(fromCategoryId)) return prev;
+        const next = new Set(prev);
+        next.delete(fromCategoryId);
+        return next;
+      });
+
+      if (selectedCategory === fromCategoryId) {
+        setSelectedCategory(toCategoryId);
+        setSelectedSubCategory(newSubId);
+      }
+
+      setExpandedCategories(prev => new Set(prev).add(toCategoryId));
+
+      updateData(newLinks, newCats);
+  };
+
   const handleDeleteCategory = (catId: string) => {
       if (!authToken) { setIsAuthOpen(true); return; }
       
@@ -2893,6 +2942,7 @@ function App() {
         onUpdateCategories={handleUpdateCategories}
         onDeleteCategory={handleDeleteCategory}
         onMoveSubCategory={handleMoveSubCategory}
+        onDemoteCategoryToSubCategory={handleDemoteCategoryToSubCategory}
         onVerifyPassword={handleCategoryActionAuth}
       />
 
