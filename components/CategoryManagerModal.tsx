@@ -916,8 +916,15 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                 <div className="text-base font-semibold text-slate-900 dark:text-slate-100">确认移动</div>
                 <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  确认将一级分类“{categoryNameMap.get(demoteConfirm.fromCatId) || demoteConfirm.fromCatId}”
-                  移动为“{categoryNameMap.get(demoteConfirm.toCatId) || demoteConfirm.toCatId}”下的二级分类吗？
+                  确认将一级分类
+                  <span className="mx-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200">
+                    {categoryNameMap.get(demoteConfirm.fromCatId) || demoteConfirm.fromCatId}
+                  </span>
+                  移动为
+                  <span className="mx-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+                    {categoryNameMap.get(demoteConfirm.toCatId) || demoteConfirm.toCatId}
+                  </span>
+                  下的二级分类吗？
                 </div>
               </div>
               <div className="p-4 text-sm text-slate-600 dark:text-slate-400">
