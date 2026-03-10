@@ -80,6 +80,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     return map;
   }, [categories]);
 
+  const captureListScroll = (catId: string) => {
+    if (!listScrollRef.current) return;
+    pendingScrollFixRef.current = { scrollTop: listScrollRef.current.scrollTop, catId };
+  };
+
   useLayoutEffect(() => {
     if (!pendingScrollFixRef.current) return;
     const { scrollTop, catId } = pendingScrollFixRef.current;
@@ -91,7 +96,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
     const el = document.getElementById(`cat-card-${catId}`);
     el?.scrollIntoView({ block: 'nearest' });
-  }, [expandedCatIds]);
+  }, [expandedCatIds, editingId, editingSubId, addingSubToCatId, movingSub, demotingCatId, demoteConfirm]);
 
   if (!isOpen) return null;
 
@@ -235,6 +240,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startEdit = (cat: Category) => {
+    captureListScroll(cat.id);
     setEditingId(cat.id);
     setEditName(cat.name);
     setEditPassword(cat.password || '');
@@ -286,9 +292,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 切换分类展开/折叠
   const toggleCategoryExpand = (catId: string) => {
-    if (listScrollRef.current) {
-      pendingScrollFixRef.current = { scrollTop: listScrollRef.current.scrollTop, catId };
-    }
+    captureListScroll(catId);
     setExpandedCatIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(catId)) {
@@ -302,13 +306,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 开始添加二级分类
   const startAddSubCategory = (catId: string) => {
+    captureListScroll(catId);
     setAddingSubToCatId(catId);
     setNewSubCatName('');
     setNewSubCatIcon('Tag');
     // 确保该分类展开
-    if (listScrollRef.current) {
-      pendingScrollFixRef.current = { scrollTop: listScrollRef.current.scrollTop, catId };
-    }
     setExpandedCatIds(prev => new Set(prev).add(catId));
   };
   
@@ -339,7 +341,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
   
   // 开始编辑二级分类
-  const startEditSubCategory = (sub: SubCategory) => {
+  const startEditSubCategory = (catId: string, sub: SubCategory) => {
+    captureListScroll(catId);
     setEditingSubId(sub.id);
     setEditSubName(sub.name);
     setEditSubIcon(sub.icon);
@@ -385,6 +388,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startMoveSubCategory = (fromCatId: string, subId: string) => {
+    captureListScroll(fromCatId);
     const firstOther = categories.find(c => c.id !== fromCatId)?.id || '';
     setMovingSub({ fromCatId, subId });
     setMoveTargetCatId(firstOther);
@@ -403,6 +407,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startDemoteCategory = (fromCategoryId: string) => {
+    captureListScroll(fromCategoryId);
     const firstOther = categories.find(c => c.id !== fromCategoryId)?.id || '';
     setDemotingCatId(fromCategoryId);
     setDemoteTargetCatId(firstOther);
@@ -438,7 +443,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     catId: string;
     sub: SubCategory;
     isSorting: boolean;
-    onStartEdit: (sub: SubCategory) => void;
+    onStartEdit: (catId: string, sub: SubCategory) => void;
     onDelete: (catId: string, subId: string, subName: string) => void;
   }> = ({ catId, sub, isSorting, onStartEdit, onDelete }) => {
     const {
@@ -525,7 +530,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               </button>
             )}
             <button
-              onClick={() => onStartEdit(sub)}
+              onClick={() => onStartEdit(catId, sub)}
               className="p-1 text-slate-400 hover:text-blue-500"
               title="编辑"
             >
