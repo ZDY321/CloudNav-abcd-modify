@@ -160,6 +160,7 @@ const WEBDAV_CONFIG_KEY = 'cloudnav_webdav_config';
 const AI_CONFIG_KEY = 'cloudnav_ai_config';
 const SEARCH_CONFIG_KEY = 'cloudnav_search_config';
 const LAST_SYNC_TIME_KEY = 'cloudnav_last_sync_time';
+const UNASSIGNED_SUBCATEGORY_FILTER = '__unassigned__';
 
 function App() {
   // --- State ---
@@ -2529,6 +2530,51 @@ function App() {
       });
   }, [links, categories, unlockedCategoryIds]);
 
+  const categoryLinkStats = useMemo(() => {
+    const categorySubCategoryIds = new Map(
+      categories.map(category => [
+        category.id,
+        new Set((category.subcategories || []).map(subCategory => subCategory.id))
+      ])
+    );
+
+    const stats = categories.reduce((acc, category) => {
+      acc[category.id] = {
+        totalCount: 0,
+        unassignedCount: 0,
+        subCategoryCounts: {} as Record<string, number>
+      };
+      return acc;
+    }, {} as Record<string, { totalCount: number; unassignedCount: number; subCategoryCounts: Record<string, number> }>);
+
+    links.forEach(link => {
+      if (isCategoryLocked(link.categoryId)) {
+        return;
+      }
+
+      if (!stats[link.categoryId]) {
+        stats[link.categoryId] = {
+          totalCount: 0,
+          unassignedCount: 0,
+          subCategoryCounts: {}
+        };
+      }
+
+      stats[link.categoryId].totalCount += 1;
+
+      const validSubCategoryIds = categorySubCategoryIds.get(link.categoryId);
+      if (link.subCategoryId && validSubCategoryIds?.has(link.subCategoryId)) {
+        stats[link.categoryId].subCategoryCounts[link.subCategoryId] =
+          (stats[link.categoryId].subCategoryCounts[link.subCategoryId] || 0) + 1;
+        return;
+      }
+
+      stats[link.categoryId].unassignedCount += 1;
+    });
+
+    return stats;
+  }, [links, categories, unlockedCategoryIds]);
+
   const displayedLinks = useMemo(() => {
     let result = links;
     
@@ -2551,7 +2597,11 @@ function App() {
     }
 
     // 二级分类过滤
-    if (selectedSubCategory) {
+    if (selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER) {
+      const currentCategory = categories.find(category => category.id === selectedCategory);
+      const validSubCategoryIds = new Set((currentCategory?.subcategories || []).map(subCategory => subCategory.id));
+      result = result.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
+    } else if (selectedSubCategory) {
       result = result.filter(l => l.subCategoryId === selectedSubCategory);
     }
     
@@ -3015,7 +3065,7 @@ function App() {
         {/* Categories List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-hide">
             <button
-              onClick={() => { setSelectedCategory('all'); setSidebarOpen(false); }}
+              onClick={() => { setSelectedCategory('all'); setSelectedSubCategory(null); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 selectedCategory === 'all' 
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
@@ -3127,7 +3177,7 @@ function App() {
                         </div>
                         <span className="truncate flex-1 text-left">{cat.name}</span>
                         <span className="px-1.5 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full">
-                          {links.filter(l => l.categoryId === cat.id && !isCategoryLocked(l.categoryId)).length}
+                          {categoryLinkStats[cat.id]?.totalCount || 0}
                         </span>
                       </button>
                       {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
@@ -3156,6 +3206,13 @@ function App() {
                                 <Icon name={subCat.icon} size={12} />
                               </div>
                               <span className="truncate flex-1 text-left text-sm">{subCat.name}</span>
+                              <span className={`px-1.5 py-0.5 text-[11px] rounded-full ${
+                                isSubSelected
+                                  ? 'bg-blue-200 text-blue-700 dark:bg-blue-700 dark:text-blue-100'
+                                  : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                              }`}>
+                                {categoryLinkStats[cat.id]?.subCategoryCounts[subCat.id] || 0}
+                              </span>
                               {isSubSelected && <div className="w-1 h-1 rounded-full bg-blue-500"></div>}
                             </button>
                           );
@@ -3681,55 +3738,77 @@ function App() {
                  {/* 二级分类标签栏 */}
                  {selectedCategory !== 'all' && !searchQuery && categories.find(c => c.id === selectedCategory)?.subcategories && categories.find(c => c.id === selectedCategory)!.subcategories!.length > 0 && (
                    <div className="flex flex-wrap gap-2 mb-4">
-                     {/* 全部标签 */}
-                     <button
-                       onClick={() => setSelectedSubCategory(null)}
-                       className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
-                         !selectedSubCategory
-                           ? 'bg-blue-600 text-white shadow-sm'
-                           : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                       }`}
-                     >
-                       全部
-                       <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                         !selectedSubCategory
-                           ? 'bg-blue-500 text-white'
-                           : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
-                       }`}>
-                         {links.filter(l => l.categoryId === selectedCategory && !isCategoryLocked(l.categoryId)).length}
-                       </span>
-                     </button>
-                     
-                     {/* 二级分类标签 */}
-                     {categories.find(c => c.id === selectedCategory)?.subcategories?.map(subCat => {
-                       const subCatCount = links.filter(l => 
-                         l.categoryId === selectedCategory && 
-                         l.subCategoryId === subCat.id && 
-                         !isCategoryLocked(l.categoryId)
-                       ).length;
-                       
+                     {(() => {
+                       const selectedCategoryStats = categoryLinkStats[selectedCategory] || {
+                         totalCount: 0,
+                         unassignedCount: 0,
+                         subCategoryCounts: {}
+                       };
+                       const selectedCategoryData = categories.find(c => c.id === selectedCategory);
+
                        return (
-                         <button
-                           key={subCat.id}
-                           onClick={() => setSelectedSubCategory(selectedSubCategory === subCat.id ? null : subCat.id)}
-                           className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
-                             selectedSubCategory === subCat.id
-                               ? 'bg-blue-600 text-white shadow-sm'
-                               : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                           }`}
-                         >
-                           <Icon name={subCat.icon} size={12} />
-                           {subCat.name}
-                           <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                             selectedSubCategory === subCat.id
-                               ? 'bg-blue-500 text-white'
-                               : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
-                           }`}>
-                             {subCatCount}
-                           </span>
-                         </button>
+                         <>
+                           <button
+                             onClick={() => setSelectedSubCategory(null)}
+                             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                               !selectedSubCategory
+                                 ? 'bg-blue-600 text-white shadow-sm'
+                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                             }`}
+                           >
+                             全部
+                             <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                               !selectedSubCategory
+                                 ? 'bg-blue-500 text-white'
+                                 : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
+                             }`}>
+                               {selectedCategoryStats.totalCount}
+                             </span>
+                           </button>
+
+                           <button
+                             onClick={() => setSelectedSubCategory(UNASSIGNED_SUBCATEGORY_FILTER)}
+                             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                               selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER
+                                 ? 'bg-amber-500 text-white shadow-sm'
+                                 : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                             }`}
+                             title="显示当前一级分类下尚未分配到任何二级分类的网站"
+                           >
+                             未分配
+                             <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                               selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER
+                                 ? 'bg-amber-400 text-white'
+                                 : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                             }`}>
+                               {selectedCategoryStats.unassignedCount}
+                             </span>
+                           </button>
+
+                           {selectedCategoryData?.subcategories?.map(subCat => (
+                             <button
+                               key={subCat.id}
+                               onClick={() => setSelectedSubCategory(selectedSubCategory === subCat.id ? null : subCat.id)}
+                               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                                 selectedSubCategory === subCat.id
+                                   ? 'bg-blue-600 text-white shadow-sm'
+                                   : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                               }`}
+                             >
+                               <Icon name={subCat.icon} size={12} />
+                               {subCat.name}
+                               <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                                 selectedSubCategory === subCat.id
+                                   ? 'bg-blue-500 text-white'
+                                   : 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400'
+                               }`}>
+                                 {selectedCategoryStats.subCategoryCounts[subCat.id] || 0}
+                               </span>
+                             </button>
+                           ))}
+                         </>
                        );
-                     })}
+                     })()}
                    </div>
                  )}
 
