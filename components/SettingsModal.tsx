@@ -337,12 +337,24 @@ function buildMenus() {
             contexts: ["page", "link", "action"]
         });
 
+        chrome.contextMenus.create({
+            id: "cloudnav_root_pin",
+            title: "📌 保存并置顶",
+            contexts: ["page", "link", "action"]
+        });
+
         if (categoryCache.length > 0) {
             categoryCache.forEach(cat => {
                 // 创建一级分类菜单
                 chrome.contextMenus.create({
                     id: \`save_to_\${cat.id}\`,
                     parentId: "cloudnav_root",
+                    title: cat.name,
+                    contexts: ["page", "link", "action"]
+                });
+                chrome.contextMenus.create({
+                    id: \`pin_to_\${cat.id}\`,
+                    parentId: "cloudnav_root_pin",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
@@ -356,6 +368,12 @@ function buildMenus() {
                             title: subCat.name,
                             contexts: ["page", "link", "action"]
                         });
+                        chrome.contextMenus.create({
+                            id: \`pin_to_\${cat.id}_\${subCat.id}\`,
+                            parentId: \`pin_to_\${cat.id}\`,
+                            title: subCat.name,
+                            contexts: ["page", "link", "action"]
+                        });
                     });
                 }
             });
@@ -363,6 +381,12 @@ function buildMenus() {
             chrome.contextMenus.create({
                 id: "save_to_common",
                 parentId: "cloudnav_root",
+                title: "默认分类",
+                contexts: ["page", "link", "action"]
+            });
+            chrome.contextMenus.create({
+                id: "pin_to_common",
+                parentId: "cloudnav_root_pin",
                 title: "默认分类",
                 contexts: ["page", "link", "action"]
             });
@@ -376,6 +400,10 @@ function updateMenuTitle(url) {
     const exists = linkCache.some(l => l.url && l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
     const newTitle = exists ? "⚠️ 已存在 - 保存到 CloudNav" : "⚡ 保存到 CloudNav";
     chrome.contextMenus.update("cloudnav_root", { title: newTitle }, () => {
+        if (chrome.runtime.lastError) { }
+    });
+    const pinTitle = exists ? "⚠️ 已存在 - 保存并置顶" : "📌 保存并置顶";
+    chrome.contextMenus.update("cloudnav_root_pin", { title: pinTitle }, () => {
         if (chrome.runtime.lastError) { }
     });
 }
@@ -403,10 +431,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
         const exists = linkCache.some(l => l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
         saveLink(title, url, catId, subCatId);
+    } else if (String(info.menuItemId).startsWith("pin_to_")) {
+        const idParts = String(info.menuItemId).replace("pin_to_", "").split("_");
+        const catId = idParts[0];
+        const subCatId = idParts.length > 1 ? idParts[1] : null;
+        const title = tab.title;
+        const url = info.linkUrl || tab.url;
+        const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
+        const exists = linkCache.some(l => l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
+        saveLink(title, url, catId, subCatId, '', true);
     }
 });
 
-async function saveLink(title, url, categoryId, subCategoryId = null, icon = '') {
+async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined) {
     if (!CONFIG.password) {
         notify('保存失败', '未配置密码，请先在侧边栏登录。');
         return;
@@ -420,25 +457,31 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '')
     }
 
     try {
+        const payload = {
+            title: title || '未命名',
+            url: url,
+            categoryId: categoryId,
+            subCategoryId: subCategoryId,
+            icon: icon
+        };
+
+        if (typeof pinned === 'boolean') {
+            payload.pinned = pinned;
+        }
+
         const res = await fetch(\`\${CONFIG.apiBase}/api/link\`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'x-auth-password': CONFIG.password
             },
-            body: JSON.stringify({
-                title: title || '未命名',
-                url: url,
-                categoryId: categoryId,
-                subCategoryId: subCategoryId,
-                icon: icon
-            })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
-            notify('保存成功', \`已保存到 CloudNav\`);
+            notify('保存成功', pinned === true ? '已保存并置顶' : \`已保存到 CloudNav\`);
             chrome.runtime.sendMessage({ type: 'refresh' }).catch(() => {});
-            const newLink = { id: Date.now().toString(), title, url, categoryId, icon };
+            const newLink = { id: Date.now().toString(), title, url, categoryId, icon, pinned: pinned === true };
             linkCache.unshift(newLink);
             updateMenuTitle(url);
         } else {
@@ -515,6 +558,8 @@ function notify(title, message) {
         .form-input, .form-select, .form-textarea { width: 100%; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
         .form-textarea { min-height: 64px; resize: vertical; }
+        .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+        .form-toggle input { margin: 0; }
         .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .primary-btn, .secondary-btn { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .primary-btn { background: var(--accent); color: white; border-color: transparent; }
@@ -561,6 +606,12 @@ function notify(title, message) {
         <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
         <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
         <div class="form-row"><input id="pageIcon" class="form-input" type="text" placeholder="图标地址（可选）"></div>
+        <div class="form-row">
+            <label class="form-toggle" title="置顶后会显示在首页顶部的「置顶/常用」区域">
+                <input id="pagePinned" type="checkbox" />
+                <span>置顶到首页（常用）</span>
+            </label>
+        </div>
         <div class="form-actions">
             <button id="fillCurrent" class="secondary-btn" type="button">读取当前页</button>
             <button id="saveCurrent" class="primary-btn" type="button">保存到分类</button>
@@ -610,6 +661,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const subCategoryWrap = document.getElementById('subCategoryWrap');
     const subCategorySelect = document.getElementById('pageSubCategory');
     const iconInput = document.getElementById('pageIcon');
+    const pinnedInput = document.getElementById('pagePinned');
     const fillCurrentBtn = document.getElementById('fillCurrent');
     const saveCurrentBtn = document.getElementById('saveCurrent');
 
@@ -796,6 +848,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 urlInput.value = existing.url || tab.url;
                 descriptionInput.value = existing.description || '';
                 iconInput.value = existing.icon || safeIcon;
+                if (pinnedInput) pinnedInput.checked = !!existing.pinned;
                 renderCategoryOptions(existing.categoryId);
                 renderSubCategoryOptions(existing.categoryId, existing.subCategoryId || '');
                 setStatus('已读取当前页，CloudNav 中已有同网址记录。可修改后再次保存。', 'warn');
@@ -804,6 +857,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 urlInput.value = tab.url;
                 descriptionInput.value = '';
                 iconInput.value = safeIcon;
+                if (pinnedInput) pinnedInput.checked = false;
                 const nextCategoryId = categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
                 renderCategoryOptions(nextCategoryId);
                 renderSubCategoryOptions(categorySelect.value, '');
@@ -938,6 +992,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         const subCategoryId = subCategorySelect.value || '';
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
+        const pinned = !!(pinnedInput && pinnedInput.checked);
         const normalizedUrl = normalizeUrl(finalUrl);
         const existedBeforeSave = !!findExistingLink(finalUrl);
 
@@ -963,8 +1018,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     url: finalUrl,
                     description,
                     categoryId,
-                    subCategoryId: subCategoryId || undefined,
-                    icon
+                    subCategoryId: subCategoryId || null,
+                    icon,
+                    pinned
                 })
             });
 

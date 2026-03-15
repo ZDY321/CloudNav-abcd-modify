@@ -318,6 +318,40 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         currentData = JSON.parse(currentDataStr);
     }
 
+    // Ensure shape
+    // @ts-ignore
+    if (!Array.isArray(currentData.links)) currentData.links = [];
+    // @ts-ignore
+    if (!Array.isArray(currentData.categories)) currentData.categories = [];
+
+    const normalizeUrlForCompare = (value: string): string => {
+      try {
+        const parsed = new URL(String(value || '').trim());
+        const pathname = (parsed.pathname || '/').replace(/\/$/, '') || '/';
+        return `${parsed.origin.toLowerCase()}${pathname}${parsed.search}`;
+      } catch {
+        return String(value || '').trim().replace(/\/$/, '').toLowerCase();
+      }
+    };
+
+    const getNextPinnedOrder = (links: any[]): number => {
+      const pinnedLinks = links.filter(l => l && l.pinned);
+      const numericOrders = pinnedLinks
+        .map(l => (typeof l.pinnedOrder === 'number' ? l.pinnedOrder : null))
+        .filter((v: any) => v !== null) as number[];
+      if (numericOrders.length > 0) return Math.max(...numericOrders) + 1;
+      return pinnedLinks.length;
+    };
+
+    // Check if URL already exists (for update instead of creating duplicates)
+    const normalizedNewUrl = normalizeUrlForCompare(newLinkData.url);
+    // @ts-ignore
+    const existingIndex = (currentData.links || []).findIndex((l: any) =>
+      l && l.url && normalizeUrlForCompare(l.url) === normalizedNewUrl
+    );
+    // @ts-ignore
+    const existingLink = existingIndex >= 0 ? currentData.links[existingIndex] : null;
+
     // 3. Determine Category
     let targetCatId = '';
     let targetCatName = '';
@@ -331,7 +365,16 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
     }
 
-    // 3b. Fallback: Auto-detect if no explicit category or explicit one not found
+    // 3b. Fallback: if updating and no valid explicit category, keep original
+    if (!targetCatId) {
+        if (existingLink && existingLink.categoryId) {
+            targetCatId = existingLink.categoryId;
+            const existingCat = currentData.categories.find((c: any) => c.id === existingLink.categoryId);
+            targetCatName = existingCat ? existingCat.name : '';
+        }
+    }
+
+    // 3c. Auto-detect if creating new link (or cannot keep original)
     if (!targetCatId) {
         if (currentData.categories && currentData.categories.length > 0) {
             // Try to find specific keywords
@@ -361,17 +404,70 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
     }
 
+    const hasPinnedField = typeof newLinkData.pinned === 'boolean';
+    const requestedPinned = newLinkData.pinned === true;
+    const hasDescriptionField = Object.prototype.hasOwnProperty.call(newLinkData, 'description');
+    const hasSubCategoryField = Object.prototype.hasOwnProperty.call(newLinkData, 'subCategoryId');
+    const hasIconField = Object.prototype.hasOwnProperty.call(newLinkData, 'icon');
+
+    // 4. Upsert by URL
+    if (existingLink) {
+        const updatedLink: any = {
+            ...existingLink,
+            title: newLinkData.title,
+            url: newLinkData.url,
+            categoryId: targetCatId
+        };
+
+        if (hasDescriptionField) updatedLink.description = newLinkData.description || '';
+        if (hasSubCategoryField) updatedLink.subCategoryId = newLinkData.subCategoryId || undefined;
+        if (hasIconField) updatedLink.icon = newLinkData.icon || undefined;
+
+        if (hasPinnedField) {
+            if (requestedPinned) {
+                if (!updatedLink.pinned) {
+                    updatedLink.pinned = true;
+                    // Assign order only when turning on pin
+                    // @ts-ignore
+                    updatedLink.pinnedOrder = getNextPinnedOrder(currentData.links || []);
+                }
+            } else {
+                updatedLink.pinned = false;
+                delete updatedLink.pinnedOrder;
+            }
+        }
+
+        // @ts-ignore
+        currentData.links[existingIndex] = updatedLink;
+
+        // 5. Save back to KV
+        await env.CLOUDNAV_KV.put('app_data', JSON.stringify(currentData));
+
+        return new Response(JSON.stringify({ 
+            success: true, 
+            updated: true,
+            link: updatedLink,
+            categoryName: targetCatName 
+        }), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+    }
+
+    const pinned = requestedPinned;
+    const pinnedOrder = pinned ? getNextPinnedOrder(currentData.links || []) : undefined;
+
     // 4. Create new link object
-    const newLink = {
+    const newLink: any = {
         id: Date.now().toString(),
         title: newLinkData.title,
         url: newLinkData.url,
-        description: newLinkData.description || '',
+        description: hasDescriptionField ? (newLinkData.description || '') : '',
         categoryId: targetCatId, 
-        subCategoryId: newLinkData.subCategoryId || undefined,
+        subCategoryId: hasSubCategoryField ? (newLinkData.subCategoryId || undefined) : undefined,
         createdAt: Date.now(),
-        pinned: false,
-        icon: newLinkData.icon || undefined
+        pinned: pinned,
+        pinnedOrder: pinnedOrder,
+        icon: hasIconField ? (newLinkData.icon || undefined) : undefined
     };
 
     // 5. Append
