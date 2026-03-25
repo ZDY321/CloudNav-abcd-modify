@@ -334,6 +334,46 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       }
     };
 
+    const getAllLinkUrls = (link: any): string[] => {
+      if (!link) return [];
+      const extraUrls = Array.isArray(link.urls)
+        ? link.urls.map((item: any) => item?.url).filter(Boolean)
+        : [];
+      return [link.url, ...extraUrls].filter(Boolean);
+    };
+
+    const sanitizeUrlItems = (items: any[], mainUrl: string): any[] => {
+      if (!Array.isArray(items)) return [];
+
+      const normalizedMainUrl = normalizeUrlForCompare(mainUrl);
+      const seen = new Set<string>(normalizedMainUrl ? [normalizedMainUrl] : []);
+      const idSeed = Date.now();
+      let defaultAssigned = false;
+
+      return items.reduce((acc: any[], item: any, index: number) => {
+        const rawUrl = String(item?.url || '').trim();
+        if (!rawUrl) return acc;
+
+        const normalizedUrl = normalizeUrlForCompare(rawUrl);
+        if (!normalizedUrl || seen.has(normalizedUrl)) return acc;
+        seen.add(normalizedUrl);
+
+        const nextItem: any = {
+          id: typeof item?.id === 'string' && item.id.trim() ? item.id.trim() : `${idSeed}_${index}`,
+          url: rawUrl,
+          label: typeof item?.label === 'string' && item.label.trim() ? item.label.trim() : '备用站'
+        };
+
+        if (item?.isDefault === true && !defaultAssigned) {
+          nextItem.isDefault = true;
+          defaultAssigned = true;
+        }
+
+        acc.push(nextItem);
+        return acc;
+      }, []);
+    };
+
     const getNextPinnedOrder = (links: any[]): number => {
       const pinnedLinks = links.filter(l => l && l.pinned);
       const numericOrders = pinnedLinks
@@ -409,6 +449,37 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     const hasDescriptionField = Object.prototype.hasOwnProperty.call(newLinkData, 'description');
     const hasSubCategoryField = Object.prototype.hasOwnProperty.call(newLinkData, 'subCategoryId');
     const hasIconField = Object.prototype.hasOwnProperty.call(newLinkData, 'icon');
+    const hasUrlsField = Object.prototype.hasOwnProperty.call(newLinkData, 'urls');
+    const sanitizedUrls = hasUrlsField ? sanitizeUrlItems(newLinkData.urls, newLinkData.url) : [];
+
+    const normalizedCandidateUrls = new Set<string>(
+      [newLinkData.url, ...sanitizedUrls.map(item => item.url)]
+        .map(normalizeUrlForCompare)
+        .filter(Boolean)
+    );
+
+    // Reject duplicates against other links, including their alternate URLs.
+    // The matching link itself is excluded when updating by its main URL.
+    const conflictingLinks = (currentData.links || []).filter((link: any, index: number) => {
+      if (!link) return false;
+      if (existingIndex >= 0 && index === existingIndex) return false;
+      return getAllLinkUrls(link).some(candidateUrl => normalizedCandidateUrls.has(normalizeUrlForCompare(candidateUrl)));
+    });
+
+    if (conflictingLinks.length > 0) {
+      return new Response(JSON.stringify({
+        error: '存在重复网址，请调整主网址或备用网址后再保存。',
+        conflicts: conflictingLinks.map((link: any) => ({
+          id: link.id,
+          title: link.title,
+          categoryId: link.categoryId,
+          subCategoryId: link.subCategoryId
+        }))
+      }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
     // 4. Upsert by URL
     if (existingLink) {
@@ -422,6 +493,13 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         if (hasDescriptionField) updatedLink.description = newLinkData.description || '';
         if (hasSubCategoryField) updatedLink.subCategoryId = newLinkData.subCategoryId || undefined;
         if (hasIconField) updatedLink.icon = newLinkData.icon || undefined;
+        if (hasUrlsField) {
+            if (sanitizedUrls.length > 0) {
+                updatedLink.urls = sanitizedUrls;
+            } else {
+                delete updatedLink.urls;
+            }
+        }
 
         if (hasPinnedField) {
             if (requestedPinned) {
@@ -467,7 +545,8 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         createdAt: Date.now(),
         pinned: pinned,
         pinnedOrder: pinnedOrder,
-        icon: hasIconField ? (newLinkData.icon || undefined) : undefined
+        icon: hasIconField ? (newLinkData.icon || undefined) : undefined,
+        urls: sanitizedUrls.length > 0 ? sanitizedUrls : undefined
     };
 
     // 5. Append

@@ -394,10 +394,36 @@ function buildMenus() {
     });
 }
 
+function normalizeUrl(url) {
+    const safeUrl = String(url || '').trim();
+    if (!safeUrl) return '';
+    try {
+        const parsed = new URL(/^https?:\\/\\//i.test(safeUrl) ? safeUrl : ('https://' + safeUrl));
+        const pathname = (parsed.pathname || '/').replace(/\\/$/, '') || '/';
+        return \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`;
+    } catch (e) {
+        return safeUrl.replace(/\\/$/, '').toLowerCase();
+    }
+}
+
+function getAllLinkUrls(link) {
+    const extraUrls = Array.isArray(link && link.urls)
+        ? link.urls.map(item => item && item.url).filter(Boolean)
+        : [];
+    return [link && link.url, ...extraUrls].filter(Boolean);
+}
+
+function findExistingLinkByUrl(url) {
+    const normalizedUrl = normalizeUrl(url);
+    if (!normalizedUrl) return null;
+    return linkCache.find(link =>
+        getAllLinkUrls(link).some(candidate => normalizeUrl(candidate) === normalizedUrl)
+    ) || null;
+}
+
 function updateMenuTitle(url) {
     if (!url) return;
-    const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
-    const exists = linkCache.some(l => l.url && l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
+    const exists = !!findExistingLinkByUrl(url);
     const newTitle = exists ? "⚠️ 已存在 - 保存到 CloudNav" : "⚡ 保存到 CloudNav";
     chrome.contextMenus.update("cloudnav_root", { title: newTitle }, () => {
         if (chrome.runtime.lastError) { }
@@ -428,8 +454,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const subCatId = idParts.length > 1 ? idParts[1] : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
-        const exists = linkCache.some(l => l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
         saveLink(title, url, catId, subCatId);
     } else if (String(info.menuItemId).startsWith("pin_to_")) {
         const idParts = String(info.menuItemId).replace("pin_to_", "").split("_");
@@ -437,8 +461,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const subCatId = idParts.length > 1 ? idParts[1] : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        const cleanUrl = url.replace(/\\/$/, '').toLowerCase();
-        const exists = linkCache.some(l => l.url.replace(/\\/$/, '').toLowerCase() === cleanUrl);
         saveLink(title, url, catId, subCatId, '', true);
     }
 });
@@ -449,9 +471,16 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
         return;
     }
 
+    const matchedLink = findExistingLinkByUrl(url);
+    const requestUrl = matchedLink && matchedLink.url ? matchedLink.url : url;
+
+    if (!icon && matchedLink && matchedLink.icon) {
+        icon = matchedLink.icon;
+    }
+
     if (!icon) {
         try {
-            const u = new URL(url);
+            const u = new URL(requestUrl);
             icon = \`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=\${encodeURIComponent(u.origin)}&size=128\`;
         } catch(e){}
     }
@@ -459,7 +488,7 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
     try {
         const payload = {
             title: title || '未命名',
-            url: url,
+            url: requestUrl,
             categoryId: categoryId,
             subCategoryId: subCategoryId,
             icon: icon
@@ -481,9 +510,21 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
         if (res.ok) {
             notify('保存成功', pinned === true ? '已保存并置顶' : \`已保存到 CloudNav\`);
             chrome.runtime.sendMessage({ type: 'refresh' }).catch(() => {});
-            const newLink = { id: Date.now().toString(), title, url, categoryId, icon, pinned: pinned === true };
-            linkCache.unshift(newLink);
-            updateMenuTitle(url);
+            if (matchedLink) {
+                linkCache = linkCache.map(link => link.id === matchedLink.id ? {
+                    ...link,
+                    title: title || link.title,
+                    url: requestUrl,
+                    categoryId,
+                    subCategoryId: subCategoryId || undefined,
+                    icon,
+                    pinned: typeof pinned === 'boolean' ? pinned : link.pinned
+                } : link);
+            } else {
+                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId, subCategoryId: subCategoryId || undefined, icon, pinned: pinned === true };
+                linkCache.unshift(newLink);
+            }
+            updateMenuTitle(requestUrl);
         } else {
             notify('保存失败', \`服务器错误: \${res.status}\`);
         }
@@ -555,6 +596,8 @@ function notify(title, message) {
         .editor-status[data-tone="error"] { color: var(--danger); }
         .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: var(--warn); background: rgba(180, 83, 9, 0.12); }
         .form-row { margin-bottom: 8px; }
+        .form-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+        .form-row-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
         .form-input, .form-select, .form-textarea { width: 100%; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
         .form-textarea { min-height: 64px; resize: vertical; }
@@ -567,6 +610,17 @@ function notify(title, message) {
         .primary-btn:disabled { opacity: 0.65; cursor: not-allowed; }
         .secondary-btn { background: var(--bg); color: var(--text); }
         .secondary-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .inline-btn { border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
+        .inline-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+        .alt-url-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .alt-url-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
+        .alt-url-grid { display: grid; grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.8fr) 32px; gap: 6px; align-items: center; }
+        .alt-url-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+        .alt-url-default { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+        .alt-url-default input { margin: 0; }
+        .icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); cursor: pointer; transition: all 0.2s; }
+        .icon-btn:hover { border-color: var(--danger); color: var(--danger); }
         .content { padding: 0 8px; }
         .cat-group { margin-bottom: 4px; }
         .cat-header { padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 8px; user-select: none; transition: background 0.1s; }
@@ -602,6 +656,14 @@ function notify(title, message) {
         </div>
         <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
         <div class="form-row"><input id="pageUrl" class="form-input" type="text" placeholder="网页地址"></div>
+        <div class="form-row">
+            <div class="form-row-head">
+                <span>备用网址</span>
+                <button id="addAltUrl" class="inline-btn" type="button">添加备用网址</button>
+            </div>
+            <div class="alt-url-hint">可选添加备用网址、镜像站、发布页等，勾选后会作为默认打开地址。</div>
+            <div id="altUrlList" class="alt-url-list" style="display:none;"></div>
+        </div>
         <div class="form-row"><textarea id="pageDescription" class="form-textarea" placeholder="网页描述（可选）"></textarea></div>
         <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
         <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
@@ -660,6 +722,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const categorySelect = document.getElementById('pageCategory');
     const subCategoryWrap = document.getElementById('subCategoryWrap');
     const subCategorySelect = document.getElementById('pageSubCategory');
+    const addAltUrlBtn = document.getElementById('addAltUrl');
+    const altUrlList = document.getElementById('altUrlList');
     const iconInput = document.getElementById('pageIcon');
     const pinnedInput = document.getElementById('pagePinned');
     const fillCurrentBtn = document.getElementById('fillCurrent');
@@ -668,6 +732,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allLinks = [];
     let allCategories = [];
     let expandedCats = new Set();
+    let currentAltUrls = [];
+    let editingLinkId = '';
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
 
@@ -724,6 +790,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    const getAllLinkUrls = (link) => {
+        const extraUrls = Array.isArray(link && link.urls)
+            ? link.urls.map(item => item && item.url).filter(Boolean)
+            : [];
+        return [link && link.url, ...extraUrls].filter(Boolean);
+    };
+
+    const getPreferredOpenUrl = (link) => {
+        if (link && Array.isArray(link.urls)) {
+            const defaultUrl = link.urls.find(item => item && item.isDefault && item.url);
+            if (defaultUrl && defaultUrl.url) return defaultUrl.url;
+        }
+        return link && link.url ? link.url : '';
+    };
+
     const findCategory = (categoryId) => allCategories.find(cat => cat.id === categoryId) || null;
     const findSubCategory = (categoryId, subCategoryId) => {
         const category = findCategory(categoryId);
@@ -731,10 +812,110 @@ document.addEventListener('DOMContentLoaded', async () => {
         return category.subcategories.find(sub => sub.id === subCategoryId) || null;
     };
 
+    const createAltUrlItem = (item = {}) => ({
+        id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+        label: typeof (item && item.label) === 'string' && item.label.trim() ? item.label.trim() : '备用站',
+        url: typeof (item && item.url) === 'string' ? item.url : '',
+        isDefault: !!(item && item.isDefault)
+    });
+
+    const getFormUrls = () => [urlInput.value, ...currentAltUrls.map(item => item && item.url)];
+
+    const getCandidateSignature = (urls = []) =>
+        urls
+            .map(normalizeUrl)
+            .filter(Boolean)
+            .sort()
+            .join('||');
+
+    const clearSavedFeedbackIfDirty = () => {
+        if (lastSavedFeedback && lastSavedFeedback.signature !== getCandidateSignature(getFormUrls())) {
+            lastSavedFeedback = null;
+        }
+    };
+
+    const getPreparedAltUrls = () => {
+        const mainNormalizedUrl = normalizeUrl(urlInput.value);
+        const seen = new Set(mainNormalizedUrl ? [mainNormalizedUrl] : []);
+        let defaultAssigned = false;
+
+        return currentAltUrls.reduce((acc, item, index) => {
+            const finalUrl = ensureProtocol(item && item.url);
+            const normalizedAltUrl = normalizeUrl(finalUrl);
+            if (!finalUrl || !normalizedAltUrl || seen.has(normalizedAltUrl)) {
+                return acc;
+            }
+
+            seen.add(normalizedAltUrl);
+
+            const nextItem = {
+                id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + index),
+                label: String(item && item.label ? item.label : '备用站').trim() || '备用站',
+                url: finalUrl
+            };
+
+            if (item && item.isDefault && !defaultAssigned) {
+                nextItem.isDefault = true;
+                defaultAssigned = true;
+            }
+
+            acc.push(nextItem);
+            return acc;
+        }, []);
+    };
+
+    const setAltUrls = (items = []) => {
+        const nextItems = Array.isArray(items) ? items.map(createAltUrlItem) : [];
+        const defaultIndex = nextItems.findIndex(item => item.isDefault);
+
+        currentAltUrls = nextItems.map((item, index) => ({
+            ...item,
+            isDefault: defaultIndex === -1 ? false : index === defaultIndex
+        }));
+
+        if (!currentAltUrls.length) {
+            altUrlList.style.display = 'none';
+            altUrlList.innerHTML = '';
+            return;
+        }
+
+        altUrlList.style.display = 'flex';
+        altUrlList.innerHTML = currentAltUrls.map(item => \`
+            <div class="alt-url-item" data-id="\${escapeHtml(item.id)}">
+                <div class="alt-url-grid">
+                    <input class="form-input alt-url-label" type="text" value="\${escapeHtml(item.label || '')}" placeholder="标签">
+                    <input class="form-input alt-url-url" type="text" value="\${escapeHtml(item.url || '')}" placeholder="备用网址">
+                    <button class="icon-btn alt-url-remove" type="button" title="删除备用网址">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                    </button>
+                </div>
+                <div class="alt-url-meta">
+                    <label class="alt-url-default">
+                        <input class="alt-url-default-toggle" type="checkbox" \${item.isDefault ? 'checked' : ''}>
+                        <span>设为默认打开</span>
+                    </label>
+                </div>
+            </div>
+        \`).join('');
+    };
+
+    const findDuplicateLinks = (candidateUrls, ignoreLinkId = '') => {
+        const normalizedCandidates = new Set((candidateUrls || []).map(normalizeUrl).filter(Boolean));
+        if (normalizedCandidates.size === 0) return [];
+
+        return allLinks.filter(link => {
+            if (!link) return false;
+            if (ignoreLinkId && link.id === ignoreLinkId) return false;
+            return getAllLinkUrls(link).some(candidate => normalizedCandidates.has(normalizeUrl(candidate)));
+        });
+    };
+
     const findExistingLink = (pageUrl) => {
         const normalized = normalizeUrl(pageUrl);
         if (!normalized) return null;
-        return allLinks.find(link => normalizeUrl(link.url) === normalized) || null;
+        return allLinks.find(link =>
+            getAllLinkUrls(link).some(candidate => normalizeUrl(candidate) === normalized)
+        ) || null;
     };
 
     const getLocationText = (categoryId, subCategoryId) => {
@@ -782,8 +963,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateDuplicateState = () => {
-        const normalizedUrl = normalizeUrl(urlInput.value);
-        if (lastSavedFeedback && lastSavedFeedback.normalizedUrl === normalizedUrl) {
+        const candidateUrls = getFormUrls();
+        const formSignature = getCandidateSignature(candidateUrls);
+
+        if (lastSavedFeedback && lastSavedFeedback.signature === formSignature) {
             const locationText = getLocationText(lastSavedFeedback.categoryId, lastSavedFeedback.subCategoryId);
             duplicateNote.textContent = lastSavedFeedback.isNew
                 ? (locationText ? \`已添加：\${locationText}\` : '已添加')
@@ -792,16 +975,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const existing = findExistingLink(urlInput.value);
-        if (!existing) {
+        const duplicates = findDuplicateLinks(candidateUrls, editingLinkId);
+        if (!duplicates.length) {
             duplicateNote.style.display = 'none';
             duplicateNote.textContent = '';
             return;
         }
 
+        const existing = duplicates[0];
         const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
 
-        duplicateNote.textContent = locationText ? \`已存在：\${locationText}\` : '该网页已存在';
+        duplicateNote.textContent = duplicates.length > 1
+            ? \`检测到 \${duplicates.length} 个重复网站\`
+            : (locationText ? \`已存在：\${locationText}\` : '该网页已存在');
         duplicateNote.style.display = 'inline-flex';
     };
 
@@ -827,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const fillCurrentTab = async (reuseExisting = true) => {
         try {
+            lastSavedFeedback = null;
             const tab = await getActiveTab();
             if (!tab || !tab.url) {
                 setStatus('未找到当前标签页，请手动填写网址。', 'error');
@@ -844,19 +1031,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 : getCloudNavIconUrl(tab.url);
 
             if (existing) {
+                editingLinkId = existing.id || '';
                 titleInput.value = existing.title || tab.title || '';
                 urlInput.value = existing.url || tab.url;
                 descriptionInput.value = existing.description || '';
                 iconInput.value = existing.icon || safeIcon;
+                setAltUrls(existing.urls || []);
                 if (pinnedInput) pinnedInput.checked = !!existing.pinned;
                 renderCategoryOptions(existing.categoryId);
                 renderSubCategoryOptions(existing.categoryId, existing.subCategoryId || '');
                 setStatus('已读取当前页，CloudNav 中已有同网址记录。可修改后再次保存。', 'warn');
             } else {
+                editingLinkId = '';
                 titleInput.value = tab.title || '';
                 urlInput.value = tab.url;
                 descriptionInput.value = '';
                 iconInput.value = safeIcon;
+                setAltUrls([]);
                 if (pinnedInput) pinnedInput.checked = false;
                 const nextCategoryId = categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
                 renderCategoryOptions(nextCategoryId);
@@ -882,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!q) return true;
 
                 return String(link.title || '').toLowerCase().includes(q) ||
-                    String(link.url || '').toLowerCase().includes(q) ||
+                    getAllLinkUrls(link).some(candidate => String(candidate || '').toLowerCase().includes(q)) ||
                     String(link.description || '').toLowerCase().includes(q);
             });
 
@@ -902,9 +1093,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             \`;
 
             catLinks.forEach(link => {
-                const iconSrc = getDisplayIconUrl(link.url);
+                const openUrl = getPreferredOpenUrl(link);
+                const iconSrc = getDisplayIconUrl(openUrl || link.url);
                 html += \`
-                    <a href="\${escapeHtml(link.url)}" target="_blank" class="link-item">
+                    <a href="\${escapeHtml(openUrl || link.url)}" target="_blank" class="link-item">
                         <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
                             <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
@@ -993,11 +1185,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const subCategoryId = subCategorySelect.value || '';
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
         const pinned = !!(pinnedInput && pinnedInput.checked);
-        const normalizedUrl = normalizeUrl(finalUrl);
-        const existedBeforeSave = !!findExistingLink(finalUrl);
+        const preparedAltUrls = getPreparedAltUrls();
+        const existedBeforeSave = !!editingLinkId || !!findExistingLink(finalUrl);
 
         if (!title || !finalUrl) {
             setStatus('标题和网址不能为空。', 'error');
+            return;
+        }
+
+        const duplicateLinks = findDuplicateLinks([finalUrl, ...preparedAltUrls.map(item => item.url)], editingLinkId);
+        if (duplicateLinks.length > 0) {
+            const firstDuplicate = duplicateLinks[0];
+            const locationText = getLocationText(firstDuplicate.categoryId, firstDuplicate.subCategoryId);
+            setStatus(locationText ? \`存在重复网址：\${locationText}\` : '存在重复网址，请调整后再保存。', 'error');
+            updateDuplicateState();
             return;
         }
 
@@ -1016,6 +1217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify({
                     title,
                     url: finalUrl,
+                    urls: preparedAltUrls,
                     description,
                     categoryId,
                     subCategoryId: subCategoryId || null,
@@ -1024,12 +1226,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 })
             });
 
-            if (!res.ok) {
-                throw new Error(\`服务器错误: \${res.status}\`);
+            let responseData = null;
+            try {
+                responseData = await res.json();
+            } catch (e) {
+                responseData = null;
             }
 
+            if (!res.ok) {
+                throw new Error(responseData && responseData.error ? responseData.error : \`服务器错误: \${res.status}\`);
+            }
+
+            if (responseData && responseData.link && responseData.link.id) {
+                editingLinkId = responseData.link.id;
+            }
+            setAltUrls(responseData && responseData.link && Array.isArray(responseData.link.urls) ? responseData.link.urls : preparedAltUrls);
             lastSavedFeedback = {
-                normalizedUrl,
+                signature: getCandidateSignature([finalUrl, ...preparedAltUrls.map(item => item.url)]),
                 isNew: !existedBeforeSave,
                 categoryId,
                 subCategoryId
@@ -1063,11 +1276,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
     saveCurrentBtn.addEventListener('click', saveCurrentPage);
+    addAltUrlBtn.addEventListener('click', () => {
+        lastSavedFeedback = null;
+        currentAltUrls = [...currentAltUrls, createAltUrlItem()];
+        setAltUrls(currentAltUrls);
+        updateDuplicateState();
+        requestAnimationFrame(() => {
+            const lastUrlInput = altUrlList.querySelector('.alt-url-item:last-child .alt-url-url');
+            if (lastUrlInput) lastUrlInput.focus();
+        });
+    });
+    altUrlList.addEventListener('input', (e) => {
+        const row = e.target.closest('.alt-url-item');
+        if (!row) return;
+        const id = row.dataset.id;
+        const item = currentAltUrls.find(entry => entry.id === id);
+        if (!item) return;
+
+        if (e.target.classList.contains('alt-url-label')) {
+            item.label = e.target.value;
+        } else if (e.target.classList.contains('alt-url-url')) {
+            item.url = e.target.value;
+            clearSavedFeedbackIfDirty();
+            updateDuplicateState();
+        }
+    });
+    altUrlList.addEventListener('change', (e) => {
+        const row = e.target.closest('.alt-url-item');
+        if (!row) return;
+        const id = row.dataset.id;
+
+        if (e.target.classList.contains('alt-url-default-toggle')) {
+            currentAltUrls = currentAltUrls.map(item => ({
+                ...item,
+                isDefault: item.id === id ? !!e.target.checked : false
+            }));
+            lastSavedFeedback = null;
+            setAltUrls(currentAltUrls);
+            updateDuplicateState();
+        }
+    });
+    altUrlList.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.alt-url-remove');
+        if (!removeBtn) return;
+        const row = removeBtn.closest('.alt-url-item');
+        if (!row) return;
+        const id = row.dataset.id;
+        lastSavedFeedback = null;
+        currentAltUrls = currentAltUrls.filter(item => item.id !== id);
+        setAltUrls(currentAltUrls);
+        updateDuplicateState();
+    });
     categorySelect.addEventListener('change', () => renderSubCategoryOptions(categorySelect.value, ''));
     urlInput.addEventListener('input', () => {
-        if (lastSavedFeedback && lastSavedFeedback.normalizedUrl !== normalizeUrl(urlInput.value)) {
-            lastSavedFeedback = null;
-        }
+        clearSavedFeedbackIfDirty();
         updateDuplicateState();
     });
 
