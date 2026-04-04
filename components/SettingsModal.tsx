@@ -470,12 +470,14 @@ function getUrlMatchMeta(url) {
 
         return {
             normalizedUrl: \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`,
+            pathname,
             hostname,
             siteKey: getRegistrableDomain(hostname)
         };
     } catch (e) {
         return {
             normalizedUrl: safeUrl.replace(/\\/$/, '').toLowerCase(),
+            pathname: '',
             hostname: '',
             siteKey: ''
         };
@@ -497,82 +499,161 @@ function findExactLinkByUrl(url) {
     ) || null;
 }
 
-function isSameSavedSite(targetUrl, candidateUrl) {
-    const targetMeta = getUrlMatchMeta(targetUrl);
-    const candidateMeta = getUrlMatchMeta(candidateUrl);
-    if (!targetMeta || !candidateMeta) return false;
-
-    if (targetMeta.normalizedUrl && candidateMeta.normalizedUrl && targetMeta.normalizedUrl === candidateMeta.normalizedUrl) {
-        return true;
-    }
-
-    if (targetMeta.hostname && candidateMeta.hostname && targetMeta.hostname === candidateMeta.hostname) {
-        return true;
-    }
-
-    return !!(
-        targetMeta.siteKey &&
-        candidateMeta.siteKey &&
-        targetMeta.siteKey === candidateMeta.siteKey &&
-        candidateMeta.hostname === candidateMeta.siteKey
-    );
+function isRootPathMatch(meta) {
+    return !!(meta && meta.pathname === '/');
 }
 
-function findMatchingLinkByUrl(url) {
-    if (!url) return null;
-    return linkCache.find(link =>
-        getAllLinkUrls(link).some(candidate => isSameSavedSite(url, candidate))
-    ) || null;
+function buildMatchState(type, link) {
+    return { type, link };
 }
 
+function getLinkMatchState(url) {
+    const targetMeta = getUrlMatchMeta(url);
+    if (!targetMeta) return null;
+
+    let rootMatch = null;
+    let siteMatch = null;
+
+    for (const link of linkCache) {
+        const candidates = getAllLinkUrls(link);
+        for (const candidate of candidates) {
+            const candidateMeta = getUrlMatchMeta(candidate);
+            if (!candidateMeta) continue;
+
+            if (targetMeta.normalizedUrl && candidateMeta.normalizedUrl && targetMeta.normalizedUrl === candidateMeta.normalizedUrl) {
+                return buildMatchState('exact', link);
+            }
+
+            const sameHost = !!(
+                targetMeta.hostname &&
+                candidateMeta.hostname &&
+                targetMeta.hostname === candidateMeta.hostname
+            );
+
+            const sameBaseSite = !!(
+                targetMeta.siteKey &&
+                candidateMeta.siteKey &&
+                targetMeta.siteKey === candidateMeta.siteKey &&
+                candidateMeta.hostname === candidateMeta.siteKey
+            );
+
+            if (!sameHost && !sameBaseSite) continue;
+
+            if (!rootMatch && isRootPathMatch(candidateMeta)) {
+                rootMatch = buildMatchState('root', link);
+                continue;
+            }
+
+            if (!siteMatch) {
+                siteMatch = buildMatchState('site', link);
+            }
+        }
+    }
+
+    return rootMatch || siteMatch;
+}
+
+function getMenuTitles(matchType) {
+    if (matchType === 'exact') {
+        return {
+            save: "✅ 已添加 - 保存到 CloudNav",
+            pin: "✅ 已添加 - 保存并置顶"
+        };
+    }
+
+    if (matchType === 'root') {
+        return {
+            save: "🏠 根目录已添加 - 保存到 CloudNav",
+            pin: "🏠 根目录已添加 - 保存并置顶"
+        };
+    }
+
+    if (matchType === 'site') {
+        return {
+            save: "🌐 同站已添加 - 保存到 CloudNav",
+            pin: "🌐 同站已添加 - 保存并置顶"
+        };
+    }
+
+    return {
+        save: "⚡ 保存到 CloudNav",
+        pin: "📌 保存并置顶"
+    };
+}
+
+function getActionBadgeState(matchType) {
+    if (matchType === 'exact') {
+        return {
+            text: '已',
+            color: '#16a34a',
+            title: '当前网址已添加到 CloudNav'
+        };
+    }
+
+    if (matchType === 'root') {
+        return {
+            text: '根',
+            color: '#2563eb',
+            title: '当前网站根目录已添加到 CloudNav'
+        };
+    }
+
+    if (matchType === 'site') {
+        return {
+            text: '站',
+            color: '#f59e0b',
+            title: '当前网站已有相关页面添加到 CloudNav'
+        };
+    }
+
+    return {
+        text: '',
+        color: '#64748b',
+        title: DEFAULT_ACTION_TITLE
+    };
+}
 function updateMenuTitle(url) {
-    if (!url) return;
-    const exists = !!findMatchingLinkByUrl(url);
-    const newTitle = exists ? "⚠️ 已存在 - 保存到 CloudNav" : "⚡ 保存到 CloudNav";
-    chrome.contextMenus.update("cloudnav_root", { title: newTitle }, () => {
+    const match = isMatchableUrl(url) ? getLinkMatchState(url) : null;
+    const titles = getMenuTitles(match && match.type);
+    chrome.contextMenus.update("cloudnav_root", { title: titles.save }, () => {
         if (chrome.runtime.lastError) { }
     });
-    const pinTitle = exists ? "⚠️ 已存在 - 保存并置顶" : "📌 保存并置顶";
-    chrome.contextMenus.update("cloudnav_root_pin", { title: pinTitle }, () => {
+    chrome.contextMenus.update("cloudnav_root_pin", { title: titles.pin }, () => {
         if (chrome.runtime.lastError) { }
     });
 }
-
-function setActionBadge(tabId, exists) {
+function setActionBadge(tabId, matchType) {
     if (typeof tabId !== 'number') return;
+    const badgeState = getActionBadgeState(matchType);
 
-    chrome.action.setBadgeText({ tabId, text: exists ? '已' : '' }, () => {
+    chrome.action.setBadgeText({ tabId, text: badgeState.text }, () => {
         if (chrome.runtime.lastError) { }
     });
 
     chrome.action.setTitle({
         tabId,
-        title: exists ? '当前站点已添加到 CloudNav' : DEFAULT_ACTION_TITLE
+        title: badgeState.title
     }, () => {
         if (chrome.runtime.lastError) { }
     });
 
-    if (exists) {
-        chrome.action.setBadgeBackgroundColor({ tabId, color: '#16a34a' }, () => {
-            if (chrome.runtime.lastError) { }
-        });
-    }
+    chrome.action.setBadgeBackgroundColor({ tabId, color: badgeState.color }, () => {
+        if (chrome.runtime.lastError) { }
+    });
 }
-
 async function updateTabUi(tab, updateMenu = true) {
     if (!tab || typeof tab.id !== 'number') return;
     await ensureCache();
 
     const currentUrl = tab.url || '';
-    const exists = !!(isMatchableUrl(currentUrl) && findMatchingLinkByUrl(currentUrl));
+    const match = isMatchableUrl(currentUrl) ? getLinkMatchState(currentUrl) : null;
 
     if (updateMenu && tab.active) {
         updateMenuTitle(currentUrl);
     }
 
-    setActionBadge(tab.id, exists);
+    setActionBadge(tab.id, match && match.type);
 }
-
 async function refreshActiveTabUi() {
     try {
         let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -756,7 +837,11 @@ function notify(title, message) {
         .editor-status[data-tone="success"] { color: var(--success); }
         .editor-status[data-tone="warn"] { color: var(--warn); }
         .editor-status[data-tone="error"] { color: var(--danger); }
-        .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: var(--warn); background: rgba(180, 83, 9, 0.12); }
+        .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: var(--muted); background: rgba(100, 116, 139, 0.12); }
+        .duplicate-note[data-kind="exact"] { color: var(--success); background: rgba(34, 197, 94, 0.14); }
+        .duplicate-note[data-kind="root"] { color: var(--accent); background: var(--accent-soft); }
+        .duplicate-note[data-kind="site"] { color: var(--warn); background: rgba(180, 83, 9, 0.12); }
+        .duplicate-note[data-kind="duplicate"] { color: var(--danger); background: rgba(220, 38, 38, 0.1); }
         .form-row { margin-bottom: 8px; }
         .form-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
         .form-row-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -913,23 +998,142 @@ document.addEventListener('DOMContentLoaded', async () => {
         return 'https://' + trimmed;
     };
 
+    const MULTI_PART_TLDS = new Set([
+        'ac.jp', 'ac.uk',
+        'co.jp', 'co.kr', 'co.uk',
+        'com.au', 'com.br', 'com.cn', 'com.hk', 'com.mx', 'com.sg', 'com.tr', 'com.tw',
+        'edu.cn', 'edu.hk',
+        'gen.tr', 'go.jp', 'gov.cn', 'gov.hk', 'gov.uk',
+        'idv.hk', 'idv.tw',
+        'mil.cn',
+        'ne.jp', 'ne.kr', 'net.au', 'net.cn', 'net.hk', 'net.sg', 'net.tw', 'net.uk',
+        'or.jp', 'or.kr', 'org.au', 'org.cn', 'org.hk', 'org.mx', 'org.sg', 'org.tw', 'org.uk',
+        're.kr'
+    ]);
+
     const normalizeUrl = (value = '') => {
+        const meta = getUrlMatchMeta(value);
+        return meta ? meta.normalizedUrl : '';
+    };
+
+    const isIpLikeHost = (hostname = '') => /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':');
+
+    const getRegistrableDomain = (hostname = '') => {
+        const safeHostname = String(hostname || '').trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+        if (!safeHostname) return '';
+        if (safeHostname === 'localhost' || isIpLikeHost(safeHostname)) return safeHostname;
+
+        const labels = safeHostname.split('.').filter(Boolean);
+        if (labels.length <= 2) return safeHostname;
+
+        const tail = labels.slice(-2).join('.');
+        if (MULTI_PART_TLDS.has(tail) && labels.length >= 3) {
+            return labels.slice(-3).join('.');
+        }
+
+        return labels.slice(-2).join('.');
+    };
+
+    const getUrlMatchMeta = (value = '') => {
         const safeValue = ensureProtocol(value);
-        if (!safeValue) return '';
+        if (!safeValue) return null;
         try {
             const parsed = new URL(safeValue);
-            const pathname = (parsed.pathname || '/').replace(/\\/$/, '') || '/';
-            return \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`;
+            const pathname = (parsed.pathname || '/').replace(/\/$/, '') || '/';
+            const rawHostname = String(parsed.hostname || '').trim().toLowerCase().replace(/\.$/, '');
+            const hostname = rawHostname.replace(/^www\./, '');
+            return {
+                normalizedUrl: \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`,
+                pathname,
+                hostname,
+                siteKey: getRegistrableDomain(hostname)
+            };
         } catch (e) {
-            return safeValue.replace(/\\/$/, '').toLowerCase();
+            return {
+                normalizedUrl: safeValue.replace(/\/$/, '').toLowerCase(),
+                pathname: '',
+                hostname: '',
+                siteKey: ''
+            };
         }
+    };
+
+    const isRootPathMatch = (meta) => !!(meta && meta.pathname === '/');
+
+    const getMatchText = (matchType, locationText = '') => {
+        const prefix = matchType === 'exact'
+            ? '已添加'
+            : (matchType === 'root' ? '根目录已添加' : '同站已添加');
+        return locationText ? \`\${prefix}：\${locationText}\` : prefix;
+    };
+
+    const setDuplicateNote = (text = '', kind = '') => {
+        duplicateNote.textContent = text;
+        duplicateNote.style.display = text ? 'inline-flex' : 'none';
+        if (kind) {
+            duplicateNote.dataset.kind = kind;
+        } else {
+            duplicateNote.removeAttribute('data-kind');
+        }
+    };
+
+    const getLinkMatchState = (pageUrl) => {
+        const targetMeta = getUrlMatchMeta(pageUrl);
+        if (!targetMeta) return null;
+
+        let rootMatch = null;
+        let siteMatch = null;
+
+        for (const link of allLinks) {
+            const candidates = getAllLinkUrls(link);
+            for (const candidate of candidates) {
+                const candidateMeta = getUrlMatchMeta(candidate);
+                if (!candidateMeta) continue;
+
+                if (targetMeta.normalizedUrl && candidateMeta.normalizedUrl && targetMeta.normalizedUrl === candidateMeta.normalizedUrl) {
+                    return { type: 'exact', link };
+                }
+
+                const sameHost = !!(
+                    targetMeta.hostname &&
+                    candidateMeta.hostname &&
+                    targetMeta.hostname === candidateMeta.hostname
+                );
+
+                const sameBaseSite = !!(
+                    targetMeta.siteKey &&
+                    candidateMeta.siteKey &&
+                    targetMeta.siteKey === candidateMeta.siteKey &&
+                    candidateMeta.hostname === candidateMeta.siteKey
+                );
+
+                if (!sameHost && !sameBaseSite) continue;
+
+                if (!rootMatch && isRootPathMatch(candidateMeta)) {
+                    rootMatch = { type: 'root', link };
+                    continue;
+                }
+
+                if (!siteMatch) {
+                    siteMatch = { type: 'site', link };
+                }
+            }
+        }
+
+        return rootMatch || siteMatch;
+    };
+
+    const getReadCurrentStatus = (matchType) => {
+        if (matchType === 'exact') return '已读取当前页，当前网址已添加到 CloudNav。可直接修改后再次保存。';
+        if (matchType === 'root') return '已读取当前页，当前网站根目录已添加到 CloudNav。当前页面可单独保存。';
+        if (matchType === 'site') return '已读取当前页，CloudNav 中已有同站记录。当前页面可单独保存。';
+        return '已读取当前页，可编辑后保存到指定分类。';
     };
 
     const setStatus = (text, tone = 'muted') => {
         pageStatus.textContent = text;
         pageStatus.dataset.tone = tone;
     };
-
     const getArrowIcon = () => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cat-arrow"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
     const getDisplayIconUrl = (pageUrl) => {
@@ -1130,29 +1334,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (lastSavedFeedback && lastSavedFeedback.signature === formSignature) {
             const locationText = getLocationText(lastSavedFeedback.categoryId, lastSavedFeedback.subCategoryId);
-            duplicateNote.textContent = lastSavedFeedback.isNew
-                ? (locationText ? \`已添加：\${locationText}\` : '已添加')
-                : (locationText ? \`已存在：\${locationText}\` : '该网页已存在');
-            duplicateNote.style.display = 'inline-flex';
+            setDuplicateNote(getMatchText('exact', locationText), 'exact');
             return;
         }
 
         const duplicates = findDuplicateLinks(candidateUrls, editingLinkId);
-        if (!duplicates.length) {
-            duplicateNote.style.display = 'none';
-            duplicateNote.textContent = '';
+        if (duplicates.length) {
+            const existing = duplicates[0];
+            const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
+            setDuplicateNote(
+                duplicates.length > 1 ? \`检测到 \${duplicates.length} 个重复网站\` : getMatchText('exact', locationText),
+                duplicates.length > 1 ? 'duplicate' : 'exact'
+            );
             return;
         }
 
-        const existing = duplicates[0];
-        const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
+        const currentMatch = getLinkMatchState(urlInput.value);
+        if (currentMatch && currentMatch.link) {
+            const locationText = getLocationText(currentMatch.link.categoryId, currentMatch.link.subCategoryId);
+            setDuplicateNote(getMatchText(currentMatch.type, locationText), currentMatch.type);
+            return;
+        }
 
-        duplicateNote.textContent = duplicates.length > 1
-            ? \`检测到 \${duplicates.length} 个重复网站\`
-            : (locationText ? \`已存在：\${locationText}\` : '该网页已存在');
-        duplicateNote.style.display = 'inline-flex';
+        setDuplicateNote();
     };
-
     const toggleCat = (id) => {
         const header = document.querySelector(\`.cat-header[data-id="\${id}"]\`);
         if (!header) return;
@@ -1187,7 +1392,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const existing = reuseExisting ? findExistingLink(tab.url) : null;
+            const matchState = reuseExisting ? getLinkMatchState(tab.url) : null;
+            const existing = matchState && matchState.type === 'exact' ? matchState.link : null;
             const safeIcon = tab.favIconUrl && /^(https?:|data:)/i.test(tab.favIconUrl)
                 ? tab.favIconUrl
                 : getCloudNavIconUrl(tab.url);
@@ -1202,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (pinnedInput) pinnedInput.checked = !!existing.pinned;
                 renderCategoryOptions(existing.categoryId);
                 renderSubCategoryOptions(existing.categoryId, existing.subCategoryId || '');
-                setStatus('已读取当前页，CloudNav 中已有同网址记录。可修改后再次保存。', 'warn');
+                setStatus(getReadCurrentStatus('exact'), 'success');
             } else {
                 editingLinkId = '';
                 titleInput.value = tab.title || '';
@@ -1211,12 +1417,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 iconInput.value = safeIcon;
                 setAltUrls([]);
                 if (pinnedInput) pinnedInput.checked = false;
-                const nextCategoryId = categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
+                const nextCategoryId = matchState && matchState.link && matchState.link.categoryId
+                    ? matchState.link.categoryId
+                    : (categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common');
+                const nextSubCategoryId = matchState && matchState.link ? (matchState.link.subCategoryId || '') : '';
                 renderCategoryOptions(nextCategoryId);
-                renderSubCategoryOptions(categorySelect.value, '');
-                setStatus('已读取当前页，可编辑后保存到指定分类。', 'success');
+                renderSubCategoryOptions(nextCategoryId, nextSubCategoryId);
+                setStatus(getReadCurrentStatus(matchState && matchState.type), matchState ? 'warn' : 'success');
             }
-
             updateDuplicateState();
         } catch (e) {
             setStatus('读取当前标签页失败，请点击“读取当前页”重试。', 'error');
