@@ -8526,25 +8526,60 @@ const CONFIG = {
 
 let linkCache = [];
 let categoryCache = [];
+let cacheInitialized = false;
+
+const DEFAULT_ACTION_TITLE = "打开侧边栏 (Ctrl+Shift+E)";
+const MULTI_PART_TLDS = new Set([
+  'ac.jp', 'ac.uk',
+  'co.jp', 'co.kr', 'co.uk',
+  'com.au', 'com.br', 'com.cn', 'com.hk', 'com.mx', 'com.sg', 'com.tr', 'com.tw',
+  'edu.cn', 'edu.hk',
+  'gen.tr', 'go.jp', 'gov.cn', 'gov.hk', 'gov.uk',
+  'idv.hk', 'idv.tw',
+  'mil.cn',
+  'ne.jp', 'ne.kr', 'net.au', 'net.cn', 'net.hk', 'net.sg', 'net.tw', 'net.uk',
+  'or.jp', 'or.kr', 'org.au', 'org.cn', 'org.hk', 'org.mx', 'org.sg', 'org.tw', 'org.uk',
+  're.kr'
+]);
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
-  refreshCache().then(buildMenus);
+  refreshUiFromCache();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  refreshUiFromCache();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.cloudnav_data) {
-        refreshCache().then(buildMenus);
+        refreshUiFromCache();
     }
 });
 
 async function refreshCache() {
     const data = await chrome.storage.local.get('cloudnav_data');
-    if (data && data.cloudnav_data) {
-        linkCache = data.cloudnav_data.links || [];
-        categoryCache = data.cloudnav_data.categories || [];
-    }
+    linkCache = data && data.cloudnav_data && Array.isArray(data.cloudnav_data.links)
+        ? data.cloudnav_data.links
+        : [];
+    categoryCache = data && data.cloudnav_data && Array.isArray(data.cloudnav_data.categories)
+        ? data.cloudnav_data.categories
+        : [];
+    cacheInitialized = true;
     return;
+}
+
+async function ensureCache() {
+    if (!cacheInitialized) {
+        await refreshCache();
+    }
+}
+
+async function refreshUiFromCache() {
+    await refreshCache();
+    buildMenus();
+    await refreshAllTabBadges();
+    await refreshActiveTabUi();
 }
 
 const windowPorts = {};
@@ -8649,14 +8684,55 @@ function buildMenus() {
 }
 
 function normalizeUrl(url) {
+    const meta = getUrlMatchMeta(url);
+    return meta ? meta.normalizedUrl : '';
+}
+
+function isMatchableUrl(url) {
+    return /^https?:\\/\\//i.test(String(url || '').trim());
+}
+
+function isIpLikeHost(hostname) {
+    return /^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(hostname) || hostname.includes(':');
+}
+
+function getRegistrableDomain(hostname) {
+    const safeHostname = String(hostname || '').trim().toLowerCase().replace(/^\\.+|\\.+$/g, '');
+    if (!safeHostname) return '';
+    if (safeHostname === 'localhost' || isIpLikeHost(safeHostname)) return safeHostname;
+
+    const labels = safeHostname.split('.').filter(Boolean);
+    if (labels.length <= 2) return safeHostname;
+
+    const tail = labels.slice(-2).join('.');
+    if (MULTI_PART_TLDS.has(tail) && labels.length >= 3) {
+        return labels.slice(-3).join('.');
+    }
+
+    return labels.slice(-2).join('.');
+}
+
+function getUrlMatchMeta(url) {
     const safeUrl = String(url || '').trim();
-    if (!safeUrl) return '';
+    if (!safeUrl) return null;
+
     try {
-        const parsed = new URL(/^https?:\\/\\//i.test(safeUrl) ? safeUrl : ('https://' + safeUrl));
+        const parsed = new URL(isMatchableUrl(safeUrl) ? safeUrl : ('https://' + safeUrl));
         const pathname = (parsed.pathname || '/').replace(/\\/$/, '') || '/';
-        return \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`;
+        const rawHostname = String(parsed.hostname || '').trim().toLowerCase().replace(/\\.$/, '');
+        const hostname = rawHostname.replace(/^www\\./, '');
+
+        return {
+            normalizedUrl: \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`,
+            hostname,
+            siteKey: getRegistrableDomain(hostname)
+        };
     } catch (e) {
-        return safeUrl.replace(/\\/$/, '').toLowerCase();
+        return {
+            normalizedUrl: safeUrl.replace(/\\/$/, '').toLowerCase(),
+            hostname: '',
+            siteKey: ''
+        };
     }
 }
 
@@ -8667,7 +8743,7 @@ function getAllLinkUrls(link) {
     return [link && link.url, ...extraUrls].filter(Boolean);
 }
 
-function findExistingLinkByUrl(url) {
+function findExactLinkByUrl(url) {
     const normalizedUrl = normalizeUrl(url);
     if (!normalizedUrl) return null;
     return linkCache.find(link =>
@@ -8675,9 +8751,37 @@ function findExistingLinkByUrl(url) {
     ) || null;
 }
 
+function isSameSavedSite(targetUrl, candidateUrl) {
+    const targetMeta = getUrlMatchMeta(targetUrl);
+    const candidateMeta = getUrlMatchMeta(candidateUrl);
+    if (!targetMeta || !candidateMeta) return false;
+
+    if (targetMeta.normalizedUrl && candidateMeta.normalizedUrl && targetMeta.normalizedUrl === candidateMeta.normalizedUrl) {
+        return true;
+    }
+
+    if (targetMeta.hostname && candidateMeta.hostname && targetMeta.hostname === candidateMeta.hostname) {
+        return true;
+    }
+
+    return !!(
+        targetMeta.siteKey &&
+        candidateMeta.siteKey &&
+        targetMeta.siteKey === candidateMeta.siteKey &&
+        candidateMeta.hostname === candidateMeta.siteKey
+    );
+}
+
+function findMatchingLinkByUrl(url) {
+    if (!url) return null;
+    return linkCache.find(link =>
+        getAllLinkUrls(link).some(candidate => isSameSavedSite(url, candidate))
+    ) || null;
+}
+
 function updateMenuTitle(url) {
     if (!url) return;
-    const exists = !!findExistingLinkByUrl(url);
+    const exists = !!findMatchingLinkByUrl(url);
     const newTitle = exists ? "⚠️ 已存在 - 保存到 CloudNav" : "⚡ 保存到 CloudNav";
     chrome.contextMenus.update("cloudnav_root", { title: newTitle }, () => {
         if (chrome.runtime.lastError) { }
@@ -8688,16 +8792,74 @@ function updateMenuTitle(url) {
     });
 }
 
+function setActionBadge(tabId, exists) {
+    if (typeof tabId !== 'number') return;
+
+    chrome.action.setBadgeText({ tabId, text: exists ? '已' : '' }, () => {
+        if (chrome.runtime.lastError) { }
+    });
+
+    chrome.action.setTitle({
+        tabId,
+        title: exists ? '当前站点已添加到 CloudNav' : DEFAULT_ACTION_TITLE
+    }, () => {
+        if (chrome.runtime.lastError) { }
+    });
+
+    if (exists) {
+        chrome.action.setBadgeBackgroundColor({ tabId, color: '#16a34a' }, () => {
+            if (chrome.runtime.lastError) { }
+        });
+    }
+}
+
+async function updateTabUi(tab, updateMenu = true) {
+    if (!tab || typeof tab.id !== 'number') return;
+    await ensureCache();
+
+    const currentUrl = tab.url || '';
+    const exists = !!(isMatchableUrl(currentUrl) && findMatchingLinkByUrl(currentUrl));
+
+    if (updateMenu && tab.active) {
+        updateMenuTitle(currentUrl);
+    }
+
+    setActionBadge(tab.id, exists);
+}
+
+async function refreshActiveTabUi() {
+    try {
+        let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (!tabs.length) {
+            tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        }
+        if (tabs[0]) {
+            await updateTabUi(tabs[0]);
+        }
+    } catch (e) { }
+}
+
+async function refreshAllTabBadges() {
+    try {
+        const tabs = await chrome.tabs.query({});
+        await Promise.all(
+            tabs
+                .filter(tab => typeof tab.id === 'number')
+                .map(tab => updateTabUi(tab, false))
+        );
+    } catch (e) { }
+}
+
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
    try {
        const tab = await chrome.tabs.get(activeInfo.tabId);
-       if (tab && tab.url) updateMenuTitle(tab.url);
+       await updateTabUi(tab);
    } catch(e){}
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-   if (changeInfo.status === 'complete' && tab.active && tab.url) {
-       updateMenuTitle(tab.url);
+   if (changeInfo.url || changeInfo.status === 'complete') {
+       updateTabUi({ ...tab, id: tabId, url: tab.url || changeInfo.url });
    }
 });
 
@@ -8725,7 +8887,7 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
         return;
     }
 
-    const matchedLink = findExistingLinkByUrl(url);
+    const matchedLink = findExactLinkByUrl(url);
     const requestUrl = matchedLink && matchedLink.url ? matchedLink.url : url;
 
     if (!icon && matchedLink && matchedLink.icon) {
@@ -8778,7 +8940,7 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
                 const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId, subCategoryId: subCategoryId || undefined, icon, pinned: pinned === true };
                 linkCache.unshift(newLink);
             }
-            updateMenuTitle(requestUrl);
+            refreshActiveTabUi();
         } else {
             notify('保存失败', \`服务器错误: \${res.status}\`);
         }
