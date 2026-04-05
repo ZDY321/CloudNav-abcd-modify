@@ -264,11 +264,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return JSON.stringify(json, null, 2);
   };
 
+  const extConfigLiteral = JSON.stringify({
+    apiBase: domain,
+    password
+  });
+
   const extBackgroundJs = `// background.js - CloudNav Assistant v7.6
-const CONFIG = {
-  apiBase: "${domain}",
-  password: "${password}"
-};
+const CONFIG = ${extConfigLiteral};
 
 let linkCache = [];
 let categoryCache = [];
@@ -933,10 +935,7 @@ function notify(title, message) {
 </body>
 </html>`;
 
-  const extSidebarJs = `const CONFIG = {
-  apiBase: "${domain}",
-  password: "${password}"
-};
+  const extSidebarJs = `const CONFIG = ${extConfigLiteral};
 const CACHE_KEY = 'cloudnav_data';
 
 let port = null;
@@ -975,6 +974,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pinnedInput = document.getElementById('pagePinned');
     const fillCurrentBtn = document.getElementById('fillCurrent');
     const saveCurrentBtn = document.getElementById('saveCurrent');
+
+    const showFatalError = (message) => {
+        const safeMessage = String(message || 'Unknown error')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        if (container) {
+            container.innerHTML = \`<div class="empty" style="color:#ef4444">初始化失败: \${safeMessage}<br>请重新生成扩展后再试</div>\`;
+        }
+        if (pageStatus) {
+            pageStatus.textContent = '初始化失败，请检查扩展配置。';
+            pageStatus.dataset.tone = 'error';
+        }
+    };
+
+    try {
+        if (
+            !container ||
+            !searchInput ||
+            !refreshBtn ||
+            !pageStatus ||
+            !duplicateNote ||
+            !titleInput ||
+            !urlInput ||
+            !descriptionInput ||
+            !categorySelect ||
+            !subCategoryWrap ||
+            !subCategorySelect ||
+            !addAltUrlBtn ||
+            !altUrlList ||
+            !iconInput ||
+            !pinnedInput ||
+            !fillCurrentBtn ||
+            !saveCurrentBtn
+        ) {
+            throw new Error('Sidebar DOM unavailable');
+        }
 
     let allLinks = [];
     let allCategories = [];
@@ -1708,6 +1747,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadData(true);
         }
     });
+    } catch (e) {
+        console.error('Sidebar init failed', e);
+        showFatalError(e && e.message ? e.message : 'Unknown error');
+    }
 });`;
 
   const renderCodeBlock = (filename: string, code: string) => (
