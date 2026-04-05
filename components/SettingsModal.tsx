@@ -1055,10 +1055,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return meta ? meta.normalizedUrl : '';
     };
 
-    const isIpLikeHost = (hostname = '') => /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':');
+    const isIpLikeHost = (hostname = '') => /^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(hostname) || hostname.includes(':');
 
     const getRegistrableDomain = (hostname = '') => {
-        const safeHostname = String(hostname || '').trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+        const safeHostname = String(hostname || '').trim().toLowerCase().replace(/^\\.+|\\.+$/g, '');
         if (!safeHostname) return '';
         if (safeHostname === 'localhost' || isIpLikeHost(safeHostname)) return safeHostname;
 
@@ -1078,9 +1078,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!safeValue) return null;
         try {
             const parsed = new URL(safeValue);
-            const pathname = (parsed.pathname || '/').replace(/\/$/, '') || '/';
-            const rawHostname = String(parsed.hostname || '').trim().toLowerCase().replace(/\.$/, '');
-            const hostname = rawHostname.replace(/^www\./, '');
+            const pathname = (parsed.pathname || '/').replace(/\\/$/, '') || '/';
+            const rawHostname = String(parsed.hostname || '').trim().toLowerCase().replace(/\\.$/, '');
+            const hostname = rawHostname.replace(/^www\\./, '');
             return {
                 normalizedUrl: \`\${parsed.origin.toLowerCase()}\${pathname}\${parsed.search}\`,
                 pathname,
@@ -1089,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         } catch (e) {
             return {
-                normalizedUrl: safeValue.replace(/\/$/, '').toLowerCase(),
+                normalizedUrl: safeValue.replace(/\\/$/, '').toLowerCase(),
                 pathname: '',
                 hostname: '',
                 siteKey: ''
