@@ -352,6 +352,54 @@ function App() {
     }
   };
 
+  const getAllLinkUrls = (link: LinkItem): string[] => {
+    const extraUrls = Array.isArray(link.urls)
+      ? link.urls.map(item => item?.url).filter((value): value is string => !!value)
+      : [];
+    return [link.url, ...extraUrls].filter((value): value is string => !!value);
+  };
+
+  const getPreferredOpenUrl = (link: LinkItem): string => {
+    const defaultUrl = link.urls?.find(item => item?.isDefault && item.url);
+    return defaultUrl?.url || link.url;
+  };
+
+  const normalizeUrlForSearch = (rawUrl: string): string => (
+    String(rawUrl || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/+$/, '')
+  );
+
+  const matchesLinkSearchQuery = (link: LinkItem, query: string): boolean => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+
+    const normalizedQuery = normalizeUrlForSearch(q);
+    const urlMatched = getAllLinkUrls(link).some(candidate => {
+      const rawCandidate = String(candidate || '').toLowerCase();
+      const normalizedCandidate = normalizeUrlForSearch(candidate);
+      return rawCandidate.includes(q) || (!!normalizedQuery && normalizedCandidate.includes(normalizedQuery));
+    });
+
+    return (
+      link.title.toLowerCase().includes(q) ||
+      !!(link.description && link.description.toLowerCase().includes(q)) ||
+      urlMatched
+    );
+  };
+
+  const getCardTooltipContent = (link: LinkItem): string => {
+    if (link.description?.trim()) {
+      return link.description;
+    }
+
+    const openUrl = getPreferredOpenUrl(link);
+    return openUrl ? `默认打开：${openUrl}` : '';
+  };
+
   const getDuplicateGroupsByUrls = (urls: string[], excludeLinkId?: string): Array<{ normalizedUrl: string; links: LinkItem[] }> => {
     const normalizedTargets = new Set(urls.map(normalizeUrlForDuplicate).filter(Boolean));
     if (normalizedTargets.size === 0) return [];
@@ -360,7 +408,7 @@ function App() {
     links.forEach(link => {
       if (excludeLinkId && link.id === excludeLinkId) return;
       const perLinkUniqueUrls = new Set(
-        [link.url, ...(link.urls?.map(u => u.url).filter(Boolean) || [])]
+        getAllLinkUrls(link)
           .map(normalizeUrlForDuplicate)
           .filter(Boolean)
       );
@@ -387,7 +435,7 @@ function App() {
 
     links.forEach(link => {
       const perLinkUniqueUrls = new Set(
-        [link.url, ...(link.urls?.map(u => u.url).filter(Boolean) || [])]
+        getAllLinkUrls(link)
           .map(normalizeUrlForDuplicate)
           .filter(Boolean)
       );
@@ -2583,12 +2631,7 @@ function App() {
 
     // Search Filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(l => 
-        l.title.toLowerCase().includes(q) || 
-        l.url.toLowerCase().includes(q) ||
-        (l.description && l.description.toLowerCase().includes(q))
-      );
+      result = result.filter(link => matchesLinkSearchQuery(link, searchQuery));
     }
 
     // Category Filter
@@ -2622,8 +2665,6 @@ function App() {
       return [];
     }
 
-    const q = searchQuery.toLowerCase();
-    
     // 获取其他目录中匹配的链接
     const otherLinks = links.filter(link => {
       // 排除当前目录的链接
@@ -2636,12 +2677,7 @@ function App() {
         return false;
       }
       
-      // 搜索匹配
-      return (
-        link.title.toLowerCase().includes(q) || 
-        link.url.toLowerCase().includes(q) ||
-        (link.description && link.description.toLowerCase().includes(q))
-      );
+      return matchesLinkSearchQuery(link, searchQuery);
     });
 
     // 按目录分组
@@ -2767,22 +2803,12 @@ function App() {
     const effectiveCategoryStatus = getEffectiveCategoryCheckStatus(link.categoryId);
     const isOfflineLink = effectiveCategoryStatus?.offlineLinks?.includes(link.id) ?? false;
     
-    // 获取要打开的URL：优先使用备用网址中设为默认的，否则使用主URL
-    const getDefaultUrl = () => {
-      if (link.urls && link.urls.length > 0) {
-        const defaultUrl = link.urls.find(u => u.isDefault);
-        if (defaultUrl && defaultUrl.url) {
-          return defaultUrl.url;
-        }
-      }
-      return link.url;
-    };
-    const targetUrl = getDefaultUrl();
+    const targetUrl = getPreferredOpenUrl(link);
 
     return (
       <Tooltip
         key={link.id}
-        content={!isBatchEditMode ? (link.description || '') : ''}
+        content={!isBatchEditMode ? getCardTooltipContent(link) : ''}
         className="block w-full"
         centered
       >

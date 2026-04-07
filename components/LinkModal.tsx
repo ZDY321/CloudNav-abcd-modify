@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle, ExternalLink } from 'lucide-react';
 import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus } from '../types';
 import { generateLinkDescription, suggestCategory } from '../services/geminiService';
 
@@ -448,6 +448,19 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
   };
 
+  const normalizePreviewUrl = (value: string) => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const openPreviewUrl = (value: string) => {
+    const target = normalizePreviewUrl(value);
+    if (!target) return;
+    window.open(target, '_blank', 'noopener,noreferrer');
+  };
+
   const handleFetchIcon = async () => {
     if (!url) return;
     
@@ -604,6 +617,16 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 />
                 <button
                   type="button"
+                  onClick={() => openPreviewUrl(url)}
+                  disabled={!url}
+                  className="px-3 py-2 rounded-lg flex items-center gap-1 transition-colors text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50"
+                  title="直达打开主网址"
+                >
+                  <ExternalLink size={14} />
+                  <span className="hidden sm:inline">直达</span>
+                </button>
+                <button
+                  type="button"
                   onClick={checkMainUrlConnectivity}
                   disabled={!url || mainUrlStatus.status === 'checking'}
                   className={`px-3 py-2 rounded-lg flex items-center gap-1 transition-colors text-xs font-medium ${
@@ -698,6 +721,15 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                         className="flex-1 px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
                         placeholder="备用网址..."
                       />
+                      <button
+                        type="button"
+                        onClick={() => openPreviewUrl(urlItem.url)}
+                        disabled={!urlItem.url}
+                        className="p-1 text-slate-400 hover:text-blue-500 transition-colors disabled:opacity-40"
+                        title={`直达打开${urlItem.label || '备用网址'}`}
+                      >
+                        <ExternalLink size={14} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => checkUrlConnectivity(urlItem.id)}

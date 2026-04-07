@@ -862,14 +862,17 @@ function notify(title, message) {
         .inline-btn { border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
         .inline-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+        .url-input-row { display: flex; gap: 8px; align-items: center; }
+        .url-input-row .form-input { flex: 1; min-width: 0; }
         .alt-url-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .alt-url-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
-        .alt-url-grid { display: grid; grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.8fr) 32px; gap: 6px; align-items: center; }
+        .alt-url-grid { display: grid; grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.8fr) 32px 32px; gap: 6px; align-items: center; }
         .alt-url-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
         .alt-url-default { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
         .alt-url-default input { margin: 0; }
         .icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); cursor: pointer; transition: all 0.2s; }
         .icon-btn:hover { border-color: var(--danger); color: var(--danger); }
+        .icon-btn.alt-url-open:hover { border-color: var(--accent); color: var(--accent); }
         .content { padding: 0 8px; }
         .cat-group { margin-bottom: 4px; }
         .cat-header { padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 8px; user-select: none; transition: background 0.1s; }
@@ -904,7 +907,12 @@ function notify(title, message) {
             <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
         </div>
         <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
-        <div class="form-row"><input id="pageUrl" class="form-input" type="text" placeholder="网页地址"></div>
+        <div class="form-row">
+            <div class="url-input-row">
+                <input id="pageUrl" class="form-input" type="text" placeholder="网页地址">
+                <button id="openMainUrl" class="inline-btn" type="button">直达</button>
+            </div>
+        </div>
         <div class="form-row">
             <div class="form-row-head">
                 <span>备用网址</span>
@@ -964,6 +972,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const duplicateNote = document.getElementById('duplicateNote');
     const titleInput = document.getElementById('pageTitle');
     const urlInput = document.getElementById('pageUrl');
+    const openMainUrlBtn = document.getElementById('openMainUrl');
     const descriptionInput = document.getElementById('pageDescription');
     const categorySelect = document.getElementById('pageCategory');
     const subCategoryWrap = document.getElementById('subCategoryWrap');
@@ -1001,6 +1010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             !duplicateNote ||
             !titleInput ||
             !urlInput ||
+            !openMainUrlBtn ||
             !descriptionInput ||
             !categorySelect ||
             !subCategoryWrap ||
@@ -1035,6 +1045,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!trimmed) return '';
         if (/^https?:\\/\\//i.test(trimmed)) return trimmed;
         return 'https://' + trimmed;
+    };
+
+    const openPreviewUrl = (value = '') => {
+        const target = ensureProtocol(value);
+        if (!target) return;
+        window.open(target, '_blank', 'noopener,noreferrer');
     };
 
     const MULTI_PART_TLDS = new Set([
@@ -1290,6 +1306,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="alt-url-grid">
                     <input class="form-input alt-url-label" type="text" value="\${escapeHtml(item.label || '')}" placeholder="标签">
                     <input class="form-input alt-url-url" type="text" value="\${escapeHtml(item.url || '')}" placeholder="备用网址">
+                    <button class="icon-btn alt-url-open" type="button" title="直达打开">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+                    </button>
                     <button class="icon-btn alt-url-remove" type="button" title="删除备用网址">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
                     </button>
@@ -1504,8 +1523,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             catLinks.forEach(link => {
                 const openUrl = getPreferredOpenUrl(link);
                 const iconSrc = getDisplayIconUrl(openUrl || link.url);
+                const hoverTitle = link.description || openUrl || link.url || '';
                 html += \`
-                    <a href="\${escapeHtml(openUrl || link.url)}" target="_blank" class="link-item">
+                    <a href="\${escapeHtml(openUrl || link.url)}" target="_blank" class="link-item" title="\${escapeHtml(hoverTitle)}">
                         <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
                             <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
@@ -1683,6 +1703,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadData(true);
         updateDuplicateState();
     });
+    openMainUrlBtn.addEventListener('click', () => openPreviewUrl(urlInput.value));
     fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
     saveCurrentBtn.addEventListener('click', saveCurrentPage);
     addAltUrlBtn.addEventListener('click', () => {
@@ -1726,6 +1747,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     altUrlList.addEventListener('click', (e) => {
+        const openBtn = e.target.closest('.alt-url-open');
+        if (openBtn) {
+            const row = openBtn.closest('.alt-url-item');
+            if (!row) return;
+            const id = row.dataset.id;
+            const item = currentAltUrls.find(entry => entry.id === id);
+            if (item && item.url) {
+                openPreviewUrl(item.url);
+            }
+            return;
+        }
+
         const removeBtn = e.target.closest('.alt-url-remove');
         if (!removeBtn) return;
         const row = removeBtn.closest('.alt-url-item');
