@@ -863,6 +863,25 @@ function notify(title, message) {
         .inline-btn { border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
         .inline-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
         .editor-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .existing-records { display: none; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.45); backdrop-filter: blur(6px); }
+        .existing-records-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        .existing-records-title { font-size: 12px; font-weight: 700; color: var(--text); }
+        .existing-records-subtitle { margin-top: 4px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+        .existing-records-body { display: flex; flex-direction: column; gap: 10px; }
+        .existing-group { display: flex; flex-direction: column; gap: 8px; }
+        .existing-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .existing-group-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; text-transform: uppercase; }
+        .existing-group-count { font-size: 11px; color: var(--muted); }
+        .existing-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+        .existing-item-main { display: flex; gap: 8px; align-items: flex-start; }
+        .existing-item-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 2px; }
+        .existing-item-icon img { width: 100%; height: 100%; object-fit: contain; }
+        .existing-item-title { font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text); }
+        .existing-item-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+        .existing-item-location { font-size: 11px; font-weight: 600; color: var(--accent); }
+        .existing-item-url { font-size: 11px; line-height: 1.45; color: var(--muted); word-break: break-all; }
+        .existing-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .existing-item-actions .inline-btn { padding: 4px 9px; font-size: 11px; }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
         .url-input-row { display: flex; gap: 8px; align-items: center; }
         .url-input-row .form-input { flex: 1; min-width: 0; }
@@ -908,9 +927,10 @@ function notify(title, message) {
             </div>
             <div class="editor-side">
                 <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
-                <button id="openExistingRecord" class="inline-btn" type="button" style="display:none;">进入已有记录</button>
+                <button id="openExistingRecord" class="inline-btn" type="button" style="display:none;">查看已有记录</button>
             </div>
         </div>
+        <div id="existingRecords" class="existing-records" style="display:none;"></div>
         <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
         <div class="form-row">
             <div class="url-input-row">
@@ -976,6 +996,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pageStatus = document.getElementById('pageStatus');
     const duplicateNote = document.getElementById('duplicateNote');
     const openExistingRecordBtn = document.getElementById('openExistingRecord');
+    const existingRecords = document.getElementById('existingRecords');
     const titleInput = document.getElementById('pageTitle');
     const urlInput = document.getElementById('pageUrl');
     const openMainUrlBtn = document.getElementById('openMainUrl');
@@ -1015,6 +1036,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             !pageStatus ||
             !duplicateNote ||
             !openExistingRecordBtn ||
+            !existingRecords ||
             !titleInput ||
             !urlInput ||
             !openMainUrlBtn ||
@@ -1039,7 +1061,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let editingLinkId = '';
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
-    let currentMatchedLink = null;
+    let currentExistingRecordState = { groups: [], total: 0, primaryLink: null };
+    let existingRecordsExpanded = false;
 
     const escapeHtml = (value = '') => String(value)
         .replace(/&/g, '&amp;')
@@ -1072,26 +1095,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const updateExistingRecordAction = (matchState = null) => {
-        currentMatchedLink = matchState && matchState.link ? matchState.link : null;
-        const targetUrl = getExistingRecordUrl(currentMatchedLink);
-
-        if (!targetUrl) {
-            openExistingRecordBtn.style.display = 'none';
-            openExistingRecordBtn.setAttribute('disabled', 'disabled');
-            openExistingRecordBtn.title = '';
-            return;
-        }
-
-        openExistingRecordBtn.style.display = 'inline-flex';
-        openExistingRecordBtn.removeAttribute('disabled');
-        openExistingRecordBtn.title = currentMatchedLink && currentMatchedLink.title
-            ? \`进入 CloudNav 中的「\${currentMatchedLink.title}」\`
-            : '进入已有的网站记录';
-    };
-
-    const openExistingRecord = () => {
-        const targetUrl = getExistingRecordUrl(currentMatchedLink);
+    const openCloudNavRecord = (link) => {
+        const targetUrl = getExistingRecordUrl(link);
         if (!targetUrl) return;
 
         if (chrome && chrome.tabs && chrome.tabs.create) {
@@ -1100,6 +1105,177 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const getExistingGroupLabel = (matchType) => {
+        if (matchType === 'exact') return '重复网址';
+        if (matchType === 'root') return '站点根目录';
+        return '同站记录';
+    };
+
+    const buildExistingRecordState = (candidateUrls = []) => {
+        const normalizedCandidates = new Set((candidateUrls || []).map(normalizeUrl).filter(Boolean));
+        const mainMeta = getUrlMatchMeta((candidateUrls && candidateUrls[0]) || '');
+        const groupedMatches = {
+            exact: new Map(),
+            root: new Map(),
+            site: new Map()
+        };
+
+        allLinks.forEach(link => {
+            if (!link) return;
+
+            const candidates = getAllLinkUrls(link);
+            let matchType = '';
+
+            for (const candidate of candidates) {
+                const candidateMeta = getUrlMatchMeta(candidate);
+                if (!candidateMeta) continue;
+
+                if (
+                    normalizedCandidates.size > 0 &&
+                    candidateMeta.normalizedUrl &&
+                    normalizedCandidates.has(candidateMeta.normalizedUrl)
+                ) {
+                    matchType = 'exact';
+                    break;
+                }
+
+                if (!mainMeta) continue;
+
+                const sameHost = !!(
+                    mainMeta.hostname &&
+                    candidateMeta.hostname &&
+                    mainMeta.hostname === candidateMeta.hostname
+                );
+
+                const sameBaseSite = !!(
+                    mainMeta.siteKey &&
+                    candidateMeta.siteKey &&
+                    mainMeta.siteKey === candidateMeta.siteKey &&
+                    candidateMeta.hostname === candidateMeta.siteKey
+                );
+
+                if (!sameHost && !sameBaseSite) continue;
+
+                if (!matchType && isRootPathMatch(candidateMeta)) {
+                    matchType = 'root';
+                    continue;
+                }
+
+                if (!matchType) {
+                    matchType = 'site';
+                }
+            }
+
+            if (matchType) {
+                groupedMatches[matchType].set(link.id, link);
+            }
+        });
+
+        const groups = ['exact', 'root', 'site']
+            .map(type => ({
+                type,
+                links: Array.from(groupedMatches[type].values()).sort((a, b) => {
+                    const aTime = Number(a && a.createdAt) || 0;
+                    const bTime = Number(b && b.createdAt) || 0;
+                    return bTime - aTime;
+                })
+            }))
+            .filter(group => group.links.length > 0);
+
+        return {
+            groups,
+            total: groups.reduce((sum, group) => sum + group.links.length, 0),
+            primaryLink: groups[0] && groups[0].links[0] ? groups[0].links[0] : null
+        };
+    };
+
+    const renderExistingRecords = () => {
+        if (!existingRecords) return;
+
+        if (!existingRecordsExpanded || !currentExistingRecordState.total) {
+            existingRecords.style.display = 'none';
+            existingRecords.innerHTML = '';
+            return;
+        }
+
+        existingRecords.style.display = 'block';
+        existingRecords.innerHTML = \`
+            <div class="existing-records-head">
+                <div>
+                    <div class="existing-records-title">已收录的网站记录</div>
+                    <div class="existing-records-subtitle">当前网页在 CloudNav 中命中 \${currentExistingRecordState.total} 条相关记录，可在侧边栏内直接查看并定位。</div>
+                </div>
+            </div>
+            <div class="existing-records-body">
+                \${currentExistingRecordState.groups.map(group => \`
+                    <div class="existing-group">
+                        <div class="existing-group-head">
+                            <span class="existing-group-label">\${escapeHtml(getExistingGroupLabel(group.type))}</span>
+                            <span class="existing-group-count">\${group.links.length} 条</span>
+                        </div>
+                        \${group.links.map(link => {
+                            const openUrl = getPreferredOpenUrl(link) || link.url || '';
+                            const iconSrc = getDisplayIconUrl(openUrl || link.url || '');
+                            const locationText = getLocationText(link.categoryId, link.subCategoryId);
+                            const extraUrlCount = Array.isArray(link.urls) ? link.urls.length : 0;
+
+                            return \`
+                                <div class="existing-item">
+                                    <div class="existing-item-main">
+                                        <div class="existing-item-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
+                                        <div class="link-info">
+                                            <div class="existing-item-title">\${escapeHtml(link.title || link.url || '未命名网站')}</div>
+                                            <div class="existing-item-meta">
+                                                <div class="existing-item-location">\${escapeHtml(locationText || '未分类')}</div>
+                                                <div class="existing-item-url">\${escapeHtml(openUrl || link.url || '')}\${extraUrlCount > 0 ? \`<br>另有 \${extraUrlCount} 个备用网址\` : ''}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="existing-item-actions">
+                                        <button class="inline-btn existing-open-site" type="button" data-url="\${escapeHtml(openUrl || link.url || '')}">直达</button>
+                                        \${link && link.id ? \`<button class="inline-btn existing-open-app" type="button" data-link-id="\${escapeHtml(link.id)}">定位记录</button>\` : ''}
+                                    </div>
+                                </div>
+                            \`;
+                        }).join('')}
+                    </div>
+                \`).join('')}
+            </div>
+        \`;
+    };
+
+    const updateExistingRecordAction = (recordState = null) => {
+        currentExistingRecordState = recordState && recordState.total
+            ? recordState
+            : { groups: [], total: 0, primaryLink: null };
+
+        if (!currentExistingRecordState.total) {
+            existingRecordsExpanded = false;
+            openExistingRecordBtn.style.display = 'none';
+            openExistingRecordBtn.setAttribute('disabled', 'disabled');
+            openExistingRecordBtn.textContent = '查看已有记录';
+            openExistingRecordBtn.title = '';
+            renderExistingRecords();
+            return;
+        }
+
+        openExistingRecordBtn.style.display = 'inline-flex';
+        openExistingRecordBtn.removeAttribute('disabled');
+        openExistingRecordBtn.textContent = existingRecordsExpanded
+            ? \`收起已有记录 (\${currentExistingRecordState.total})\`
+            : \`查看已有记录 (\${currentExistingRecordState.total})\`;
+        openExistingRecordBtn.title = currentExistingRecordState.primaryLink && currentExistingRecordState.primaryLink.title
+            ? \`查看与「\${currentExistingRecordState.primaryLink.title}」相关的已有记录\`
+            : '查看已有的网站记录';
+        renderExistingRecords();
+    };
+
+    const openExistingRecord = () => {
+        if (!currentExistingRecordState.total) return;
+        existingRecordsExpanded = !existingRecordsExpanded;
+        updateExistingRecordAction(currentExistingRecordState);
     };
 
     const MULTI_PART_TLDS = new Set([
@@ -1438,10 +1614,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const updateDuplicateState = () => {
         const candidateUrls = getFormUrls();
         const formSignature = getCandidateSignature(candidateUrls);
+        const existingRecordState = buildExistingRecordState(candidateUrls);
 
         if (lastSavedFeedback && lastSavedFeedback.signature === formSignature) {
             const locationText = getLocationText(lastSavedFeedback.categoryId, lastSavedFeedback.subCategoryId);
-            updateExistingRecordAction(editingLinkId ? { type: 'exact', link: { id: editingLinkId, title: titleInput.value } } : null);
+            updateExistingRecordAction(existingRecordState);
             setDuplicateNote(getMatchText('exact', locationText), 'exact');
             return;
         }
@@ -1450,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (duplicates.length) {
             const existing = duplicates[0];
             const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
-            updateExistingRecordAction({ type: 'exact', link: existing });
+            updateExistingRecordAction(existingRecordState);
             setDuplicateNote(
                 duplicates.length > 1 ? \`检测到 \${duplicates.length} 个重复网站\` : getMatchText('exact', locationText),
                 duplicates.length > 1 ? 'duplicate' : 'exact'
@@ -1461,12 +1638,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentMatch = getLinkMatchState(urlInput.value);
         if (currentMatch && currentMatch.link) {
             const locationText = getLocationText(currentMatch.link.categoryId, currentMatch.link.subCategoryId);
-            updateExistingRecordAction(currentMatch);
+            updateExistingRecordAction(existingRecordState);
             setDuplicateNote(getMatchText(currentMatch.type, locationText), currentMatch.type);
             return;
         }
 
-        updateExistingRecordAction();
+        updateExistingRecordAction(existingRecordState.total ? existingRecordState : null);
         setDuplicateNote();
     };
     const toggleCat = (id) => {
@@ -1757,6 +1934,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateDuplicateState();
     });
     openExistingRecordBtn.addEventListener('click', () => openExistingRecord());
+    existingRecords.addEventListener('click', (e) => {
+        const openSiteBtn = e.target.closest('.existing-open-site');
+        if (openSiteBtn) {
+            const targetUrl = openSiteBtn.dataset.url || '';
+            if (targetUrl) {
+                openPreviewUrl(targetUrl);
+            }
+            return;
+        }
+
+        const openAppBtn = e.target.closest('.existing-open-app');
+        if (!openAppBtn) return;
+
+        const targetLinkId = openAppBtn.dataset.linkId || '';
+        const targetLink = allLinks.find(link => link && link.id === targetLinkId) || null;
+        if (targetLink) {
+            openCloudNavRecord(targetLink);
+        }
+    });
     openMainUrlBtn.addEventListener('click', () => openPreviewUrl(urlInput.value));
     fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
     saveCurrentBtn.addEventListener('click', saveCurrentPage);

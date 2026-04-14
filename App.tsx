@@ -2711,6 +2711,60 @@ function App() {
     });
   }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
 
+  const searchResultGroups = useMemo(() => {
+    if (!isSearchActive) return [];
+
+    const categoryOrder = new Map(categories.map((category, index) => [category.id, index]));
+    const groupMap = new Map<string, {
+      categoryId: string;
+      categoryName: string;
+      categoryIcon: string;
+      links: LinkItem[];
+      subCategoryIds: Set<string>;
+    }>();
+
+    displayedLinks.forEach(link => {
+      const category = categories.find(item => item.id === link.categoryId);
+      const groupKey = link.categoryId || '__uncategorized__';
+      const currentGroup = groupMap.get(groupKey) || {
+        categoryId: groupKey,
+        categoryName: category?.name || '未分类',
+        categoryIcon: category?.icon || 'Folder',
+        links: [],
+        subCategoryIds: new Set<string>()
+      };
+
+      currentGroup.links.push(link);
+
+      if (link.subCategoryId && category?.subcategories?.some(item => item.id === link.subCategoryId)) {
+        currentGroup.subCategoryIds.add(link.subCategoryId);
+      }
+
+      groupMap.set(groupKey, currentGroup);
+    });
+
+    return Array.from(groupMap.values())
+      .sort((a, b) => {
+        const aOrder = categoryOrder.get(a.categoryId) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = categoryOrder.get(b.categoryId) ?? Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        return a.categoryName.localeCompare(b.categoryName, 'zh-CN');
+      })
+      .map(group => ({
+        categoryId: group.categoryId,
+        categoryName: group.categoryName,
+        categoryIcon: group.categoryIcon,
+        links: group.links,
+        subCategoryCount: group.subCategoryIds.size
+      }));
+  }, [displayedLinks, categories, isSearchActive]);
+
+  const linkGridClassName = siteSettings.cardStyle === 'detailed'
+    ? 'grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+    : 'grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8';
+
   // --- Render Components ---
 
   // 创建可排序的链接卡片组件
@@ -3661,6 +3715,9 @@ function App() {
                              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
                                {displayedLinks.length}
                              </span>
+                             <span className="px-2 py-0.5 text-xs font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 rounded-full whitespace-nowrap">
+                               {searchResultGroups.length} 个分类
+                             </span>
                              <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 rounded-full whitespace-nowrap">
                                全站搜索
                              </span>
@@ -3898,7 +3955,38 @@ function App() {
                         )}
                     </div>
                  ) : (
-                    !isSearchActive && isSortingMode === selectedCategory ? (
+                    isSearchActive ? (
+                        <div className="space-y-5">
+                            {searchResultGroups.map(group => (
+                                <section
+                                    key={group.categoryId}
+                                    className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/80 md:p-5"
+                                >
+                                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="min-w-0 flex items-center gap-3">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                                                <Icon name={group.categoryIcon} size={16} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                    {group.categoryName}
+                                                </h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                    {group.links.length} 个结果{group.subCategoryCount > 0 ? ` · ${group.subCategoryCount} 个二级分类` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="self-start rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300 sm:self-auto">
+                                            {group.links.length}
+                                        </span>
+                                    </div>
+                                    <div className={linkGridClassName}>
+                                        {group.links.map(link => renderLinkCard(link))}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    ) : isSortingMode === selectedCategory ? (
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCorners}
@@ -3908,11 +3996,7 @@ function App() {
                                 items={displayedLinks.map(link => link.id)}
                                 strategy={rectSortingStrategy}
                             >
-                                <div className={`grid gap-3 ${
-                                  siteSettings.cardStyle === 'detailed' 
-                                    ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                                }`}>
+                                <div className={linkGridClassName}>
                                     {displayedLinks.map(link => (
                                         <SortableLinkCard key={link.id} link={link} />
                                     ))}
@@ -3920,11 +4004,7 @@ function App() {
                             </SortableContext>
                         </DndContext>
                     ) : (
-                        <div className={`grid gap-3 ${
-                          siteSettings.cardStyle === 'detailed' 
-                            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                            : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                        }`}>
+                        <div className={linkGridClassName}>
                             {displayedLinks.map(link => renderLinkCard(link))}
                         </div>
                     )
