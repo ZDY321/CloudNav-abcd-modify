@@ -649,7 +649,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">备用网址列表</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500">（标签如：主站、备用站、发布页）</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">（标签如：主站、备用站、主题体、发布页）</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -664,7 +664,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                   </div>
                 </div>
                 {urls.map((urlItem, index) => {
-                  const predefinedLabels = ['主站', '备用站', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
+                  const predefinedLabels = ['主站', '备用站', '主题体', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
                   const isCustomLabel = !predefinedLabels.includes(urlItem.label) || customLabelId === urlItem.id;
                   
                   return (
@@ -704,6 +704,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                           >
                             <option value="主站">主站</option>
                             <option value="备用站">备用站</option>
+                            <option value="主题体">主题体</option>
                             <option value="镜像站">镜像站</option>
                             <option value="发布页">发布页</option>
                             <option value="官网">官网</option>

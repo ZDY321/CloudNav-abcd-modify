@@ -266,6 +266,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const extConfigLiteral = JSON.stringify({
     apiBase: domain,
+    appUrl: typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '',
     password
   });
 
@@ -861,6 +862,7 @@ function notify(title, message) {
         .secondary-btn:hover { border-color: var(--accent); color: var(--accent); }
         .inline-btn { border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
         .inline-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .editor-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
         .url-input-row { display: flex; gap: 8px; align-items: center; }
         .url-input-row .form-input { flex: 1; min-width: 0; }
@@ -904,7 +906,10 @@ function notify(title, message) {
                 <div class="editor-title">保存当前网页</div>
                 <div id="pageStatus" class="editor-status">准备读取当前标签页...</div>
             </div>
-            <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
+            <div class="editor-side">
+                <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
+                <button id="openExistingRecord" class="inline-btn" type="button" style="display:none;">进入已有记录</button>
+            </div>
         </div>
         <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
         <div class="form-row">
@@ -970,6 +975,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshBtn = document.getElementById('refresh');
     const pageStatus = document.getElementById('pageStatus');
     const duplicateNote = document.getElementById('duplicateNote');
+    const openExistingRecordBtn = document.getElementById('openExistingRecord');
     const titleInput = document.getElementById('pageTitle');
     const urlInput = document.getElementById('pageUrl');
     const openMainUrlBtn = document.getElementById('openMainUrl');
@@ -1008,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             !refreshBtn ||
             !pageStatus ||
             !duplicateNote ||
+            !openExistingRecordBtn ||
             !titleInput ||
             !urlInput ||
             !openMainUrlBtn ||
@@ -1032,6 +1039,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let editingLinkId = '';
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
+    let currentMatchedLink = null;
 
     const escapeHtml = (value = '') => String(value)
         .replace(/&/g, '&amp;')
@@ -1051,6 +1059,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         const target = ensureProtocol(value);
         if (!target) return;
         window.open(target, '_blank', 'noopener,noreferrer');
+    };
+
+    const getExistingRecordUrl = (link) => {
+        if (!link || !link.id || !CONFIG.appUrl) return '';
+        try {
+            const target = new URL(CONFIG.appUrl);
+            target.searchParams.set('focus_link', String(link.id));
+            return target.toString();
+        } catch (e) {
+            return '';
+        }
+    };
+
+    const updateExistingRecordAction = (matchState = null) => {
+        currentMatchedLink = matchState && matchState.link ? matchState.link : null;
+        const targetUrl = getExistingRecordUrl(currentMatchedLink);
+
+        if (!targetUrl) {
+            openExistingRecordBtn.style.display = 'none';
+            openExistingRecordBtn.setAttribute('disabled', 'disabled');
+            openExistingRecordBtn.title = '';
+            return;
+        }
+
+        openExistingRecordBtn.style.display = 'inline-flex';
+        openExistingRecordBtn.removeAttribute('disabled');
+        openExistingRecordBtn.title = currentMatchedLink && currentMatchedLink.title
+            ? \`进入 CloudNav 中的「\${currentMatchedLink.title}」\`
+            : '进入已有的网站记录';
+    };
+
+    const openExistingRecord = () => {
+        const targetUrl = getExistingRecordUrl(currentMatchedLink);
+        if (!targetUrl) return;
+
+        if (chrome && chrome.tabs && chrome.tabs.create) {
+            chrome.tabs.create({ url: targetUrl });
+            return;
+        }
+
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
     };
 
     const MULTI_PART_TLDS = new Set([
@@ -1392,6 +1441,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (lastSavedFeedback && lastSavedFeedback.signature === formSignature) {
             const locationText = getLocationText(lastSavedFeedback.categoryId, lastSavedFeedback.subCategoryId);
+            updateExistingRecordAction(editingLinkId ? { type: 'exact', link: { id: editingLinkId, title: titleInput.value } } : null);
             setDuplicateNote(getMatchText('exact', locationText), 'exact');
             return;
         }
@@ -1400,6 +1450,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (duplicates.length) {
             const existing = duplicates[0];
             const locationText = getLocationText(existing.categoryId, existing.subCategoryId);
+            updateExistingRecordAction({ type: 'exact', link: existing });
             setDuplicateNote(
                 duplicates.length > 1 ? \`检测到 \${duplicates.length} 个重复网站\` : getMatchText('exact', locationText),
                 duplicates.length > 1 ? 'duplicate' : 'exact'
@@ -1410,10 +1461,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentMatch = getLinkMatchState(urlInput.value);
         if (currentMatch && currentMatch.link) {
             const locationText = getLocationText(currentMatch.link.categoryId, currentMatch.link.subCategoryId);
+            updateExistingRecordAction(currentMatch);
             setDuplicateNote(getMatchText(currentMatch.type, locationText), currentMatch.type);
             return;
         }
 
+        updateExistingRecordAction();
         setDuplicateNote();
     };
     const toggleCat = (id) => {
@@ -1703,6 +1756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadData(true);
         updateDuplicateState();
     });
+    openExistingRecordBtn.addEventListener('click', () => openExistingRecord());
     openMainUrlBtn.addEventListener('click', () => openPreviewUrl(urlInput.value));
     fillCurrentBtn.addEventListener('click', () => fillCurrentTab(false));
     saveCurrentBtn.addEventListener('click', saveCurrentPage);

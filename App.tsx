@@ -334,6 +334,8 @@ function App() {
   });
   // 直达后临时高亮卡片
   const [focusedLinkId, setFocusedLinkId] = useState<string | null>(null);
+  const [pendingFocusLinkId, setPendingFocusLinkId] = useState<string | null>(null);
+  const isSearchActive = searchQuery.trim().length > 0;
 
   const normalizeUrlForDuplicate = (rawUrl: string): string => {
     if (!rawUrl) return '';
@@ -398,6 +400,27 @@ function App() {
 
     const openUrl = getPreferredOpenUrl(link);
     return openUrl ? `默认打开：${openUrl}` : '';
+  };
+
+  const getLinkLocationText = (link: LinkItem): string => {
+    const category = categories.find(item => item.id === link.categoryId);
+    const subCategory = category?.subcategories?.find(item => item.id === link.subCategoryId);
+    return [category?.name || '未分类', subCategory?.name].filter(Boolean).join(' / ');
+  };
+
+  const getCurrentBrowseLocationText = (): string => {
+    if (selectedCategory === 'all') {
+      return '全部分类';
+    }
+
+    const category = categories.find(item => item.id === selectedCategory);
+    const subCategory = category?.subcategories?.find(item => item.id === selectedSubCategory);
+
+    if (selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER) {
+      return `${category?.name || '当前分类'} / 未分配`;
+    }
+
+    return [category?.name || selectedCategory, subCategory?.name].filter(Boolean).join(' / ');
   };
 
   const getDuplicateGroupsByUrls = (urls: string[], excludeLinkId?: string): Array<{ normalizedUrl: string; links: LinkItem[] }> => {
@@ -1127,13 +1150,17 @@ function App() {
         } catch (e) {}
     }
 
-    // Handle URL Params for Bookmarklet (Add Link)
-    const urlParams = new URLSearchParams(window.location.search);
-    const addUrl = urlParams.get('add_url');
+    // Handle URL Params for Bookmarklet / Deep Link
+    const currentUrl = new URL(window.location.href);
+    const addUrl = currentUrl.searchParams.get('add_url');
+    const focusLinkId = currentUrl.searchParams.get('focus_link');
+    let shouldCleanQuery = false;
+
     if (addUrl) {
-        const addTitle = urlParams.get('add_title') || '';
-        // Clean URL params to avoid re-triggering on refresh
-        window.history.replaceState({}, '', window.location.pathname);
+        const addTitle = currentUrl.searchParams.get('add_title') || '';
+        currentUrl.searchParams.delete('add_url');
+        currentUrl.searchParams.delete('add_title');
+        shouldCleanQuery = true;
         
         setPrefillLink({
             title: addTitle,
@@ -1142,6 +1169,17 @@ function App() {
         });
         setEditingLink(undefined);
         setIsModalOpen(true);
+    }
+
+    if (focusLinkId) {
+      setPendingFocusLinkId(focusLinkId);
+      currentUrl.searchParams.delete('focus_link');
+      shouldCleanQuery = true;
+    }
+
+    if (shouldCleanQuery) {
+      const nextUrl = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+      window.history.replaceState({}, '', nextUrl);
     }
 
     // Initial Data Fetch
@@ -1336,6 +1374,20 @@ function App() {
 
     initData();
   }, []);
+
+  useEffect(() => {
+    if (!pendingFocusLinkId) {
+      return;
+    }
+
+    const targetLink = links.find(link => link.id === pendingFocusLinkId);
+    if (!targetLink) {
+      return;
+    }
+
+    setPendingFocusLinkId(null);
+    jumpToDuplicateCard(targetLink);
+  }, [pendingFocusLinkId, links, categories, unlockedCategoryIds]);
 
   // Update page title and favicon when site settings change
   useEffect(() => {
@@ -2632,20 +2684,20 @@ function App() {
     // Search Filter
     if (searchQuery.trim()) {
       result = result.filter(link => matchesLinkSearchQuery(link, searchQuery));
-    }
+    } else {
+      // Category Filter
+      if (selectedCategory !== 'all') {
+        result = result.filter(l => l.categoryId === selectedCategory);
+      }
 
-    // Category Filter
-    if (selectedCategory !== 'all') {
-      result = result.filter(l => l.categoryId === selectedCategory);
-    }
-
-    // 二级分类过滤
-    if (selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER) {
-      const currentCategory = categories.find(category => category.id === selectedCategory);
-      const validSubCategoryIds = new Set((currentCategory?.subcategories || []).map(subCategory => subCategory.id));
-      result = result.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
-    } else if (selectedSubCategory) {
-      result = result.filter(l => l.subCategoryId === selectedSubCategory);
+      // 二级分类过滤
+      if (selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER) {
+        const currentCategory = categories.find(category => category.id === selectedCategory);
+        const validSubCategoryIds = new Set((currentCategory?.subcategories || []).map(subCategory => subCategory.id));
+        result = result.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
+      } else if (selectedSubCategory) {
+        result = result.filter(l => l.subCategoryId === selectedSubCategory);
+      }
     }
     
     // 按照order字段排序，如果没有order字段则按创建时间排序
@@ -2658,49 +2710,6 @@ function App() {
       return aOrder - bOrder;
     });
   }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
-
-  // 计算其他目录的搜索结果
-  const otherCategoryResults = useMemo(() => {
-    if (!searchQuery.trim() || selectedCategory === 'all') {
-      return [];
-    }
-
-    // 获取其他目录中匹配的链接
-    const otherLinks = links.filter(link => {
-      // 排除当前目录的链接
-      if (link.categoryId === selectedCategory) {
-        return false;
-      }
-      
-      // 排除锁定的目录
-      if (isCategoryLocked(link.categoryId)) {
-        return false;
-      }
-      
-      return matchesLinkSearchQuery(link, searchQuery);
-    });
-
-    // 按目录分组
-    const groupedByCategory = otherLinks.reduce((acc, link) => {
-      if (!acc[link.categoryId]) {
-        acc[link.categoryId] = [];
-      }
-      acc[link.categoryId].push(link);
-      return acc;
-    }, {} as Record<string, LinkItem[]>);
-
-    // 对每个目录内的链接进行排序
-    Object.keys(groupedByCategory).forEach(categoryId => {
-      groupedByCategory[categoryId].sort((a, b) => {
-        const aOrder = a.order !== undefined ? a.order : a.createdAt;
-        const bOrder = b.order !== undefined ? b.order : b.createdAt;
-        return aOrder - bOrder;
-      });
-    });
-
-    return groupedByCategory;
-  }, [links, selectedCategory, searchQuery, categories, unlockedCategoryIds]);
-
 
   // --- Render Components ---
 
@@ -2792,7 +2801,8 @@ function App() {
   };
 
   const renderLinkCard = (link: LinkItem) => {
-    const isSelected = selectedLinks.has(link.id);
+    const isBatchSelectionMode = isBatchEditMode && !isSearchActive;
+    const isSelected = isBatchSelectionMode && selectedLinks.has(link.id);
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
@@ -2804,11 +2814,12 @@ function App() {
     const isOfflineLink = effectiveCategoryStatus?.offlineLinks?.includes(link.id) ?? false;
     
     const targetUrl = getPreferredOpenUrl(link);
+    const locationText = isSearchActive ? getLinkLocationText(link) : '';
 
     return (
       <Tooltip
         key={link.id}
-        content={!isBatchEditMode ? getCardTooltipContent(link) : ''}
+        content={!isBatchSelectionMode ? getCardTooltipContent(link) : ''}
         className="block w-full"
         centered
       >
@@ -2824,7 +2835,7 @@ function App() {
             : isOfflineLink
               ? 'bg-red-50/50 dark:bg-red-900/20 border-red-300 dark:border-red-700 hover:bg-red-100/50 dark:hover:bg-red-900/30'
               : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
-        } ${isBatchEditMode ? 'cursor-pointer' : ''} ${duplicateInfo ? 'border-2' : ''} ${
+        } ${isBatchSelectionMode ? 'cursor-pointer' : ''} ${duplicateInfo ? 'border-2' : ''} ${
           isDetailedView 
             ? `flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
             : `flex items-center justify-between rounded-xl border shadow-sm p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
@@ -2833,7 +2844,7 @@ function App() {
           borderColor: duplicateInfo.color,
           boxShadow: `0 0 0 1px ${duplicateInfo.color}`
         } : undefined}
-        onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
+        onClick={() => isBatchSelectionMode && toggleLinkSelection(link.id)}
         onContextMenu={(e) => handleContextMenu(e, link)}
       >
         {duplicateInfo && (
@@ -2846,7 +2857,7 @@ function App() {
           </div>
         )}
         {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
-        {isBatchEditMode ? (
+        {isBatchSelectionMode ? (
           <div className={`flex flex-1 min-w-0 ${
             isDetailedView ? 'flex-col' : 'items-center overflow-hidden h-full'
           }`}>
@@ -2859,12 +2870,20 @@ function App() {
                   {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
               </div>
               
-              {/* 标题 */}
-              <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-base' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
-              }`} title={link.title}>
-                  {link.title}
-              </h3>
+              <div className="min-w-0 flex-1">
+                <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                  isDetailedView ? 'text-base' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+                }`} title={link.title}>
+                    {link.title}
+                </h3>
+                {locationText && (
+                  <div className="mt-1 flex">
+                    <span className="max-w-full truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                      {locationText}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* 第二行：描述文字 - 使用title属性作为悬停提示 */}
@@ -2895,12 +2914,20 @@ function App() {
                   {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
               </div>
               
-              {/* 标题 */}
+              <div className="min-w-0 flex-1">
                 <h3 className={`text-slate-800 dark:text-slate-200 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
                   isDetailedView ? 'text-base' : 'text-sm font-medium'
                 }`} title={link.title}>
                     {link.title}
                 </h3>
+                {locationText && (
+                  <div className="mt-1 flex">
+                    <span className="max-w-full truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                      {locationText}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* 第二行：描述文字（仅详情视图显示） */}
@@ -2916,7 +2943,7 @@ function App() {
 
 
         {/* 离线状态下的快速重试按钮 - 检测中时显示旋转动画 */}
-        {!isBatchEditMode && (isOfflineLink || checkingLinkIds.has(link.id)) && (
+        {!isBatchSelectionMode && (isOfflineLink || checkingLinkIds.has(link.id)) && (
           <div className={`absolute z-20 ${
             isDetailedView
               ? 'top-1/2 right-3 -translate-y-1/2'
@@ -2957,7 +2984,7 @@ function App() {
         )}
 
         {/* Hover Actions (Absolute Right) - 在批量编辑模式下隐藏 */}
-        {!isBatchEditMode && (
+        {!isBatchSelectionMode && (
           <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 dark:bg-blue-900/20 backdrop-blur-sm rounded-md p-1 absolute ${
             isDetailedView ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
           }`}>
@@ -3627,9 +3654,23 @@ function App() {
                  <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                      <div className="min-w-0">
                          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                             {selectedCategory === 'all' ? (searchQuery ? '搜索结果' : '所有链接') : categories.find(c => c.id === selectedCategory)?.name}
+                             {isSearchActive ? '搜索结果' : selectedCategory === 'all' ? '所有链接' : categories.find(c => c.id === selectedCategory)?.name}
                          </h2>
-                         {selectedCategory !== 'all' && (
+                         {isSearchActive ? (
+                           <div className="mt-2 flex flex-wrap items-center gap-2">
+                             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
+                               {displayedLinks.length}
+                             </span>
+                             <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 rounded-full whitespace-nowrap">
+                               全站搜索
+                             </span>
+                             {selectedCategory !== 'all' && (
+                               <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full whitespace-nowrap">
+                                 当前浏览：{getCurrentBrowseLocationText()}
+                               </span>
+                             )}
+                           </div>
+                         ) : selectedCategory !== 'all' && (
                            <div className="mt-2 flex flex-wrap items-center gap-2">
                              {isCategoryLocked(selectedCategory) && <Lock size={14} className="text-amber-500 shrink-0" />}
                              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
@@ -3674,7 +3715,7 @@ function App() {
                              <Search size={14} />
                              <span>全站查重</span>
                          </button>
-                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && (
+                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && !isSearchActive && (
                              isSortingMode === selectedCategory ? (
                                  <div className="flex flex-wrap items-center gap-2">
                                      <button 
@@ -3840,7 +3881,7 @@ function App() {
 
                  {displayedLinks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                        {isCategoryLocked(selectedCategory) ? (
+                        {!isSearchActive && isCategoryLocked(selectedCategory) ? (
                             <>
                                 <Lock size={40} className="text-amber-400 mb-4" />
                                 <p>该目录已锁定</p>
@@ -3857,7 +3898,7 @@ function App() {
                         )}
                     </div>
                  ) : (
-                    isSortingMode === selectedCategory ? (
+                    !isSearchActive && isSortingMode === selectedCategory ? (
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCorners}
@@ -3891,58 +3932,6 @@ function App() {
             </section>
             )}
 
-            {/* 其他目录搜索结果区域 */}
-            {searchQuery.trim() && selectedCategory !== 'all' && (
-              <section className="mt-8 pt-8 border-t-2 border-slate-200 dark:border-slate-700">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-search">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                    <path d="M11 11h.01"></path>
-                  </svg>
-                  其他目录搜索结果
-                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 rounded-full">
-                    {Object.values(otherCategoryResults).flat().length}
-                  </span>
-                </h2>
-
-                {Object.keys(otherCategoryResults).length > 0 ? (
-                  Object.entries(otherCategoryResults).map(([categoryId, links]) => {
-                    const category = categories.find(c => c.id === categoryId);
-                    if (!category) return null;
-
-                    return (
-                      <div key={categoryId} className="mb-6 last:mb-0">
-                        <div className="flex items-center gap-2 mb-3">
-                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                            {category.name}
-                          </h3>
-                          <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full">
-                            {links.length}
-                          </span>
-                        </div>
-
-                        <div className={`grid gap-3 ${
-                          siteSettings.cardStyle === 'detailed' 
-                            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                            : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                        }`}>
-                          {links.map(link => renderLinkCard(link))}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-30 mb-4">
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <path d="m21 21-4.35-4.35"></path>
-                    </svg>
-                    <p className="text-sm">其他目录中没有找到相关内容</p>
-                  </div>
-                )}
-              </section>
-            )}
         </div>
       </main>
 
