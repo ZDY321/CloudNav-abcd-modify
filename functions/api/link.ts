@@ -383,12 +383,20 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       return pinnedLinks.length;
     };
 
-    // Check if URL already exists (for update instead of creating duplicates)
+    // Check if link already exists, prefer explicit id for stable editing updates.
+    const requestedLinkId = typeof newLinkData.id === 'string' && newLinkData.id.trim()
+      ? newLinkData.id.trim()
+      : '';
     const normalizedNewUrl = normalizeUrlForCompare(newLinkData.url);
     // @ts-ignore
-    const existingIndex = (currentData.links || []).findIndex((l: any) =>
+    const existingIndexById = requestedLinkId
+      ? (currentData.links || []).findIndex((l: any) => l && l.id === requestedLinkId)
+      : -1;
+    // @ts-ignore
+    const existingIndexByUrl = (currentData.links || []).findIndex((l: any) =>
       l && l.url && normalizeUrlForCompare(l.url) === normalizedNewUrl
     );
+    const existingIndex = existingIndexById >= 0 ? existingIndexById : existingIndexByUrl;
     // @ts-ignore
     const existingLink = existingIndex >= 0 ? currentData.links[existingIndex] : null;
 

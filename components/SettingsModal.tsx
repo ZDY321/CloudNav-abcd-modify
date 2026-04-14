@@ -873,6 +873,7 @@ function notify(title, message) {
         .existing-group-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; text-transform: uppercase; }
         .existing-group-count { font-size: 11px; color: var(--muted); }
         .existing-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+        .existing-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--bg); }
         .existing-item-main { display: flex; gap: 8px; align-items: flex-start; }
         .existing-item-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 2px; }
         .existing-item-icon img { width: 100%; height: 100%; object-fit: contain; }
@@ -882,6 +883,8 @@ function notify(title, message) {
         .existing-item-url { font-size: 11px; line-height: 1.45; color: var(--muted); word-break: break-all; }
         .existing-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .existing-item-actions .inline-btn { padding: 4px 9px; font-size: 11px; }
+        .existing-item-actions .inline-btn.primary-inline { background: var(--accent); color: #fff; border-color: transparent; }
+        .existing-item-actions .inline-btn.primary-inline:hover { filter: brightness(1.05); background: var(--accent); }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
         .url-input-row { display: flex; gap: 8px; align-items: center; }
         .url-input-row .form-input { flex: 1; min-width: 0; }
@@ -1220,9 +1223,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const iconSrc = getDisplayIconUrl(openUrl || link.url || '');
                             const locationText = getLocationText(link.categoryId, link.subCategoryId);
                             const extraUrlCount = Array.isArray(link.urls) ? link.urls.length : 0;
+                            const isActive = !!(editingLinkId && link.id === editingLinkId);
 
                             return \`
-                                <div class="existing-item">
+                                <div class="existing-item \${isActive ? 'active' : ''}">
                                     <div class="existing-item-main">
                                         <div class="existing-item-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                                         <div class="link-info">
@@ -1234,6 +1238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
                                     </div>
                                     <div class="existing-item-actions">
+                                        <button class="inline-btn primary-inline existing-load-editor" type="button" data-link-id="\${escapeHtml(link.id)}">\${isActive ? '已载入' : '载入编辑'}</button>
                                         <button class="inline-btn existing-open-site" type="button" data-url="\${escapeHtml(openUrl || link.url || '')}">直达</button>
                                         \${link && link.id ? \`<button class="inline-btn existing-open-app" type="button" data-link-id="\${escapeHtml(link.id)}">定位记录</button>\` : ''}
                                     </div>
@@ -1575,6 +1580,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             .join(' / ');
     };
 
+    const loadLinkIntoEditor = (link, statusText = '已载入已有记录，可直接查看并编辑后保存。') => {
+        if (!link) return;
+
+        lastSavedFeedback = null;
+        editingLinkId = link.id || '';
+        titleInput.value = link.title || '';
+        urlInput.value = link.url || '';
+        descriptionInput.value = link.description || '';
+        iconInput.value = link.icon || getCloudNavIconUrl(link.url || '');
+        setAltUrls(link.urls || []);
+        if (pinnedInput) pinnedInput.checked = !!link.pinned;
+
+        const nextCategoryId = link.categoryId || categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
+        renderCategoryOptions(nextCategoryId);
+        renderSubCategoryOptions(nextCategoryId, link.subCategoryId || '');
+        setStatus(statusText, 'success');
+        updateDuplicateState();
+    };
+
     const renderCategoryOptions = (selectedCategoryId) => {
         const fallbackId = selectedCategoryId || categorySelect.value || (allCategories[0] && allCategories[0].id) || 'common';
         if (allCategories.length === 0) {
@@ -1687,16 +1711,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 : getCloudNavIconUrl(tab.url);
 
             if (existing) {
-                editingLinkId = existing.id || '';
-                titleInput.value = existing.title || tab.title || '';
-                urlInput.value = existing.url || tab.url;
-                descriptionInput.value = existing.description || '';
-                iconInput.value = existing.icon || safeIcon;
-                setAltUrls(existing.urls || []);
-                if (pinnedInput) pinnedInput.checked = !!existing.pinned;
-                renderCategoryOptions(existing.categoryId);
-                renderSubCategoryOptions(existing.categoryId, existing.subCategoryId || '');
-                setStatus(getReadCurrentStatus('exact'), 'success');
+                loadLinkIntoEditor({
+                    ...existing,
+                    title: existing.title || tab.title || '',
+                    url: existing.url || tab.url,
+                    icon: existing.icon || safeIcon
+                }, getReadCurrentStatus('exact'));
             } else {
                 editingLinkId = '';
                 titleInput.value = tab.title || '';
@@ -1874,6 +1894,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     'x-auth-password': CONFIG.password
                 },
                 body: JSON.stringify({
+                    id: editingLinkId || undefined,
                     title,
                     url: finalUrl,
                     urls: preparedAltUrls,
@@ -1935,6 +1956,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     openExistingRecordBtn.addEventListener('click', () => openExistingRecord());
     existingRecords.addEventListener('click', (e) => {
+        const loadEditorBtn = e.target.closest('.existing-load-editor');
+        if (loadEditorBtn) {
+            const targetLinkId = loadEditorBtn.dataset.linkId || '';
+            const targetLink = allLinks.find(link => link && link.id === targetLinkId) || null;
+            if (targetLink) {
+                loadLinkIntoEditor(targetLink);
+            }
+            return;
+        }
+
         const openSiteBtn = e.target.closest('.existing-open-site');
         if (openSiteBtn) {
             const targetUrl = openSiteBtn.dataset.url || '';

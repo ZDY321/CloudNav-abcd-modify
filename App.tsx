@@ -2711,10 +2711,18 @@ function App() {
     });
   }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
 
-  const searchResultGroups = useMemo(() => {
+  const searchResultGroups = useMemo<Array<{
+    categoryId: string;
+    categoryName: string;
+    categoryIcon: string;
+    links: LinkItem[];
+    subCategoryCount: number;
+  }>>(() => {
     if (!isSearchActive) return [];
 
-    const categoryOrder = new Map(categories.map((category, index) => [category.id, index]));
+    const categoryOrder = new Map<string, number>(
+      categories.map((category, index) => [category.id, index] as const)
+    );
     const groupMap = new Map<string, {
       categoryId: string;
       categoryName: string;
