@@ -9223,7 +9223,7 @@ function notify(title, message) {
         </div>
         <div class="form-actions">
             <button id="fillCurrent" class="secondary-btn" type="button">读取当前页</button>
-            <button id="saveCurrent" class="primary-btn" type="button">保存到分类</button>
+            <button id="saveCurrent" class="primary-btn" type="button">新建记录</button>
         </div>
     </div>
     <div id="content" class="content">
@@ -9840,6 +9840,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             .join(' / ');
     };
 
+    const getSaveActionText = () => editingLinkId ? '更新记录' : '新建记录';
+
+    const getSavePendingText = () => editingLinkId ? '更新中...' : '新建中...';
+
+    const syncSaveActionLabel = () => {
+        saveCurrentBtn.textContent = getSaveActionText();
+        saveCurrentBtn.title = editingLinkId
+            ? '更新当前载入的已有记录'
+            : '新建一条记录并保存到当前分类';
+    };
+
     const loadLinkIntoEditor = (link, statusText = '已载入已有记录，可直接查看并编辑后保存。') => {
         if (!link) return;
 
@@ -9855,6 +9866,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextCategoryId = link.categoryId || categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         renderCategoryOptions(nextCategoryId);
         renderSubCategoryOptions(nextCategoryId, link.subCategoryId || '');
+        syncSaveActionLabel();
         setStatus(statusText, 'success');
         updateDuplicateState();
     };
@@ -9991,6 +10003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nextSubCategoryId = matchState && matchState.link ? (matchState.link.subCategoryId || '') : '';
                 renderCategoryOptions(nextCategoryId);
                 renderSubCategoryOptions(nextCategoryId, nextSubCategoryId);
+                syncSaveActionLabel();
                 setStatus(getReadCurrentStatus(matchState && matchState.type), matchState ? 'warn' : 'success');
             }
             updateDuplicateState();
@@ -10143,7 +10156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         isSavingCurrent = true;
         saveCurrentBtn.disabled = true;
-        saveCurrentBtn.textContent = '保存中...';
+        saveCurrentBtn.textContent = getSavePendingText();
         setStatus('正在保存当前网页...', 'muted');
 
         try {
@@ -10195,7 +10208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             isSavingCurrent = false;
             saveCurrentBtn.disabled = false;
-            saveCurrentBtn.textContent = '保存到分类';
+            syncSaveActionLabel();
         }
     };
 
@@ -10206,6 +10219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    syncSaveActionLabel();
     await loadData();
     await fillCurrentTab();
 
