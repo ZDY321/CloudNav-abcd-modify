@@ -247,7 +247,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               "default": "Ctrl+Shift+E",
               "mac": "Command+Shift+E"
             },
-            "description": "打开/关闭 CloudNav 侧边栏"
+            "description": "打开 CloudNav 侧边栏"
           }
         }
     };
@@ -278,6 +278,7 @@ let categoryCache = [];
 let cacheInitialized = false;
 
 const DEFAULT_ACTION_TITLE = "打开侧边栏 (Ctrl+Shift+E)";
+const SIDEBAR_PATH = 'sidebar.html';
 const MULTI_PART_TLDS = new Set([
   'ac.jp', 'ac.uk',
   'co.jp', 'co.kr', 'co.uk',
@@ -291,12 +292,22 @@ const MULTI_PART_TLDS = new Set([
   're.kr'
 ]);
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+async function ensureSidePanelReady() {
+  await Promise.allSettled([
+    chrome.sidePanel.setOptions({ path: SIDEBAR_PATH, enabled: true }),
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+  ]);
+}
+
+ensureSidePanelReady().catch(() => {});
+
+chrome.runtime.onInstalled.addListener(async () => {
+  await ensureSidePanelReady();
   refreshUiFromCache();
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
+  await ensureSidePanelReady();
   refreshUiFromCache();
 });
 
@@ -349,6 +360,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
 chrome.action.onClicked.addListener(async (tab) => {
     const windowId = tab.windowId;
+    if (typeof windowId !== 'number') return;
     const existingPort = windowPorts[windowId];
 
     if (existingPort) {
@@ -356,10 +368,16 @@ chrome.action.onClicked.addListener(async (tab) => {
             existingPort.postMessage({ action: 'close_panel' });
         } catch (e) {
             delete windowPorts[windowId];
-            chrome.sidePanel.open({ windowId });
+            try {
+                await ensureSidePanelReady();
+                await chrome.sidePanel.open({ windowId });
+            } catch (openError) {
+                console.error('Failed to reopen sidebar', openError);
+            }
         }
     } else {
         try {
+            await ensureSidePanelReady();
             await chrome.sidePanel.open({ windowId: windowId });
         } catch (e) {
             console.error('Failed to open sidebar', e);
@@ -834,13 +852,14 @@ function notify(title, message) {
         .rotating { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .page-editor { margin: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(180deg, var(--accent-soft), transparent 72%), var(--panel); }
-        .editor-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
-        .editor-title { font-size: 14px; font-weight: 700; }
-        .editor-status { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+        .editor-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .editor-title { font-size: 14px; font-weight: 700; line-height: 1.2; }
+        .editor-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .editor-status { font-size: 11px; color: var(--muted); line-height: 1.45; }
         .editor-status[data-tone="success"] { color: var(--success); }
         .editor-status[data-tone="warn"] { color: var(--warn); }
         .editor-status[data-tone="error"] { color: var(--danger); }
-        .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: var(--muted); background: rgba(100, 116, 139, 0.12); }
+        .duplicate-note { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 10px; font-weight: 600; line-height: 1.2; color: var(--muted); background: rgba(100, 116, 139, 0.12); }
         .duplicate-note[data-kind="exact"] { color: var(--success); background: rgba(34, 197, 94, 0.14); }
         .duplicate-note[data-kind="root"] { color: var(--accent); background: var(--accent-soft); }
         .duplicate-note[data-kind="site"] { color: var(--warn); background: rgba(180, 83, 9, 0.12); }
@@ -860,9 +879,8 @@ function notify(title, message) {
         .primary-btn:disabled { opacity: 0.65; cursor: not-allowed; }
         .secondary-btn { background: var(--bg); color: var(--text); }
         .secondary-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .inline-btn { border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
+        .inline-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; transition: all 0.2s; background: var(--bg); color: var(--accent); }
         .inline-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
-        .editor-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         .existing-records { display: none; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.45); backdrop-filter: blur(6px); }
         .existing-records-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
         .existing-records-title { font-size: 12px; font-weight: 700; color: var(--text); }
@@ -881,8 +899,8 @@ function notify(title, message) {
         .existing-item-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
         .existing-item-location { font-size: 11px; font-weight: 600; color: var(--accent); }
         .existing-item-url { font-size: 11px; line-height: 1.45; color: var(--muted); word-break: break-all; }
-        .existing-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-        .existing-item-actions .inline-btn { padding: 4px 9px; font-size: 11px; }
+        .existing-item-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
+        .existing-item-actions .inline-btn { padding: 4px 8px; font-size: 10.5px; }
         .existing-item-actions .inline-btn.primary-inline { background: var(--accent); color: #fff; border-color: transparent; }
         .existing-item-actions .inline-btn.primary-inline:hover { filter: brightness(1.05); background: var(--accent); }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
@@ -924,14 +942,12 @@ function notify(title, message) {
     </div>
     <div class="page-editor">
         <div class="editor-head">
-            <div>
-                <div class="editor-title">保存当前网页</div>
-                <div id="pageStatus" class="editor-status">准备读取当前标签页...</div>
-            </div>
-            <div class="editor-side">
+            <div class="editor-title">保存当前网页</div>
+            <div class="editor-meta">
                 <div id="duplicateNote" class="duplicate-note" style="display:none;"></div>
-                <button id="openExistingRecord" class="inline-btn" type="button" style="display:none;">查看已有记录</button>
+                <button id="openExistingRecord" class="inline-btn" type="button" style="display:none;">查看记录</button>
             </div>
+            <div id="pageStatus" class="editor-status">准备读取当前标签页...</div>
         </div>
         <div id="existingRecords" class="existing-records" style="display:none;"></div>
         <div class="form-row"><input id="pageTitle" class="form-input" type="text" placeholder="网页标题"></div>
@@ -1207,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         existingRecords.innerHTML = \`
             <div class="existing-records-head">
                 <div>
-                    <div class="existing-records-title">已收录的网站记录</div>
+                    <div class="existing-records-title">已收录记录</div>
                     <div class="existing-records-subtitle">当前网页在 CloudNav 中命中 \${currentExistingRecordState.total} 条相关记录，可在侧边栏内直接查看并定位。</div>
                 </div>
             </div>
@@ -1260,7 +1276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             existingRecordsExpanded = false;
             openExistingRecordBtn.style.display = 'none';
             openExistingRecordBtn.setAttribute('disabled', 'disabled');
-            openExistingRecordBtn.textContent = '查看已有记录';
+            openExistingRecordBtn.textContent = '查看记录';
             openExistingRecordBtn.title = '';
             renderExistingRecords();
             return;
@@ -1269,8 +1285,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         openExistingRecordBtn.style.display = 'inline-flex';
         openExistingRecordBtn.removeAttribute('disabled');
         openExistingRecordBtn.textContent = existingRecordsExpanded
-            ? \`收起已有记录 (\${currentExistingRecordState.total})\`
-            : \`查看已有记录 (\${currentExistingRecordState.total})\`;
+            ? \`收起记录 (\${currentExistingRecordState.total})\`
+            : \`查看记录 (\${currentExistingRecordState.total})\`;
         openExistingRecordBtn.title = currentExistingRecordState.primaryLink && currentExistingRecordState.primaryLink.title
             ? \`查看与「\${currentExistingRecordState.primaryLink.title}」相关的已有记录\`
             : '查看已有的网站记录';
@@ -2465,7 +2481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <li>1. 开启右上角的 "开发者模式" (Chrome)。</li>
                                     <li>2. 点击 "加载已解压的扩展程序"，选择包含上述文件的文件夹。</li>
                                     <li>3. 前往 <code className="select-all bg-white dark:bg-slate-900 px-1 rounded">chrome://extensions/shortcuts</code>。</li>
-                                    <li>4. <strong>[重要]</strong> 找到 "打开/关闭 CloudNav 侧边栏"，设置快捷键 (如 Ctrl+Shift+E)。</li>
+                                    <li>4. <strong>[重要]</strong> 找到 "打开 CloudNav 侧边栏"，设置快捷键 (如 Ctrl+Shift+E)。</li>
                                 </ol>
                                 
                                 <div className="mt-4 mb-4">
@@ -2482,7 +2498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded border border-green-200 dark:border-green-900/50 text-sm space-y-2">
                                     <div className="font-bold flex items-center gap-2"><Zap size={16}/> 完美交互方案 (v7.6):</div>
                                     <ul className="list-disc list-inside text-xs space-y-1">
-                                        <li><strong>左键 / 快捷键:</strong> 极速打开/关闭侧边栏 (无弹窗延迟)。</li>
+                                        <li><strong>左键 / 快捷键:</strong> 稳定打开侧边栏，首次点击也可直接拉起。</li>
                                         <li><strong>网页右键:</strong> 直接展示分类列表 (支持判重警告)。</li>
                                         <li><strong>图标右键:</strong> 同上，统一为级联菜单，直接保存。</li>
                                     </ul>
