@@ -9147,8 +9147,11 @@ function notify(title, message) {
         .existing-item-url { font-size: 11px; line-height: 1.45; color: var(--muted); word-break: break-all; }
         .existing-item-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
         .existing-item-actions .inline-btn { padding: 4px 8px; font-size: 10.5px; }
+        .existing-item-actions .inline-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .existing-item-actions .inline-btn.primary-inline { background: var(--accent); color: #fff; border-color: transparent; }
         .existing-item-actions .inline-btn.primary-inline:hover { filter: brightness(1.05); background: var(--accent); }
+        .existing-item-actions .inline-btn.danger-inline { color: var(--danger); }
+        .existing-item-actions .inline-btn.danger-inline:hover { border-color: var(--danger); background: rgba(220, 38, 38, 0.08); }
         .alt-url-hint { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
         .url-input-row { display: flex; gap: 8px; align-items: center; }
         .url-input-row .form-input { flex: 1; min-width: 0; }
@@ -9326,6 +9329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastSavedFeedback = null;
     let currentExistingRecordState = { groups: [], total: 0, primaryLink: null };
     let existingRecordsExpanded = false;
+    let deletingLinkIds = new Set();
 
     const escapeHtml = (value = '') => String(value)
         .replace(/&/g, '&amp;')
@@ -9468,7 +9472,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="existing-records-head">
                 <div>
                     <div class="existing-records-title">已收录记录</div>
-                    <div class="existing-records-subtitle">当前网页在 CloudNav 中命中 \${currentExistingRecordState.total} 条相关记录，可在侧边栏内直接查看并定位。</div>
+                    <div class="existing-records-subtitle">当前网页在 CloudNav 中命中 \${currentExistingRecordState.total} 条相关记录，可在侧边栏内直接查看、定位或删除。</div>
                 </div>
             </div>
             <div class="existing-records-body">
@@ -9484,6 +9488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const locationText = getLocationText(link.categoryId, link.subCategoryId);
                             const extraUrlCount = Array.isArray(link.urls) ? link.urls.length : 0;
                             const isActive = !!(editingLinkId && link.id === editingLinkId);
+                            const isDeleting = deletingLinkIds.has(link.id);
 
                             return \`
                                 <div class="existing-item \${isActive ? 'active' : ''}">
@@ -9501,6 +9506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         <button class="inline-btn primary-inline existing-load-editor" type="button" data-link-id="\${escapeHtml(link.id)}">\${isActive ? '已载入' : '载入编辑'}</button>
                                         <button class="inline-btn existing-open-site" type="button" data-url="\${escapeHtml(openUrl || link.url || '')}">直达</button>
                                         \${link && link.id ? \`<button class="inline-btn existing-open-app" type="button" data-link-id="\${escapeHtml(link.id)}">定位记录</button>\` : ''}
+                                        \${link && link.id ? \`<button class="inline-btn danger-inline existing-delete-record" type="button" data-link-id="\${escapeHtml(link.id)}" \${isDeleting ? 'disabled' : ''}>\${isDeleting ? '删除中...' : '删除'}</button>\` : ''}
                                     </div>
                                 </div>
                             \`;
@@ -9541,6 +9547,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentExistingRecordState.total) return;
         existingRecordsExpanded = !existingRecordsExpanded;
         updateExistingRecordAction(currentExistingRecordState);
+    };
+
+    const deleteExistingRecord = async (link) => {
+        if (!link || !link.id || deletingLinkIds.has(link.id)) return;
+
+        const label = link.title || link.url || '当前记录';
+        const confirmed = window.confirm(\`确定要删除「\${label}」吗？删除后网站中的对应卡片也会同步移除。\`);
+        if (!confirmed) return;
+
+        deletingLinkIds.add(link.id);
+        renderExistingRecords();
+
+        try {
+            const res = await fetch(\`\${CONFIG.apiBase}/api/link\`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-auth-password': CONFIG.password
+                },
+                body: JSON.stringify({ id: link.id })
+            });
+
+            let responseData = null;
+            try {
+                responseData = await res.json();
+            } catch (e) {
+                responseData = null;
+            }
+
+            if (!res.ok) {
+                throw new Error(responseData && responseData.error ? responseData.error : \`删除失败: \${res.status}\`);
+            }
+
+            if (editingLinkId === link.id) {
+                editingLinkId = '';
+                syncSaveActionLabel();
+            }
+
+            lastSavedFeedback = null;
+            await loadData(true);
+            setStatus(\`已删除「\${label}」。\`, 'success');
+        } catch (e) {
+            setStatus(e && e.message ? e.message : '删除失败，请稍后重试。', 'error');
+        } finally {
+            deletingLinkIds.delete(link.id);
+            renderExistingRecords();
+        }
     };
 
     const MULTI_PART_TLDS = new Set([
@@ -10230,6 +10283,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     openExistingRecordBtn.addEventListener('click', () => openExistingRecord());
     existingRecords.addEventListener('click', (e) => {
+        const deleteBtn = e.target.closest('.existing-delete-record');
+        if (deleteBtn) {
+            const targetLinkId = deleteBtn.dataset.linkId || '';
+            const targetLink = allLinks.find(link => link && link.id === targetLinkId) || null;
+            if (targetLink) {
+                deleteExistingRecord(targetLink);
+            }
+            return;
+        }
+
         const loadEditorBtn = e.target.closest('.existing-load-editor');
         if (loadEditorBtn) {
             const targetLinkId = loadEditorBtn.dataset.linkId || '';

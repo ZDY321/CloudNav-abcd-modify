@@ -6,7 +6,7 @@ interface Env {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET, DELETE',
   'Access-Control-Allow-Headers': 'Content-Type, x-auth-password',
   'Access-Control-Max-Age': '86400',
 };
@@ -288,18 +288,45 @@ export const onRequestHead = async (context: { request: Request; env: Env }) => 
   });
 };
 
-export const onRequestPost = async (context: { request: Request; env: Env }) => {
-  const { request, env } = context;
+const getUnauthorizedResponse = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
 
-  // 1. Auth Check
+const ensureAuthorized = (request: Request, env: Env): Response | null => {
   const providedPassword = request.headers.get('x-auth-password');
   const serverPassword = env.PASSWORD;
 
   if (!serverPassword || providedPassword !== serverPassword) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return getUnauthorizedResponse();
+  }
+
+  return null;
+};
+
+const loadCurrentData = async (env: Env) => {
+  const currentDataStr = await env.CLOUDNAV_KV.get('app_data');
+  let currentData = { links: [], categories: [] };
+
+  if (currentDataStr) {
+    currentData = JSON.parse(currentDataStr);
+  }
+
+  // @ts-ignore
+  if (!Array.isArray(currentData.links)) currentData.links = [];
+  // @ts-ignore
+  if (!Array.isArray(currentData.categories)) currentData.categories = [];
+
+  return currentData;
+};
+
+export const onRequestPost = async (context: { request: Request; env: Env }) => {
+  const { request, env } = context;
+
+  const unauthorizedResponse = ensureAuthorized(request, env);
+  if (unauthorizedResponse) {
+    return unauthorizedResponse;
   }
 
   try {
@@ -311,18 +338,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     }
 
     // 2. Fetch current data from KV
-    const currentDataStr = await env.CLOUDNAV_KV.get('app_data');
-    let currentData = { links: [], categories: [] };
-    
-    if (currentDataStr) {
-        currentData = JSON.parse(currentDataStr);
-    }
-
-    // Ensure shape
-    // @ts-ignore
-    if (!Array.isArray(currentData.links)) currentData.links = [];
-    // @ts-ignore
-    if (!Array.isArray(currentData.categories)) currentData.categories = [];
+    const currentData = await loadCurrentData(env);
 
     const normalizeUrlForCompare = (value: string): string => {
       try {
@@ -572,6 +588,57 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
 
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+};
+
+export const onRequestDelete = async (context: { request: Request; env: Env }) => {
+  const { request, env } = context;
+
+  const unauthorizedResponse = ensureAuthorized(request, env);
+  if (unauthorizedResponse) {
+    return unauthorizedResponse;
+  }
+
+  try {
+    const payload = await request.json() as any;
+    const linkId = typeof payload?.id === 'string' ? payload.id.trim() : '';
+
+    if (!linkId) {
+      return new Response(JSON.stringify({ error: 'Missing link id' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    const currentData = await loadCurrentData(env);
+    // @ts-ignore
+    const existingLink = (currentData.links || []).find((link: any) => link && link.id === linkId);
+
+    if (!existingLink) {
+      return new Response(JSON.stringify({ error: 'Link not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // @ts-ignore
+    currentData.links = (currentData.links || []).filter((link: any) => !link || link.id !== linkId);
+
+    await env.CLOUDNAV_KV.put('app_data', JSON.stringify(currentData));
+
+    return new Response(JSON.stringify({
+      success: true,
+      deleted: true,
+      linkId,
+      link: existingLink,
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
