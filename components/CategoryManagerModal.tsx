@@ -119,7 +119,6 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     if (activeId.startsWith('cat:')) {
       if (!isCategorySorting) return;
       const activeCatId = activeId.slice('cat:'.length);
-      if (activeCatId === 'common') return;
 
       const overCatId = overId.startsWith('cat:')
         ? overId.slice('cat:'.length)
@@ -130,19 +129,10 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       if (!overCatId) return;
 
       const activeIndex = categories.findIndex(c => c.id === activeCatId);
-      const overIndexRaw = categories.findIndex(c => c.id === overCatId);
-      if (activeIndex < 0 || overIndexRaw < 0) return;
-      const overIndex = overCatId === 'common' ? 1 : overIndexRaw;
+      const overIndex = categories.findIndex(c => c.id === overCatId);
+      if (activeIndex < 0 || overIndex < 0) return;
 
       const moved = arrayMove<Category>(categories, activeIndex, overIndex);
-      const commonIndex = moved.findIndex(c => c.id === 'common');
-      if (commonIndex > 0) {
-        const next = [...moved];
-        const [common] = next.splice(commonIndex, 1);
-        next.unshift(common);
-        onUpdateCategories(next);
-        return;
-      }
       onUpdateCategories(moved);
       return;
     }
@@ -571,7 +561,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const SortableCategoryCard: React.FC<{ cat: Category }> = ({ cat }) => {
-    const isSortableEnabled = isCategorySorting && cat.id !== 'common';
+    const isSortableEnabled = isCategorySorting;
     const editNameInputRef = useRef<HTMLInputElement | null>(null);
     const addSubInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -590,7 +580,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     };
 
     useLayoutEffect(() => {
-      if (editingId !== cat.id || cat.id === 'common') return;
+      if (editingId !== cat.id) return;
       const input = editNameInputRef.current;
       if (!input) return;
       try {
@@ -629,7 +619,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
               isSortableEnabled ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
             }`}
-            title={cat.id === 'common' ? '默认分类固定在顶部' : (isSortableEnabled ? '拖拽排序' : '开启手动排序后可拖拽')}
+            title={isSortableEnabled ? '拖拽排序' : '开启手动排序后可拖拽'}
             {...(isSortableEnabled ? attributes : {})}
             {...(isSortableEnabled ? listeners : {})}
             onClick={(e) => e.preventDefault()}
@@ -638,7 +628,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2 flex-1">
-            {editingId === cat.id && cat.id !== 'common' ? (
+            {editingId === cat.id ? (
               <div className="flex flex-col gap-2 w-full">
                 <div className="flex items-center gap-2">
                   <Icon name={editIcon} size={16} />
@@ -676,7 +666,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 <span className="font-medium dark:text-slate-200 truncate">
                   {cat.name}
                   {cat.id === 'common' && (
-                    <span className="ml-2 text-xs text-slate-400">(默认分类，不可编辑)</span>
+                    <span className="ml-2 text-xs text-slate-400">(默认分类)</span>
                   )}
                 </span>
                 {subCount > 0 && (
@@ -726,15 +716,13 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     <CornerDownRight size={14} />
                   </button>
                 )}
-                {cat.id !== 'common' && (
-                  <button
-                    onClick={() => handleStartEdit(cat)}
-                    className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                    title="编辑"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                )}
+                <button
+                  onClick={() => handleStartEdit(cat)}
+                  className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                  title="编辑"
+                >
+                  <Edit2 size={14} />
+                </button>
                 {cat.id !== 'common' && (
                   <button
                     onClick={() => handleDeleteClick(cat)}

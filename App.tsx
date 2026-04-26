@@ -736,41 +736,41 @@ function App() {
   
   // --- Helpers & Sync Logic ---
 
+  const getDefaultCommonCategory = (): Category => {
+    const defaultCommon = DEFAULT_CATEGORIES.find(category => category.id === 'common');
+    return defaultCommon ? { ...defaultCommon } : { id: 'common', name: '常用推荐', icon: 'Star' };
+  };
+
+  const normalizeCategories = (sourceCategories?: Category[]) => {
+    const baseCategories = sourceCategories ?? DEFAULT_CATEGORIES;
+    if (baseCategories.some(category => category.id === 'common')) {
+      return baseCategories;
+    }
+    return [...baseCategories, getDefaultCommonCategory()];
+  };
+
+  const normalizeLinks = (sourceLinks: LinkItem[], sourceCategories: Category[]) => {
+    const validCategoryIds = new Set(sourceCategories.map(category => category.id));
+    return sourceLinks.map(link => {
+      if (validCategoryIds.has(link.categoryId)) {
+        return link;
+      }
+
+      return {
+        ...link,
+        categoryId: 'common',
+        subCategoryId: undefined
+      };
+    });
+  };
+
   const loadFromLocal = () => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        let loadedCategories = parsed.categories || DEFAULT_CATEGORIES;
-        
-        // 确保"常用推荐"分类始终存在，并确保它是第一个分类
-        if (!loadedCategories.some(c => c.id === 'common')) {
-          loadedCategories = [
-            { id: 'common', name: '常用推荐', icon: 'Star' },
-            ...loadedCategories
-          ];
-        } else {
-          // 如果"常用推荐"分类已存在，确保它是第一个分类
-          const commonIndex = loadedCategories.findIndex(c => c.id === 'common');
-          if (commonIndex > 0) {
-            const commonCategory = loadedCategories[commonIndex];
-            loadedCategories = [
-              commonCategory,
-              ...loadedCategories.slice(0, commonIndex),
-              ...loadedCategories.slice(commonIndex + 1)
-            ];
-          }
-        }
-        
-        // 检查是否有链接的categoryId不存在于当前分类中，将这些链接移动到"常用推荐"
-        const validCategoryIds = new Set(loadedCategories.map(c => c.id));
-        let loadedLinks = parsed.links || INITIAL_LINKS;
-        loadedLinks = loadedLinks.map(link => {
-          if (!validCategoryIds.has(link.categoryId)) {
-            return { ...link, categoryId: 'common' };
-          }
-          return link;
-        });
+        const loadedCategories = normalizeCategories(parsed.categories);
+        const loadedLinks = normalizeLinks(parsed.links || INITIAL_LINKS, loadedCategories);
         
         setLinks(loadedLinks);
         setCategories(loadedCategories);
@@ -864,16 +864,19 @@ function App() {
   };
 
   const updateData = (newLinks: LinkItem[], newCategories: Category[]) => {
+      const normalizedCategories = normalizeCategories(newCategories);
+      const normalizedLinks = normalizeLinks(newLinks, normalizedCategories);
+
       // 1. Optimistic UI Update
-      setLinks(newLinks);
-      setCategories(newCategories);
+      setLinks(normalizedLinks);
+      setCategories(normalizedCategories);
       
       // 2. Save to Local Cache
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links: newLinks, categories: newCategories }));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links: normalizedLinks, categories: normalizedCategories }));
 
       // 3. Sync to Cloud (if authenticated)
       if (authToken) {
-          syncToCloud(newLinks, newCategories, authToken);
+          syncToCloud(normalizedLinks, normalizedCategories, authToken);
       }
   };
 
@@ -1215,12 +1218,18 @@ function App() {
                 }
                 const data = await res.json();
                 if (data.links && data.links.length > 0) {
-                    setLinks(data.links);
-                    setCategories(data.categories || DEFAULT_CATEGORIES);
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+                    const normalizedCategories = normalizeCategories(data.categories);
+                    const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
+                    setLinks(normalizedLinks);
+                    setCategories(normalizedCategories);
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+                      ...data,
+                      links: normalizedLinks,
+                      categories: normalizedCategories
+                    }));
                     
                     // 加载链接图标缓存
-                    loadLinkIcons(data.links);
+                    loadLinkIcons(normalizedLinks);
                     hasCloudData = true;
                 }
             } else if (res.status === 401) {
@@ -1567,12 +1576,18 @@ function App() {
                     const data = await res.json();
                     // 如果服务器有数据，使用服务器数据
                     if (data.links && data.links.length > 0) {
-                        setLinks(data.links);
-                        setCategories(data.categories || DEFAULT_CATEGORIES);
-                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+                        const normalizedCategories = normalizeCategories(data.categories);
+                        const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
+                        setLinks(normalizedLinks);
+                        setCategories(normalizedCategories);
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+                          ...data,
+                          links: normalizedLinks,
+                          categories: normalizedCategories
+                        }));
                         
                         // 加载链接图标缓存
-                        loadLinkIcons(data.links);
+                        loadLinkIcons(normalizedLinks);
                     } else {
                         // 如果服务器没有数据，使用本地数据
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
@@ -1682,12 +1697,7 @@ function App() {
   const handleImportConfirm = (newLinks: LinkItem[], newCategories: Category[]) => {
       // Merge categories: Avoid duplicate names/IDs
       const mergedCategories = [...categories];
-      
-      // 确保"常用推荐"分类始终存在
-      if (!mergedCategories.some(c => c.id === 'common')) {
-        mergedCategories.push({ id: 'common', name: '常用推荐', icon: 'Star' });
-      }
-      
+
       newCategories.forEach(nc => {
           if (!mergedCategories.some(c => c.id === nc.id || c.name === nc.name)) {
               mergedCategories.push(nc);
@@ -2270,19 +2280,11 @@ function App() {
           return;
       }
       
-      let newCats = categories.filter(c => c.id !== catId);
-      
-      // 检查是否存在"常用推荐"分类，如果不存在则创建它
-      if (!newCats.some(c => c.id === 'common')) {
-          newCats = [
-              { id: 'common', name: '常用推荐', icon: 'Star' },
-              ...newCats
-          ];
-      }
+      const newCats = categories.filter(c => c.id !== catId);
       
       // Move links to common or first available
       const targetId = 'common'; 
-      const newLinks = links.map(l => l.categoryId === catId ? { ...l, categoryId: targetId } : l);
+      const newLinks = links.map(l => l.categoryId === catId ? { ...l, categoryId: targetId, subCategoryId: undefined } : l);
       
       updateData(newLinks, newCats);
   };
