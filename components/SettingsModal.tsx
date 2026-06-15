@@ -66,7 +66,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [localSiteSettings, setLocalSiteSettings] = useState<SiteSettings>(() => ({
       title: siteSettings?.title || 'CloudNav - 我的导航',
       navTitle: siteSettings?.navTitle || 'CloudNav',
-      favicon: siteSettings?.favicon || '',
+      favicon: siteSettings?.favicon || '/favicon.png',
       cardStyle: siteSettings?.cardStyle || 'detailed',
       passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
   }));
@@ -101,7 +101,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const safeSettings = {
           title: siteSettings?.title || 'CloudNav - 我的导航',
           navTitle: siteSettings?.navTitle || 'CloudNav',
-          favicon: siteSettings?.favicon || '',
+          favicon: siteSettings?.favicon || '/favicon.png',
           cardStyle: siteSettings?.cardStyle || 'detailed'
       };
       setLocalSiteSettings(safeSettings);

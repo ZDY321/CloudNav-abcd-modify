@@ -214,7 +214,7 @@ function App() {
       return {
           title: 'CloudNav - 我的导航',
           navTitle: 'CloudNav',
-          favicon: '',
+          favicon: '/favicon.png',
           cardStyle: 'detailed' as const,
           passwordExpiryDays: 7
       };
