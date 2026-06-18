@@ -1,6 +1,5 @@
 ﻿
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
@@ -20,133 +19,25 @@ import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
   rectSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, UrlItem } from './types';
 import Icon from './components/Icon';
-import LinkModal from './components/LinkModal';
 import AuthModal from './components/AuthModal';
-import CategoryManagerModal from './components/CategoryManagerModal';
-import BackupModal from './components/BackupModal';
-import CategoryAuthModal from './components/CategoryAuthModal';
-import ImportModal from './components/ImportModal';
-import SettingsModal from './components/SettingsModal';
-import SearchConfigModal from './components/SearchConfigModal';
 import ContextMenu from './components/ContextMenu';
-import QRCodeModal from './components/QRCodeModal';
 import Tooltip from './components/Tooltip';
-import { LoginResult } from './components/AuthModal';
+import type { LoginResult } from './components/AuthModal';
 
-// --- 智能传送门提示框组件 ---
-// 解决所有遮挡问题的终极方案：将元素渲染到 body 根节点，脱离原有文档流
-const PortalTooltip = ({ 
-  content, 
-  visible, 
-  parentRef 
-}: { 
-  content: string; 
-  visible: boolean; 
-  parentRef: React.RefObject<HTMLElement | null>;
-}) => {
-  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
-  
-  useEffect(() => {
-    if (visible && parentRef.current) {
-      const updatePosition = () => {
-        const rect = parentRef.current!.getBoundingClientRect();
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        const tooltipW = 300; // 预设最大宽度
-        const tooltipH = 100; // 预估高度
-        const gap = 10; // 间距
-
-        let top = 0;
-        let left = 0;
-
-        // 1. 垂直定位逻辑：默认在下方，如果底部空间不足则翻转到上方
-        if (rect.bottom + tooltipH + gap > screenH) {
-          // 翻转到上方
-          top = rect.top - gap; 
-          // 此时需要配合 CSS transform: translateY(-100%) 实现向上对齐
-        } else {
-          // 显示在下方
-          top = rect.bottom + gap;
-        }
-
-        // 2. 水平定位逻辑：默认居中
-        left = rect.left + rect.width / 2;
-
-        // 检查右边缘
-        if (left + tooltipW / 2 > screenW) {
-          left = screenW - tooltipW / 2 - 20; // 靠右贴边，留出20px安全距离
-        }
-        // 检查左边缘
-        if (left - tooltipW / 2 < 0) {
-          left = tooltipW / 2 + 20; // 靠左贴边
-        }
-
-        // 决定是否向上翻转的样式标记
-        const isFlipped = rect.bottom + tooltipH + gap > screenH;
-
-        setStyle({
-          position: 'fixed',
-          top: `${top}px`,
-          left: `${left}px`,
-          transform: `translateX(-50%) ${isFlipped ? 'translateY(-100%)' : ''}`,
-          zIndex: 9999,
-          opacity: 1,
-          maxWidth: '90vw',
-          width: '300px'
-        });
-      };
-
-      updatePosition();
-      // 监听滚动和调整大小，保持位置准确
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-      
-      return () => {
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
-      };
-    } else {
-      setStyle(prev => ({ ...prev, opacity: 0 }));
-    }
-  }, [visible, parentRef]);
-
-  if (!visible) return null;
-
-  return createPortal(
-    <div 
-      style={style} 
-      className="pointer-events-none transition-opacity duration-200"
-    >
-      <div className="bg-slate-800 dark:bg-slate-700 text-slate-50 border border-slate-600 px-3 py-2 rounded-lg shadow-2xl text-xs leading-relaxed break-words whitespace-pre-wrap">
-        {content}
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-// --- 屏幕中央描述提示框组件 ---
-// 将提示框显示在屏幕正中央，使用 Portal 彻底解决遮挡问题
-// 注意：此组件不再使用透明层，避免阻挡点击事件
-const SmartTooltip = ({ text, isHovered }: { text: string; isHovered: boolean; parentRef?: React.RefObject<HTMLElement> }) => {
-  if (!isHovered) return null;
-  
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-      <div className="bg-slate-800/95 dark:bg-slate-700/95 text-white text-sm px-4 py-3 rounded-xl shadow-2xl break-words leading-relaxed whitespace-pre-wrap border border-slate-600 max-w-md mx-4 backdrop-blur-sm">
-        {text}
-      </div>
-    </div>,
-    document.body
-  );
-};
+const LinkModal = lazy(() => import('./components/LinkModal'));
+const CategoryManagerModal = lazy(() => import('./components/CategoryManagerModal'));
+const BackupModal = lazy(() => import('./components/BackupModal'));
+const CategoryAuthModal = lazy(() => import('./components/CategoryAuthModal'));
+const ImportModal = lazy(() => import('./components/ImportModal'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const SearchConfigModal = lazy(() => import('./components/SearchConfigModal'));
+const QRCodeModal = lazy(() => import('./components/QRCodeModal'));
 
 // --- 配置项 ---
 // 项目核心仓库地址
@@ -172,7 +63,6 @@ function App() {
   // Search Mode State
   const [searchMode, setSearchMode] = useState<SearchMode>('external');
   const [externalSearchSources, setExternalSearchSources] = useState<ExternalSearchSource[]>([]);
-  const [isLoadingSearchConfig, setIsLoadingSearchConfig] = useState(true);
   
   // Category Security State
   const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
@@ -1375,7 +1265,6 @@ function App() {
             }
         ]);
         
-        setIsLoadingSearchConfig(false);
         setIsCheckingAuth(false);
     };
 
@@ -3086,67 +2975,81 @@ function App() {
       {(!requiresAuth || authToken) && (
         <>
           <AuthModal isOpen={isAuthOpen} onLogin={handleLogin} />
-      
-      <CategoryAuthModal 
-        isOpen={!!catAuthModalData}
-        category={catAuthModalData}
-        onClose={() => setCatAuthModalData(null)}
-        onUnlock={handleUnlockCategory}
-      />
 
-      <CategoryManagerModal 
-        isOpen={isCatManagerOpen} 
-        onClose={() => setIsCatManagerOpen(false)}
-        categories={categories}
-        onUpdateCategories={handleUpdateCategories}
-        onDeleteCategory={handleDeleteCategory}
-        onMoveSubCategory={handleMoveSubCategory}
-        onDemoteCategoryToSubCategory={handleDemoteCategoryToSubCategory}
-        onVerifyPassword={handleCategoryActionAuth}
-      />
+      <Suspense fallback={null}>
+        {catAuthModalData && (
+          <CategoryAuthModal
+            isOpen={!!catAuthModalData}
+            category={catAuthModalData}
+            onClose={() => setCatAuthModalData(null)}
+            onUnlock={handleUnlockCategory}
+          />
+        )}
 
-      <BackupModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-        links={links}
-        categories={categories}
-        onRestore={handleRestoreBackup}
-        webDavConfig={webDavConfig}
-        onSaveWebDavConfig={handleSaveWebDavConfig}
-        searchConfig={{ mode: searchMode, externalSources: externalSearchSources }}
-        onRestoreSearchConfig={handleRestoreSearchConfig}
-        aiConfig={aiConfig}
-        onRestoreAIConfig={handleRestoreAIConfig}
-      />
+        {isCatManagerOpen && (
+          <CategoryManagerModal
+            isOpen={isCatManagerOpen}
+            onClose={() => setIsCatManagerOpen(false)}
+            categories={categories}
+            onUpdateCategories={handleUpdateCategories}
+            onDeleteCategory={handleDeleteCategory}
+            onMoveSubCategory={handleMoveSubCategory}
+            onDemoteCategoryToSubCategory={handleDemoteCategoryToSubCategory}
+            onVerifyPassword={handleCategoryActionAuth}
+          />
+        )}
 
-      <ImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        existingLinks={links}
-        categories={categories}
-        onImport={handleImportConfirm}
-        onImportSearchConfig={handleRestoreSearchConfig}
-        onImportAIConfig={handleRestoreAIConfig}
-      />
+        {isBackupModalOpen && (
+          <BackupModal
+            isOpen={isBackupModalOpen}
+            onClose={() => setIsBackupModalOpen(false)}
+            links={links}
+            categories={categories}
+            onRestore={handleRestoreBackup}
+            webDavConfig={webDavConfig}
+            onSaveWebDavConfig={handleSaveWebDavConfig}
+            searchConfig={{ mode: searchMode, externalSources: externalSearchSources }}
+            onRestoreSearchConfig={handleRestoreSearchConfig}
+            aiConfig={aiConfig}
+            onRestoreAIConfig={handleRestoreAIConfig}
+          />
+        )}
 
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        config={aiConfig}
-        siteSettings={siteSettings}
-        onSave={handleSaveAIConfig}
-        links={links}
-        categories={categories}
-        onUpdateLinks={(newLinks) => updateData(newLinks, categories)}
-        authToken={authToken}
-      />
+        {isImportModalOpen && (
+          <ImportModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            existingLinks={links}
+            categories={categories}
+            onImport={handleImportConfirm}
+            onImportSearchConfig={handleRestoreSearchConfig}
+            onImportAIConfig={handleRestoreAIConfig}
+          />
+        )}
 
-      <SearchConfigModal
-        isOpen={isSearchConfigModalOpen}
-        onClose={() => setIsSearchConfigModalOpen(false)}
-        sources={externalSearchSources}
-        onSave={(sources) => handleSaveSearchConfig(sources, searchMode)}
-      />
+        {isSettingsModalOpen && (
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            config={aiConfig}
+            siteSettings={siteSettings}
+            onSave={handleSaveAIConfig}
+            links={links}
+            categories={categories}
+            onUpdateLinks={(newLinks) => updateData(newLinks, categories)}
+            authToken={authToken}
+          />
+        )}
+
+        {isSearchConfigModalOpen && (
+          <SearchConfigModal
+            isOpen={isSearchConfigModalOpen}
+            onClose={() => setIsSearchConfigModalOpen(false)}
+            sources={externalSearchSources}
+            onSave={(sources) => handleSaveSearchConfig(sources, searchMode)}
+          />
+        )}
+      </Suspense>
 
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
@@ -4191,17 +4094,21 @@ function App() {
             </div>
           )}
 
-          <LinkModal
-            isOpen={isModalOpen}
-            onClose={() => { setIsModalOpen(false); setEditingLink(undefined); setPrefillLink(undefined); }}
-            onSave={editingLink ? handleEditLink : handleAddLink}
-            onDelete={editingLink ? handleDeleteLink : undefined}
-            categories={categories}
-            initialData={editingLink || (prefillLink as LinkItem)}
-            aiConfig={aiConfig}
-            defaultCategoryId={selectedCategory !== 'all' ? selectedCategory : undefined}
-            onMainUrlCheckResult={handleModalMainUrlCheckResult}
-          />
+          <Suspense fallback={null}>
+            {isModalOpen && (
+              <LinkModal
+                isOpen={isModalOpen}
+                onClose={() => { setIsModalOpen(false); setEditingLink(undefined); setPrefillLink(undefined); }}
+                onSave={editingLink ? handleEditLink : handleAddLink}
+                onDelete={editingLink ? handleDeleteLink : undefined}
+                categories={categories}
+                initialData={editingLink || (prefillLink as LinkItem)}
+                aiConfig={aiConfig}
+                defaultCategoryId={selectedCategory !== 'all' ? selectedCategory : undefined}
+                onMainUrlCheckResult={handleModalMainUrlCheckResult}
+              />
+            )}
+          </Suspense>
 
           {/* 右键菜单 */}
           <ContextMenu
@@ -4218,12 +4125,16 @@ function App() {
           />
 
           {/* 二维码模态框 */}
-          <QRCodeModal
-            isOpen={qrCodeModal.isOpen}
-            url={qrCodeModal.url || ''}
-            title={qrCodeModal.title || ''}
-            onClose={() => setQrCodeModal({ isOpen: false, url: '', title: '' })}
-          />
+          <Suspense fallback={null}>
+            {qrCodeModal.isOpen && (
+              <QRCodeModal
+                isOpen={qrCodeModal.isOpen}
+                url={qrCodeModal.url || ''}
+                title={qrCodeModal.title || ''}
+                onClose={() => setQrCodeModal({ isOpen: false, url: '', title: '' })}
+              />
+            )}
+          </Suspense>
         </>
       )}
     </div>

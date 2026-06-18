@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle, ExternalLink } from 'lucide-react';
 import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus } from '../types';
-import { generateLinkDescription, suggestCategory } from '../services/geminiService';
 
 interface LinkModalProps {
   isOpen: boolean;
@@ -14,6 +13,8 @@ interface LinkModalProps {
   aiConfig: AIConfig;
   defaultCategoryId?: string;
 }
+
+const AUTH_KEY = 'cloudnav_auth_token';
 
 const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete, onMainUrlCheckResult, categories, initialData, aiConfig, defaultCategoryId }) => {
   const [title, setTitle] = useState('');
@@ -119,7 +120,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       }
       
       // 将自定义图标保存到KV缓存
-      const authToken = localStorage.getItem('authToken');
+      const authToken = localStorage.getItem(AUTH_KEY);
       if (authToken) {
         await fetch('/api/storage', {
           method: 'POST',
@@ -211,6 +212,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     
     // Parallel execution for speed
     try {
+        const { generateLinkDescription, suggestCategory } = await import('../services/geminiService');
         const descPromise = generateLinkDescription(title, url, aiConfig);
         const catPromise = suggestCategory(title, url, categories, aiConfig);
         
@@ -499,7 +501,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       
       // 将图标保存到KV缓存
       try {
-        const authToken = localStorage.getItem('authToken');
+        const authToken = localStorage.getItem(AUTH_KEY);
         if (authToken) {
           await fetch('/api/storage', {
             method: 'POST',

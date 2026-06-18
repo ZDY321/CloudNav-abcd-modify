@@ -227,11 +227,30 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       });
     }
     
-    // 如果是保存图标（允许无密码访问）
+    // 如果是保存图标缓存，服务端设置密码时必须验证，避免公开写入 KV
     if (body.saveConfig === 'favicon') {
       const { domain, icon } = body;
       if (!domain || !icon) {
         return new Response(JSON.stringify({ error: 'Domain and icon are required' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+
+      if (serverPassword) {
+        const unauthorizedResponse = requirePassword(request, env);
+        if (unauthorizedResponse) {
+          return unauthorizedResponse;
+        }
+      }
+
+      if (
+        typeof domain !== 'string' ||
+        typeof icon !== 'string' ||
+        !/^[a-z0-9.-]{1,253}$/i.test(domain) ||
+        icon.length > 32768
+      ) {
+        return new Response(JSON.stringify({ error: 'Invalid favicon payload' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });

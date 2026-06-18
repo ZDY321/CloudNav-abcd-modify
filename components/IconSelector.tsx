@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import * as LucideIcons from 'lucide-react';
 import { Search, ExternalLink, Plus, Trash2, RotateCcw, Globe } from 'lucide-react';
 import Icon from './Icon';
+import { commonLucideIconNames, normalizeLucideIconName } from './iconRegistry';
 
 interface IconSelectorProps {
   onSelectIcon: (iconName: string) => void;
@@ -16,25 +16,7 @@ interface EmojiResourceSite {
 const EMOJI_RESOURCE_SITES_KEY = 'cloudnav_emoji_resource_sites';
 
 // 常用图标列表，可以根据需要扩展
-const commonIcons = [
-  'Star', 'Heart', 'Bookmark', 'Flag', 'Tag', 'Hash',
-  'Home', 'User', 'Users', 'Settings', 'Bell', 'Mail',
-  'Calendar', 'Clock', 'MapPin', 'Phone', 'Camera', 'Image',
-  'Folder', 'File', 'Archive', 'Trash2', 'Download', 'Upload',
-  'Search', 'Filter', 'Menu', 'MoreVertical', 'ChevronDown', 'ChevronUp',
-  'Plus', 'Minus', 'X', 'Check', 'AlertCircle', 'Info',
-  'Edit', 'Copy', 'Share', 'Link', 'ExternalLink', 'Lock',
-  'Code', 'Terminal', 'Database', 'Server', 'Cloud', 'Wifi',
-  'ShoppingCart', 'CreditCard', 'Package', 'Truck', 'Store',
-  'Music', 'Play', 'Pause', 'Volume2', 'Headphones', 'Mic',
-  'Book', 'BookOpen', 'FileText', 'PenTool', 'Highlighter', 'Type',
-  'Layout', 'Grid', 'List', 'Columns', 'Sidebar', 'Layers',
-  'Circle', 'Square', 'Triangle', 'Hexagon', 'Zap', 'Target',
-  'Rocket', 'Plane', 'Car', 'Bike', 'Ship', 'Train',
-  'Moon', 'Sun', 'CloudRain', 'CloudSnow', 'Wind', 'Thermometer',
-  'Github', 'Gitlab', 'Chrome', 'Firefox', 'Safari', 'Edge',
-  'MessageSquare', 'MessageCircle', 'Send', 'AtSign', 'Percent'
-];
+const commonIcons = [...commonLucideIconNames];
 
 // 内置常用 Emoji 库
 const commonEmojis = [
@@ -159,14 +141,6 @@ const IconSelector: React.FC<IconSelectorProps> = ({
     return item.label.toLowerCase().includes(q) || item.value.includes(searchQuery.trim());
   });
 
-  // 将 kebab-case 转换为 PascalCase
-  const kebabToPascal = (kebabName: string): string => {
-    return kebabName
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join('');
-  };
-
   // 验证图标名称是否有效
   const normalizeIconName = (iconName: string): string => {
     const trimmedIconName = iconName.trim();
@@ -176,28 +150,7 @@ const IconSelector: React.FC<IconSelectorProps> = ({
       return trimmedIconName;
     }
     
-    // 检查是否是常用图标列表中的图标
-    if (commonIcons.includes(trimmedIconName)) return trimmedIconName;
-    
-    // 检查是否是 Lucide 图标库中的图标
-    try {
-      // 首先尝试直接匹配
-      if (trimmedIconName in LucideIcons) return trimmedIconName;
-      
-      // 如果包含连字符，尝试转换为 PascalCase
-      if (trimmedIconName.includes('-')) {
-        const pascalName = kebabToPascal(trimmedIconName);
-        if (pascalName in LucideIcons) return pascalName;
-      }
-      
-      // 尝试首字母大写
-      const capitalizedName = trimmedIconName.charAt(0).toUpperCase() + trimmedIconName.slice(1);
-      if (capitalizedName in LucideIcons) return capitalizedName;
-    } catch {
-      return '';
-    }
-
-    return '';
+    return normalizeLucideIconName(trimmedIconName);
   };
 
   const handleSelect = (iconName: string) => {
