@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu } from 'lucide-react';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, Eye, EyeOff, Palette } from 'lucide-react';
 import { AIConfig, LinkItem, Category, SiteSettings } from '../types';
+import Icon from './Icon';
+import IconSelector from './IconSelector';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -64,6 +66,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [localSiteSettings, setLocalSiteSettings] = useState<SiteSettings>(() => ({
       title: siteSettings?.title || 'CloudNav - 我的导航',
       navTitle: siteSettings?.navTitle || 'CloudNav',
+      pinnedCategoryIcon: siteSettings?.pinnedCategoryIcon || 'LayoutGrid',
       favicon: siteSettings?.favicon || '/favicon.png',
       cardStyle: siteSettings?.cardStyle || 'detailed',
       passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
@@ -76,9 +79,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const shouldStopRef = useRef(false);
 
   const [password, setPassword] = useState('');
+  const [showToolPassword, setShowToolPassword] = useState(false);
   const [domain, setDomain] = useState('');
   const [browserType, setBrowserType] = useState<'chrome' | 'firefox'>('chrome');
   const [isZipping, setIsZipping] = useState(false);
+  const [isPinnedIconSelectorOpen, setIsPinnedIconSelectorOpen] = useState(false);
   
   const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({});
 
@@ -99,8 +104,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       const safeSettings = {
           title: siteSettings?.title || 'CloudNav - 我的导航',
           navTitle: siteSettings?.navTitle || 'CloudNav',
+          pinnedCategoryIcon: siteSettings?.pinnedCategoryIcon || 'LayoutGrid',
           favicon: siteSettings?.favicon || '/favicon.png',
-          cardStyle: siteSettings?.cardStyle || 'detailed'
+          cardStyle: siteSettings?.cardStyle || 'detailed',
+          passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -111,6 +118,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsZipping(false);
       setProgress({ current: 0, total: 0 });
       shouldStopRef.current = false;
+      setShowToolPassword(false);
+      setIsPinnedIconSelectorOpen(false);
       setDomain(window.location.origin);
       const storedToken = localStorage.getItem('cloudnav_auth_token');
       if (storedToken) setPassword(storedToken);
@@ -159,6 +168,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = () => {
     onSave(localConfig, localSiteSettings);
+    if (authToken) {
+        saveWebsiteConfigToKV(localSiteSettings);
+    }
     onClose();
   };
 
@@ -2337,6 +2349,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">置顶分类图标</label>
+                                <div className="flex gap-3 items-center">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600">
+                                        <Icon name={localSiteSettings.pinnedCategoryIcon || 'LayoutGrid'} size={20} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={localSiteSettings.pinnedCategoryIcon || 'LayoutGrid'}
+                                        onChange={(e) => handleSiteChange('pinnedCategoryIcon', e.target.value)}
+                                        placeholder="LayoutGrid / Star / 📌"
+                                        className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPinnedIconSelectorOpen(true)}
+                                        className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded-lg text-slate-600 dark:text-slate-300 transition-colors"
+                                        title="选择图标"
+                                    >
+                                        <Palette size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">网站图标 (Favicon URL)</label>
                                 <div className="flex gap-3 items-center">
                                     <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-600">
@@ -2489,13 +2524,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                                      <div>
                                         <label className="text-xs text-slate-500 mb-1 block">访问密码 (Password)</label>
                                         <div className="flex gap-2">
-                                            <input 
-                                                type="text" 
+                                            <div className="relative flex-1">
+                                            <input
+                                                type={showToolPassword ? 'text' : 'password'}
                                                 value={password} 
                                                 readOnly 
-                                                className="flex-1 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm outline-none font-mono"
+                                                className="w-full p-2 pr-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm outline-none font-mono"
                                                 placeholder="未登录 / 未设置"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowToolPassword(prev => !prev)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                                                title={showToolPassword ? '隐藏密码' : '显示密码'}
+                                            >
+                                                {showToolPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            </button>
+                                            </div>
                                              <button onClick={() => handleCopy(password, 'pwd')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded text-slate-600 dark:text-slate-400 transition-colors">
                                                 {copiedStates['pwd'] ? <Check size={16}/> : <Copy size={16}/>}
                                             </button>
@@ -2629,6 +2674,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         </div>
       </div>
+      {isPinnedIconSelectorOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">选择置顶分类图标</h3>
+              <button
+                type="button"
+                onClick={() => setIsPinnedIconSelectorOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <IconSelector
+                onSelectIcon={(iconName) => {
+                  handleSiteChange('pinnedCategoryIcon', iconName);
+                  setIsPinnedIconSelectorOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

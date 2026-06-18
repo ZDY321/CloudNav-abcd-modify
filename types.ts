@@ -49,6 +49,7 @@ export interface Category {
 export interface SiteSettings {
   title: string;
   navTitle: string;
+  pinnedCategoryIcon: string;
   favicon: string;
   cardStyle: 'detailed' | 'simple';
   passwordExpiryDays: number; // 密码过期天数，0表示永久不退出

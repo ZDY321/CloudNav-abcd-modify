@@ -102,6 +102,7 @@ function App() {
       return {
           title: 'CloudNav - 我的导航',
           navTitle: 'CloudNav',
+          pinnedCategoryIcon: 'LayoutGrid',
           favicon: '/favicon.png',
           cardStyle: 'detailed' as const,
           passwordExpiryDays: 7
@@ -449,9 +450,28 @@ function App() {
     setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
   };
 
-  const getEffectiveCategoryCheckStatus = (categoryId: string) => {
-    const baseStatus = categoryCheckStatus[categoryId];
-    const categoryLinks = links.filter(link => link.categoryId === categoryId && !isCategoryLocked(link.categoryId));
+  const getCategoryCheckScopeKey = (categoryId: string, subCategoryId: string | null = null) => (
+    subCategoryId ? `${categoryId}::sub::${subCategoryId}` : categoryId
+  );
+
+  const getLinksForCategoryCheck = (categoryId: string, subCategoryId: string | null = null) => {
+    let scopedLinks = links.filter(link => link.categoryId === categoryId && !isCategoryLocked(link.categoryId));
+
+    if (subCategoryId === UNASSIGNED_SUBCATEGORY_FILTER) {
+      const category = categories.find(item => item.id === categoryId);
+      const validSubCategoryIds = new Set((category?.subcategories || []).map(item => item.id));
+      scopedLinks = scopedLinks.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
+    } else if (subCategoryId) {
+      scopedLinks = scopedLinks.filter(link => link.subCategoryId === subCategoryId);
+    }
+
+    return scopedLinks;
+  };
+
+  const getEffectiveCategoryCheckStatus = (categoryId: string, subCategoryId: string | null = null) => {
+    const scopeKey = getCategoryCheckScopeKey(categoryId, subCategoryId);
+    const baseStatus = categoryCheckStatus[scopeKey];
+    const categoryLinks = getLinksForCategoryCheck(categoryId, subCategoryId);
     const overrideLinks = categoryLinks.filter(link => Object.prototype.hasOwnProperty.call(linkCheckResults, link.id));
 
     if (!baseStatus && overrideLinks.length === 0) {
@@ -564,13 +584,14 @@ function App() {
   };
 
   // 批量检测分类下所有网站可用性（使用用户本地网络，并发控制）
-  const checkCategoryAvailability = async (categoryId: string) => {
-    const categoryLinks = links.filter(l => l.categoryId === categoryId && !isCategoryLocked(l.categoryId));
+  const checkCategoryAvailability = async (categoryId: string, subCategoryId: string | null = null) => {
+    const scopeKey = getCategoryCheckScopeKey(categoryId, subCategoryId);
+    const categoryLinks = getLinksForCategoryCheck(categoryId, subCategoryId);
     if (categoryLinks.length === 0) return;
     
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [categoryId]: { checking: true, online: 0, offline: 0, total: categoryLinks.length, offlineLinks: [] }
+      [scopeKey]: { checking: true, online: 0, offline: 0, total: categoryLinks.length, offlineLinks: [] }
     }));
     
     let online = 0;
@@ -611,14 +632,14 @@ function App() {
       // 实时更新进度
       setCategoryCheckStatus(prev => ({
         ...prev,
-        [categoryId]: { checking: true, online, offline, total: categoryLinks.length, offlineLinks: [...offlineLinks] }
+        [scopeKey]: { checking: true, online, offline, total: categoryLinks.length, offlineLinks: [...offlineLinks] }
       }));
     }
     
     // 检测完成
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [categoryId]: { checking: false, online, offline, total: categoryLinks.length, offlineLinks }
+      [scopeKey]: { checking: false, online, offline, total: categoryLinks.length, offlineLinks }
     }));
   };
   
@@ -1161,6 +1182,7 @@ function App() {
                         ...prev,
                         title: websiteConfigData.title || prev.title,
                         navTitle: websiteConfigData.navTitle || prev.navTitle,
+                        pinnedCategoryIcon: websiteConfigData.pinnedCategoryIcon || prev.pinnedCategoryIcon || 'LayoutGrid',
                         favicon: websiteConfigData.favicon || prev.favicon,
                         cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
                         passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
@@ -1438,6 +1460,7 @@ function App() {
                             ...prev,
                             title: websiteConfigData.title || prev.title,
                             navTitle: websiteConfigData.navTitle || prev.navTitle,
+                            pinnedCategoryIcon: websiteConfigData.pinnedCategoryIcon || prev.pinnedCategoryIcon || 'LayoutGrid',
                             favicon: websiteConfigData.favicon || prev.favicon,
                             cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
                             passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
@@ -2755,7 +2778,8 @@ function App() {
     const isFocusedLink = focusedLinkId === link.id;
     
     // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
-    const effectiveCategoryStatus = getEffectiveCategoryCheckStatus(link.categoryId);
+    const visibleSubCategoryScope = !isSearchActive && selectedCategory === link.categoryId ? selectedSubCategory : null;
+    const effectiveCategoryStatus = getEffectiveCategoryCheckStatus(link.categoryId, visibleSubCategoryScope);
     const isOfflineLink = effectiveCategoryStatus?.offlineLinks?.includes(link.id) ?? false;
     
     const targetUrl = getPreferredOpenUrl(link);
@@ -3084,7 +3108,7 @@ function App() {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
-              <div className="p-1"><Icon name="LayoutGrid" size={18} /></div>
+              <div className="p-1"><Icon name={siteSettings.pinnedCategoryIcon || 'LayoutGrid'} size={18} /></div>
               <span>置顶网站</span>
             </button>
             
@@ -3640,25 +3664,25 @@ function App() {
                              </span>
                              {!isCategoryLocked(selectedCategory) && (
                                <>
-                                 {getEffectiveCategoryCheckStatus(selectedCategory)?.checking ? (
+                                 {getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)?.checking ? (
                                    <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
                                      <Loader2 size={10} className="animate-spin" />
-                                     检测中 {getEffectiveCategoryCheckStatus(selectedCategory)!.online + getEffectiveCategoryCheckStatus(selectedCategory)!.offline}/{getEffectiveCategoryCheckStatus(selectedCategory)!.total}
+                                     检测中 {getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.online + getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.offline}/{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.total}
                                    </span>
-                                 ) : getEffectiveCategoryCheckStatus(selectedCategory) ? (
+                                 ) : getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory) ? (
                                    <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap">
                                      <Wifi size={10} className="text-green-500" />
-                                     <span className="text-green-600">{getEffectiveCategoryCheckStatus(selectedCategory)!.online}</span>
+                                     <span className="text-green-600">{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.online}</span>
                                      <span className="text-slate-400">/</span>
                                      <WifiOff size={10} className="text-red-500" />
-                                     <span className="text-red-600">{getEffectiveCategoryCheckStatus(selectedCategory)!.offline}</span>
+                                     <span className="text-red-600">{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.offline}</span>
                                    </span>
                                  ) : null}
                                  <button
-                                   onClick={() => checkCategoryAvailability(selectedCategory)}
-                                   disabled={getEffectiveCategoryCheckStatus(selectedCategory)?.checking}
+                                   onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
+                                   disabled={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)?.checking}
                                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
-                                   title="批量检测可用性&#10;🟢 绿色：可正常访问&#10;🔴 红色：不可访问&#10;🟠 橙色：需要VPN访问&#10;🟡 黄色：受Cloudflare保护"
+                                   title={`${selectedSubCategory ? '检测当前二级分类' : '检测当前一级分类'}\n🟢 绿色：可正常访问\n🔴 红色：不可访问\n🟠 橙色：需要VPN访问\n🟡 黄色：受Cloudflare保护`}
                                  >
                                    <Globe size={10} />
                                    检测

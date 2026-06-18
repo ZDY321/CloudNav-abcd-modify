@@ -7,12 +7,6 @@ module.exports = {
     './components/**/*.{ts,tsx}',
     './services/**/*.{ts,tsx}',
   ],
-  safelist: [
-    {
-      pattern: /(bg|text|border|ring)-(amber|red)-(50|100|300|400|500|600|700|900)/,
-      variants: ['dark', 'hover', 'focus'],
-    },
-  ],
   theme: {
     extend: {
       colors: {

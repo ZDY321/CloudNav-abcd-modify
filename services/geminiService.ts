@@ -1,5 +1,57 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { AIConfig } from "../types";
+
+const getGeminiEndpoint = (config: AIConfig): string => {
+    const modelName = encodeURIComponent(config.model || 'gemini-2.5-flash');
+    const baseUrl = (config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/, '');
+
+    if (baseUrl.includes(':generateContent')) {
+        const separator = baseUrl.includes('?') ? '&' : '?';
+        return `${baseUrl}${separator}key=${encodeURIComponent(config.apiKey)}`;
+    }
+
+    return `${baseUrl}/models/${modelName}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+};
+
+const extractGeminiText = (data: any): string => {
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return '';
+
+    return parts
+        .map((part: any) => typeof part?.text === 'string' ? part.text : '')
+        .join('')
+        .trim();
+};
+
+const callGemini = async (config: AIConfig, prompt: string): Promise<string> => {
+    try {
+        const response = await fetch(getGeminiEndpoint(config), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: prompt }]
+                    }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error("Gemini API Error:", err);
+            return "";
+        }
+
+        const data = await response.json();
+        return extractGeminiText(data);
+    } catch (e) {
+        console.error("Gemini Call Failed", e);
+        return "";
+    }
+};
 
 /**
  * Helper to call OpenAI Compatible API
@@ -66,15 +118,8 @@ export const generateLinkDescription = async (title: string, url: string, config
 
   try {
     if (config.provider === 'gemini') {
-        const ai = new GoogleGenAI({ apiKey: config.apiKey });
-        // Use user defined model or fallback
-        const modelName = config.model || 'gemini-2.5-flash';
-        
-        const response: GenerateContentResponse = await ai.models.generateContent({
-            model: modelName,
-            contents: `I have a website bookmark. ${prompt}`,
-        });
-        return response.text ? response.text.trim() : "无法生成描述";
+        const result = await callGemini(config, `I have a website bookmark. ${prompt}`);
+        return result || "无法生成描述";
     } else {
         // OpenAI Compatible
         const result = await callOpenAICompatible(
@@ -108,14 +153,8 @@ export const suggestCategory = async (title: string, url: string, categories: {i
 
     try {
         if (config.provider === 'gemini') {
-            const ai = new GoogleGenAI({ apiKey: config.apiKey });
-            const modelName = config.model || 'gemini-2.5-flash';
-            
-            const response: GenerateContentResponse = await ai.models.generateContent({
-                model: modelName,
-                contents: `Task: Categorize this website.\n${prompt}`,
-            });
-            return response.text ? response.text.trim() : null;
+            const result = await callGemini(config, `Task: Categorize this website.\n${prompt}`);
+            return result || null;
         } else {
              // OpenAI Compatible
             const result = await callOpenAICompatible(
