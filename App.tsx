@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X,
-  ChevronDown, ChevronRight, Wifi, WifiOff, Globe, Star
+  ChevronDown, ChevronRight, Star
 } from 'lucide-react';
 import {
   DndContext,
@@ -28,6 +28,7 @@ import Icon from './components/Icon';
 import AuthModal from './components/AuthModal';
 import ContextMenu from './components/ContextMenu';
 import Tooltip from './components/Tooltip';
+import AvailabilityControls from './components/AvailabilityControls';
 import type { LoginResult } from './components/AuthModal';
 import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
 
@@ -3473,56 +3474,12 @@ function App() {
                                {displayedLinks.length}
                              </span>
                              {!isCategoryLocked(selectedCategory) && (
-                               (() => {
-                                 const checkStatus = getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory);
-                                 const checkedCount = (checkStatus?.online || 0) + (checkStatus?.offline || 0);
-                                 const hasFailedLinks = !!checkStatus && checkStatus.offline > 0 && !checkStatus.checking;
-
-                                 return (
-                                   <>
-                                     {checkStatus?.checking ? (
-                                       <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
-                                         <Loader2 size={10} className="animate-spin" />
-                                         检测中 {checkedCount}/{checkStatus.total}
-                                       </span>
-                                     ) : checkStatus ? (
-                                       <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap">
-                                         <Wifi size={10} className="text-green-500" />
-                                         <span className="text-green-600">{checkStatus.online}</span>
-                                         <span className="text-slate-400">/</span>
-                                         <WifiOff size={10} className="text-red-500" />
-                                         <span className="text-red-600">{checkStatus.offline}</span>
-                                         {checkStatus.timeout > 0 && (
-                                           <>
-                                             <span className="text-slate-400">/</span>
-                                             <AlertCircle size={10} className="text-amber-500" />
-                                             <span className="text-amber-600">{checkStatus.timeout}</span>
-                                           </>
-                                         )}
-                                       </span>
-                                     ) : null}
-                                     <button
-                                       onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
-                                       disabled={checkStatus?.checking}
-                                       className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
-                                       title={`${selectedSubCategory ? '检测当前二级分类' : '检测当前一级分类'}\n绿色：可正常访问\n红色：不可访问\n黄色：请求超时`}
-                                     >
-                                       <Globe size={10} />
-                                       检测
-                                     </button>
-                                     {hasFailedLinks && (
-                                       <button
-                                         onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory, { onlyFailed: true })}
-                                         className="flex items-center gap-1 px-2.5 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap shrink-0"
-                                         title="只重新检测当前范围内失败的网站"
-                                       >
-                                         <WifiOff size={10} />
-                                         重试失败
-                                       </button>
-                                     )}
-                                   </>
-                                 );
-                               })()
+                               <AvailabilityControls
+                                 status={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)}
+                                 isSubCategoryScope={!!selectedSubCategory}
+                                 onCheck={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
+                                 onRetryFailed={() => checkCategoryAvailability(selectedCategory, selectedSubCategory, { onlyFailed: true })}
+                               />
                             )}
                            </div>
                          )}

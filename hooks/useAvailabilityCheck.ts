@@ -247,26 +247,22 @@ export const useAvailabilityCheck = ({
   ) => {
     const scopeKey = getCategoryCheckScopeKey(categoryId, subCategoryId);
     const scopedLinks = getLinksForCategoryCheck(categoryId, subCategoryId);
+    const currentStatus = getEffectiveCategoryCheckStatus(categoryId, subCategoryId);
     const targetLinks = options.onlyFailed
-      ? scopedLinks.filter(link => getEffectiveCategoryCheckStatus(categoryId, subCategoryId)?.offlineLinks.includes(link.id))
+      ? scopedLinks.filter(link => currentStatus?.offlineLinks.includes(link.id))
       : scopedLinks;
 
     if (targetLinks.length === 0) return;
 
+    const total = scopedLinks.length;
+    const resultsByLinkId: Record<string, LinkAvailabilityResult> = options.onlyFailed
+      ? { ...(currentStatus?.resultsByLinkId || {}) }
+      : {};
+
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [scopeKey]: {
-        checking: true,
-        online: 0,
-        offline: 0,
-        timeout: 0,
-        total: targetLinks.length,
-        offlineLinks: [],
-        resultsByLinkId: {}
-      }
+      [scopeKey]: buildStatusFromResults(resultsByLinkId, total, true)
     }));
-
-    const resultsByLinkId: Record<string, LinkAvailabilityResult> = {};
 
     for (let i = 0; i < targetLinks.length; i += CONCURRENT_LIMIT) {
       const chunk = targetLinks.slice(i, i + CONCURRENT_LIMIT);
@@ -281,13 +277,13 @@ export const useAvailabilityCheck = ({
 
       setCategoryCheckStatus(prev => ({
         ...prev,
-        [scopeKey]: buildStatusFromResults(resultsByLinkId, targetLinks.length, true)
+        [scopeKey]: buildStatusFromResults(resultsByLinkId, total, true)
       }));
     }
 
     setCategoryCheckStatus(prev => ({
       ...prev,
-      [scopeKey]: buildStatusFromResults(resultsByLinkId, targetLinks.length, false)
+      [scopeKey]: buildStatusFromResults(resultsByLinkId, total, false)
     }));
   }, [buildStatusFromResults, getEffectiveCategoryCheckStatus, getLinksForCategoryCheck]);
 

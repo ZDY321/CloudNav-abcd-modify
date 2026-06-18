@@ -455,10 +455,18 @@ export const normalizeLucideIconName = (rawName: string): keyof typeof iconRegis
     // Not a URL; continue with the raw icon name.
   }
 
+  const withoutIconSuffix = name.replace(/Icon$/i, '');
+  const delimiterNormalizedName = withoutIconSuffix.replace(/[\s_]+/g, '-');
+  const compactName = withoutIconSuffix.replace(/[\s_-]+/g, '').toLowerCase();
+  const compactMatch = Object.keys(iconRegistry).find(iconName => iconName.toLowerCase() === compactName);
+
   const candidates = [
     name,
-    name.includes('-') ? kebabToPascal(name) : name,
-    name.charAt(0).toUpperCase() + name.slice(1),
+    withoutIconSuffix,
+    delimiterNormalizedName,
+    delimiterNormalizedName.includes('-') ? kebabToPascal(delimiterNormalizedName) : delimiterNormalizedName,
+    withoutIconSuffix.charAt(0).toUpperCase() + withoutIconSuffix.slice(1),
+    compactMatch || '',
   ];
 
   for (const candidate of candidates) {
