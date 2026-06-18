@@ -29,6 +29,7 @@ import AuthModal from './components/AuthModal';
 import ContextMenu from './components/ContextMenu';
 import Tooltip from './components/Tooltip';
 import type { LoginResult } from './components/AuthModal';
+import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
 
 const LinkModal = lazy(() => import('./components/LinkModal'));
 const CategoryManagerModal = lazy(() => import('./components/CategoryManagerModal'));
@@ -187,12 +188,20 @@ function App() {
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
-  // 分类可用性检测状态
-  const [categoryCheckStatus, setCategoryCheckStatus] = useState<Record<string, { checking: boolean; online: number; offline: number; total: number; offlineLinks: string[] }>>({});
-  // 单独检测结果：linkId -> true(在线)/false(离线)，优先级高于批量检测结果
-  const [linkCheckResults, setLinkCheckResults] = useState<Record<string, boolean>>({});
-  // 正在检测中的链接ID集合
-  const [checkingLinkIds, setCheckingLinkIds] = useState<Set<string>>(new Set());
+  const {
+    checkingLinkIds,
+    checkCategoryAvailability,
+    checkLinkAvailability,
+    applyLinkAvailabilityResult,
+    getEffectiveCategoryCheckStatus,
+    getLinkAvailabilityResult
+  } = useAvailabilityCheck({
+    links,
+    categories,
+    unlockedCategoryIds,
+    unassignedSubCategoryFilter: UNASSIGNED_SUBCATEGORY_FILTER
+  });
+
   // 全站查重标注：linkId -> 颜色与分组信息
   const [duplicateHighlights, setDuplicateHighlights] = useState<Record<string, { color: string; groupKey: string; groupSize: number }>>({});
   // 全站查重结果弹窗
@@ -446,202 +455,12 @@ function App() {
     }, 220);
   };
 
-  const applySingleCheckResult = (link: LinkItem, isOnline: boolean) => {
-    setLinkCheckResults(prev => ({ ...prev, [link.id]: isOnline }));
-  };
-
-  const getCategoryCheckScopeKey = (categoryId: string, subCategoryId: string | null = null) => (
-    subCategoryId ? `${categoryId}::sub::${subCategoryId}` : categoryId
-  );
-
-  const getLinksForCategoryCheck = (categoryId: string, subCategoryId: string | null = null) => {
-    let scopedLinks = links.filter(link => link.categoryId === categoryId && !isCategoryLocked(link.categoryId));
-
-    if (subCategoryId === UNASSIGNED_SUBCATEGORY_FILTER) {
-      const category = categories.find(item => item.id === categoryId);
-      const validSubCategoryIds = new Set((category?.subcategories || []).map(item => item.id));
-      scopedLinks = scopedLinks.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
-    } else if (subCategoryId) {
-      scopedLinks = scopedLinks.filter(link => link.subCategoryId === subCategoryId);
-    }
-
-    return scopedLinks;
-  };
-
-  const getEffectiveCategoryCheckStatus = (categoryId: string, subCategoryId: string | null = null) => {
-    const scopeKey = getCategoryCheckScopeKey(categoryId, subCategoryId);
-    const baseStatus = categoryCheckStatus[scopeKey];
-    const categoryLinks = getLinksForCategoryCheck(categoryId, subCategoryId);
-    const overrideLinks = categoryLinks.filter(link => Object.prototype.hasOwnProperty.call(linkCheckResults, link.id));
-
-    if (!baseStatus && overrideLinks.length === 0) {
-      return undefined;
-    }
-
-    let online = baseStatus?.online ?? 0;
-    let offline = baseStatus?.offline ?? 0;
-    const offlineLinkSet = new Set(baseStatus?.offlineLinks ?? []);
-    const baseOfflineLinkSet = new Set(baseStatus?.offlineLinks ?? []);
-
-    overrideLinks.forEach(link => {
-      const isOnline = linkCheckResults[link.id];
-
-      if (!baseStatus) {
-        if (isOnline) {
-          online += 1;
-        } else {
-          offline += 1;
-          offlineLinkSet.add(link.id);
-        }
-        return;
-      }
-
-      const wasOffline = baseOfflineLinkSet.has(link.id);
-      if (isOnline && wasOffline) {
-        online += 1;
-        offline = Math.max(0, offline - 1);
-        offlineLinkSet.delete(link.id);
-      } else if (!isOnline && !wasOffline) {
-        offline += 1;
-        online = Math.max(0, online - 1);
-        offlineLinkSet.add(link.id);
-      }
-    });
-
-    return {
-      checking: baseStatus?.checking ?? false,
-      online,
-      offline,
-      total: baseStatus?.total ?? overrideLinks.length,
-      offlineLinks: Array.from(offlineLinkSet)
-    };
-  };
-
   // 数据发生变化后清除旧的查重标注，避免展示过期颜色
   useEffect(() => {
     setDuplicateHighlights({});
     setDuplicateCheckModal(prev => ({ ...prev, isOpen: false, groups: [], involvedTotal: 0 }));
     setSaveDuplicateModal(prev => ({ ...prev, isOpen: false, targetTotal: 0, involvedTotal: 0, groups: [] }));
   }, [links]);
-  
-  // 并发限制常量
-  const CONCURRENT_LIMIT = 5;
-  
-  // 使用本地网络直接检测URL连通性（借鉴死链检测方法）
-  // 优点：完全本地化，无云端依赖，隐私保护，零成本
-  const checkUrlWithLocalNetwork = async (url: string): Promise<boolean> => {
-    // 确保URL有协议前缀
-    let testUrl = url;
-    if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
-      testUrl = 'https://' + testUrl;
-    }
-    
-    // 带超时的fetch请求
-    const tryFetch = async (targetUrl: string, timeout = 15000): Promise<boolean> => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      
-      try {
-        // 使用 mode: 'no-cors' 模式进行连通性检测
-        // 这样只检测连接是否成功，不需要服务器返回CORS头
-        await fetch(targetUrl, {
-          method: 'GET',
-          signal: controller.signal,
-          mode: 'no-cors' // 关键：CORS无关模式，验证网站是否可达
-        });
-        clearTimeout(timeoutId);
-        return true; // 请求成功，网站可达
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          throw new Error('Timeout (15s)');
-        }
-        throw error;
-      }
-    };
-    
-    try {
-      // 1️⃣ 首先尝试原始URL
-      await tryFetch(testUrl);
-      return true;
-    } catch (e) {
-      // 2️⃣ 如果是HTTPS失败（可能是证书问题），自动降级到HTTP重试
-      if (testUrl.startsWith('https://')) {
-        try {
-          const httpUrl = testUrl.replace(/^https:\/\//, 'http://');
-          await tryFetch(httpUrl);
-          return true; // HTTP重试成功
-        } catch (e2) {
-          // 两种协议都失败，标记为不可用
-          console.error('URL检测失败 (HTTPS和HTTP都失败):', testUrl);
-          return false;
-        }
-      }
-      // HTTP请求失败
-      console.error('URL检测失败:', testUrl, e);
-      return false;
-    }
-  };
-
-  // 批量检测分类下所有网站可用性（使用用户本地网络，并发控制）
-  const checkCategoryAvailability = async (categoryId: string, subCategoryId: string | null = null) => {
-    const scopeKey = getCategoryCheckScopeKey(categoryId, subCategoryId);
-    const categoryLinks = getLinksForCategoryCheck(categoryId, subCategoryId);
-    if (categoryLinks.length === 0) return;
-    
-    setCategoryCheckStatus(prev => ({
-      ...prev,
-      [scopeKey]: { checking: true, online: 0, offline: 0, total: categoryLinks.length, offlineLinks: [] }
-    }));
-    
-    let online = 0;
-    let offline = 0;
-    const offlineLinks: string[] = [];
-    
-    // 检测单个URL的函数
-    const checkSingleUrl = async (link: LinkItem): Promise<{ linkId: string; isOnline: boolean }> => {
-      try {
-        let testUrl = link.url;
-        if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
-          testUrl = 'https://' + testUrl;
-        }
-        const isOnline = await checkUrlWithLocalNetwork(testUrl);
-        return { linkId: link.id, isOnline };
-      } catch (error) {
-        return { linkId: link.id, isOnline: false };
-      }
-    };
-    
-    // 使用并发控制进行批量检测（5个并发）
-    for (let i = 0; i < categoryLinks.length; i += CONCURRENT_LIMIT) {
-      const chunk = categoryLinks.slice(i, i + CONCURRENT_LIMIT);
-      
-      // 并发执行当前批次的检测
-      const results = await Promise.all(chunk.map(link => checkSingleUrl(link)));
-      
-      // 处理检测结果
-      for (const result of results) {
-        if (result.isOnline) {
-          online++;
-        } else {
-          offline++;
-          offlineLinks.push(result.linkId);
-        }
-      }
-      
-      // 实时更新进度
-      setCategoryCheckStatus(prev => ({
-        ...prev,
-        [scopeKey]: { checking: true, online, offline, total: categoryLinks.length, offlineLinks: [...offlineLinks] }
-      }));
-    }
-    
-    // 检测完成
-    setCategoryCheckStatus(prev => ({
-      ...prev,
-      [scopeKey]: { checking: false, online, offline, total: categoryLinks.length, offlineLinks }
-    }));
-  };
   
   // --- Helpers & Sync Logic ---
 
@@ -816,25 +635,17 @@ function App() {
 
   // 1. 提取核心检测逻辑为通用函数（支持右键菜单和卡片按钮调用）
   const runLinkCheck = async (link: LinkItem, showAlert: boolean = false) => {
-    // 标记该链接为检测中
-    setCheckingLinkIds(prev => new Set(prev).add(link.id));
-    
     try {
-      let testUrl = link.url;
-      if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
-        testUrl = 'https://' + testUrl;
-      }
-      
-      const isOnline = await checkUrlWithLocalNetwork(testUrl);
-      applySingleCheckResult(link, isOnline);
+      const result = await checkLinkAvailability(link);
       
       // 只有通过右键菜单调用时才显示弹窗
       if (showAlert) {
-        const resultText = isOnline ? '可用 ✓' : '不可用 ✗';
-        alert(`"${link.title}" 检测结果: ${resultText}`);
+        const resultText = result.isOnline ? '可用' : result.status === 'timeout' ? '超时' : '不可用';
+        const detailText = result.message ? `\n原因: ${result.message}` : '';
+        alert(`"${link.title}" 检测结果: ${resultText}${detailText}`);
       }
       
-      return isOnline;
+      return result.isOnline;
 
     } catch (error) {
       console.error('检测链接失败:', error);
@@ -842,13 +653,6 @@ function App() {
         alert('检测失败，请重试');
       }
       return false;
-    } finally {
-      // 无论成功还是失败，都要清除检测状态
-      setCheckingLinkIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(link.id);
-        return newSet;
-      });
     }
   };
 
@@ -1750,7 +1554,7 @@ function App() {
   const handleModalMainUrlCheckResult = (linkId: string, isOnline: boolean) => {
     const targetLink = links.find(link => link.id === linkId);
     if (!targetLink) return;
-    applySingleCheckResult(targetLink, isOnline);
+    applyLinkAvailabilityResult(targetLink, isOnline);
   };
 
   const getLinkDisplayOrder = (link: LinkItem) => link.order ?? link.createdAt;
@@ -2777,10 +2581,16 @@ function App() {
     const duplicateInfo = duplicateHighlights[link.id];
     const isFocusedLink = focusedLinkId === link.id;
     
-    // 检查是否是检测失败的链接：单独检测结果(linkCheckResults)优先级高于批量检测结果
+    // 单独检测结果优先于批量检测结果。
     const visibleSubCategoryScope = !isSearchActive && selectedCategory === link.categoryId ? selectedSubCategory : null;
     const effectiveCategoryStatus = getEffectiveCategoryCheckStatus(link.categoryId, visibleSubCategoryScope);
     const isOfflineLink = effectiveCategoryStatus?.offlineLinks?.includes(link.id) ?? false;
+    const availabilityResult = getLinkAvailabilityResult(link, visibleSubCategoryScope);
+    const retryTitle = checkingLinkIds.has(link.id)
+      ? '检测中...'
+      : availabilityResult?.message
+        ? `检测结果：${availabilityResult.message}，点击重试`
+        : '检测到连接失败，点击重试';
     
     const targetUrl = getPreferredOpenUrl(link);
     const locationText = isSearchActive ? getLinkLocationText(link) : '';
@@ -2932,7 +2742,7 @@ function App() {
                   ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-500 border-blue-200 dark:border-blue-800 cursor-wait'
                   : 'bg-white/90 dark:bg-slate-800/90 text-red-500 hover:text-white hover:bg-red-500 border-red-200 dark:border-red-900'
               }`}
-              title={checkingLinkIds.has(link.id) ? "检测中..." : "检测到连接失败，点击重试"}
+              title={retryTitle}
             >
               <svg 
                 width="14" 
@@ -3663,31 +3473,56 @@ function App() {
                                {displayedLinks.length}
                              </span>
                              {!isCategoryLocked(selectedCategory) && (
-                               <>
-                                 {getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)?.checking ? (
-                                   <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
-                                     <Loader2 size={10} className="animate-spin" />
-                                     检测中 {getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.online + getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.offline}/{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.total}
-                                   </span>
-                                 ) : getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory) ? (
-                                   <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap">
-                                     <Wifi size={10} className="text-green-500" />
-                                     <span className="text-green-600">{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.online}</span>
-                                     <span className="text-slate-400">/</span>
-                                     <WifiOff size={10} className="text-red-500" />
-                                     <span className="text-red-600">{getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)!.offline}</span>
-                                   </span>
-                                 ) : null}
-                                 <button
-                                   onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
-                                   disabled={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)?.checking}
-                                   className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
-                                   title={`${selectedSubCategory ? '检测当前二级分类' : '检测当前一级分类'}\n🟢 绿色：可正常访问\n🔴 红色：不可访问\n🟠 橙色：需要VPN访问\n🟡 黄色：受Cloudflare保护`}
-                                 >
-                                   <Globe size={10} />
-                                   检测
-                                 </button>
-                              </>
+                               (() => {
+                                 const checkStatus = getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory);
+                                 const checkedCount = (checkStatus?.online || 0) + (checkStatus?.offline || 0);
+                                 const hasFailedLinks = !!checkStatus && checkStatus.offline > 0 && !checkStatus.checking;
+
+                                 return (
+                                   <>
+                                     {checkStatus?.checking ? (
+                                       <span className="flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
+                                         <Loader2 size={10} className="animate-spin" />
+                                         检测中 {checkedCount}/{checkStatus.total}
+                                       </span>
+                                     ) : checkStatus ? (
+                                       <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap">
+                                         <Wifi size={10} className="text-green-500" />
+                                         <span className="text-green-600">{checkStatus.online}</span>
+                                         <span className="text-slate-400">/</span>
+                                         <WifiOff size={10} className="text-red-500" />
+                                         <span className="text-red-600">{checkStatus.offline}</span>
+                                         {checkStatus.timeout > 0 && (
+                                           <>
+                                             <span className="text-slate-400">/</span>
+                                             <AlertCircle size={10} className="text-amber-500" />
+                                             <span className="text-amber-600">{checkStatus.timeout}</span>
+                                           </>
+                                         )}
+                                       </span>
+                                     ) : null}
+                                     <button
+                                       onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
+                                       disabled={checkStatus?.checking}
+                                       className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+                                       title={`${selectedSubCategory ? '检测当前二级分类' : '检测当前一级分类'}\n绿色：可正常访问\n红色：不可访问\n黄色：请求超时`}
+                                     >
+                                       <Globe size={10} />
+                                       检测
+                                     </button>
+                                     {hasFailedLinks && (
+                                       <button
+                                         onClick={() => checkCategoryAvailability(selectedCategory, selectedSubCategory, { onlyFailed: true })}
+                                         className="flex items-center gap-1 px-2.5 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap shrink-0"
+                                         title="只重新检测当前范围内失败的网站"
+                                       >
+                                         <WifiOff size={10} />
+                                         重试失败
+                                       </button>
+                                     )}
+                                   </>
+                                 );
+                               })()
                             )}
                            </div>
                          )}

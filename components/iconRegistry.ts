@@ -215,37 +215,6 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const commonLucideIconNames = [
-  'Star', 'Heart', 'Bookmark', 'Flag', 'Tag', 'Hash', 'BadgeCheck', 'Crown',
-  'Home', 'User', 'Users', 'Settings', 'Cog', 'Bell', 'BellRing', 'Mail',
-  'Calendar', 'CalendarCheck', 'CalendarDays', 'Clock', 'Timer', 'AlarmClock',
-  'MapPin', 'Map', 'MapPinned', 'Navigation', 'Route', 'Waypoints', 'Phone',
-  'Camera', 'Image', 'Album', 'Film', 'Video', 'Tv', 'Webcam',
-  'Folder', 'File', 'Archive', 'ArchiveRestore', 'Boxes', 'Inbox', 'Trash2', 'Download', 'Upload',
-  'CloudDownload', 'CloudUpload', 'Clipboard', 'ClipboardCheck', 'ClipboardList', 'Notebook',
-  'Search', 'Filter', 'Menu', 'MoreVertical', 'Ellipsis', 'ChevronDown', 'ChevronUp',
-  'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowUpRight',
-  'Plus', 'Minus', 'X', 'Check', 'AlertCircle', 'AlertTriangle', 'Info',
-  'Edit', 'Copy', 'Share', 'Link', 'ExternalLink', 'Lock', 'Shield', 'ShieldCheck', 'ShieldQuestion',
-  'Eye', 'EyeOff', 'Fingerprint', 'Scan', 'QrCode',
-  'Code', 'Terminal', 'SquareCode', 'SquareTerminal', 'Database', 'Server', 'Cloud', 'Wifi',
-  'Cpu', 'HardDrive', 'Monitor', 'Laptop', 'Smartphone', 'Tablet', 'MousePointer', 'Command',
-  'Plug', 'Router', 'Bluetooth', 'Airplay', 'AppWindow', 'Workflow',
-  'ShoppingCart', 'CreditCard', 'Package', 'Truck', 'Store', 'Receipt', 'Wallet', 'Banknote', 'DollarSign', 'Barcode',
-  'Music', 'Play', 'Pause', 'Volume2', 'Headphones', 'Mic', 'Radio',
-  'Book', 'BookOpen', 'FileText', 'Highlighter', 'Type', 'Languages', 'GraduationCap', 'School', 'Newspaper',
-  'Layout', 'Grid', 'List', 'ListChecks', 'Columns', 'Sidebar', 'Layers', 'Blocks', 'Puzzle',
-  'Circle', 'Square', 'Triangle', 'Hexagon', 'Diamond', 'Zap', 'Target', 'Sparkles', 'WandSparkles',
-  'Rocket', 'Plane', 'Car', 'Bike', 'Ship', 'Train',
-  'Moon', 'Sun', 'CloudRain', 'CloudSnow', 'Wind', 'Thermometer', 'Flame', 'Sprout', 'Flower', 'Umbrella',
-  'Github', 'Gitlab', 'Chrome', 'Youtube', 'Apple', 'Figma',
-  'MessageSquare', 'MessageCircle', 'Send', 'AtSign', 'Percent', 'Megaphone', 'Rss',
-  'Palette', 'Brush', 'PenTool', 'Gamepad2', 'Bot', 'Compass', 'Globe', 'Earth',
-  'Briefcase', 'Building', 'Building2', 'Landmark', 'Calculator', 'ChartBar', 'ChartLine', 'ChartPie', 'BarChart3',
-  'Accessibility', 'Activity', 'Battery', 'Dumbbell', 'Gauge', 'Gift', 'Handshake', 'Laugh', 'Lightbulb',
-  'Presentation', 'Projector', 'Tickets', 'Trophy', 'Wrench', 'Smile',
-] as const;
-
 const iconRegistry = {
   Accessibility,
   Activity,
@@ -462,6 +431,8 @@ const iconRegistry = {
   Zap,
 } satisfies Record<string, LucideIcon>;
 
+export const commonLucideIconNames = Object.keys(iconRegistry).sort((a, b) => a.localeCompare(b));
+
 const kebabToPascal = (kebabName: string): string => {
   return kebabName
     .split('-')
@@ -471,8 +442,18 @@ const kebabToPascal = (kebabName: string): string => {
 };
 
 export const normalizeLucideIconName = (rawName: string): keyof typeof iconRegistry | '' => {
-  const name = rawName.trim();
+  let name = rawName.trim();
   if (!name) return '';
+
+  try {
+    const parsed = new URL(name);
+    const iconSlug = parsed.pathname.split('/').filter(Boolean).pop();
+    if (parsed.hostname.endsWith('lucide.dev') && iconSlug) {
+      name = iconSlug;
+    }
+  } catch {
+    // Not a URL; continue with the raw icon name.
+  }
 
   const candidates = [
     name,
