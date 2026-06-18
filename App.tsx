@@ -11,7 +11,6 @@ import {
   DndContext,
   DragEndEvent,
   closestCenter,
-  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
@@ -1839,93 +1838,86 @@ function App() {
     applySingleCheckResult(targetLink, isOnline);
   };
 
+  const getLinkDisplayOrder = (link: LinkItem) => link.order ?? link.createdAt;
+
+  const sortLinksByDisplayOrder = (items: LinkItem[]) => {
+    return [...items].sort((a, b) => getLinkDisplayOrder(a) - getLinkDisplayOrder(b));
+  };
+
   // 拖拽结束事件处理函数
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      // 获取当前分类下的所有链接
-      const categoryLinks = links.filter(link => 
-        selectedCategory === 'all' || link.categoryId === selectedCategory
-      );
-      
-      // 找到被拖拽元素和目标元素的索引
-      const activeIndex = categoryLinks.findIndex(link => link.id === active.id);
-      const overIndex = categoryLinks.findIndex(link => link.id === over.id);
-      
-      if (activeIndex !== -1 && overIndex !== -1) {
-        // 重新排序当前分类的链接
-        const reorderedCategoryLinks = arrayMove(categoryLinks, activeIndex, overIndex);
-        
-        // 更新所有链接的顺序
-        const updatedLinks = links.map(link => {
-          const reorderedIndex = reorderedCategoryLinks.findIndex(l => l.id === link.id);
-          if (reorderedIndex !== -1) {
-            return { ...link, order: reorderedIndex };
-          }
-          return link;
-        });
-        
-        // 按照order字段重新排序
-        updatedLinks.sort((a, b) => (a.order || 0) - (b.order || 0));
-        
-        updateData(updatedLinks, categories);
-      }
+    if (!over || active.id === over.id || selectedCategory === 'all' || isSearchActive) {
+      return;
     }
+
+    const activeIndex = displayedLinks.findIndex(link => link.id === active.id);
+    const overIndex = displayedLinks.findIndex(link => link.id === over.id);
+
+    if (activeIndex === -1 || overIndex === -1) {
+      return;
+    }
+
+    const reorderedVisibleLinks = arrayMove(displayedLinks, activeIndex, overIndex);
+    const visibleLinkIds = new Set(reorderedVisibleLinks.map(link => link.id));
+    const visibleQueue = [...reorderedVisibleLinks];
+    const categoryLinks = sortLinksByDisplayOrder(
+      links.filter(link => link.categoryId === selectedCategory && !isCategoryLocked(link.categoryId))
+    );
+
+    const reorderedCategoryLinks = categoryLinks.map(link => {
+      if (!visibleLinkIds.has(link.id)) {
+        return link;
+      }
+
+      return visibleQueue.shift() || link;
+    });
+    const orderByLinkId = new Map<string, number>();
+    reorderedCategoryLinks.forEach((link, index) => {
+      orderByLinkId.set(link.id, index);
+    });
+
+    const updatedLinks = links.map(link => {
+      const nextOrder = orderByLinkId.get(link.id);
+      return nextOrder !== undefined ? { ...link, order: nextOrder } : link;
+    });
+
+    updateData(updatedLinks, categories);
   };
 
   // 置顶链接拖拽结束事件处理函数
   const handlePinnedDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      // 获取所有置顶链接
-      const pinnedLinksList = links.filter(link => link.pinned);
-      
-      // 找到被拖拽元素和目标元素的索引
-      const activeIndex = pinnedLinksList.findIndex(link => link.id === active.id);
-      const overIndex = pinnedLinksList.findIndex(link => link.id === over.id);
-      
-      if (activeIndex !== -1 && overIndex !== -1) {
-        // 重新排序置顶链接
-        const reorderedPinnedLinks = arrayMove(pinnedLinksList, activeIndex, overIndex);
-        
-        // 创建一个映射，存储每个置顶链接的新pinnedOrder
-        const pinnedOrderMap = new Map<string, number>();
-        reorderedPinnedLinks.forEach((link, index) => {
-          pinnedOrderMap.set(link.id, index);
-        });
-        
-        // 只更新置顶链接的pinnedOrder，不改变任何链接的顺序
-        const updatedLinks = links.map(link => {
-          if (link.pinned) {
-            return { 
-              ...link, 
-              pinnedOrder: pinnedOrderMap.get(link.id) 
-            };
-          }
-          return link;
-        });
-        
-        // 按照pinnedOrder重新排序整个链接数组，确保置顶链接的顺序正确
-        // 同时保持非置顶链接的相对顺序不变
-        updatedLinks.sort((a, b) => {
-          // 如果都是置顶链接，按照pinnedOrder排序
-          if (a.pinned && b.pinned) {
-            return (a.pinnedOrder || 0) - (b.pinnedOrder || 0);
-          }
-          // 如果只有一个是置顶链接，置顶链接排在前面
-          if (a.pinned) return -1;
-          if (b.pinned) return 1;
-          // 如果都不是置顶链接，保持原位置不变（按照order或createdAt排序）
-          const aOrder = a.order !== undefined ? a.order : a.createdAt;
-          const bOrder = b.order !== undefined ? b.order : b.createdAt;
-          return bOrder - aOrder;
-        });
-        
-        updateData(updatedLinks, categories);
-      }
+    if (!over || active.id === over.id) {
+      return;
     }
+
+    const activeIndex = pinnedLinks.findIndex(link => link.id === active.id);
+    const overIndex = pinnedLinks.findIndex(link => link.id === over.id);
+
+    if (activeIndex === -1 || overIndex === -1) {
+      return;
+    }
+
+    const reorderedPinnedLinks = arrayMove(pinnedLinks, activeIndex, overIndex);
+    const pinnedOrderMap = new Map<string, number>();
+    reorderedPinnedLinks.forEach((link, index) => {
+      pinnedOrderMap.set(link.id, index);
+    });
+
+    const updatedLinks = links.map(link => {
+      if (link.pinned && pinnedOrderMap.has(link.id)) {
+        return {
+          ...link,
+          pinnedOrder: pinnedOrderMap.get(link.id)
+        };
+      }
+      return link;
+    });
+
+    updateData(updatedLinks, categories);
   };
 
   // 开始排序
@@ -2619,7 +2611,7 @@ function App() {
       // Don't show pinned links if they belong to a locked category
       const filteredPinnedLinks = links.filter(l => l.pinned && !isCategoryLocked(l.categoryId));
       // 按照pinnedOrder字段排序，如果没有pinnedOrder字段则按创建时间排序
-      return filteredPinnedLinks.sort((a, b) => {
+      return [...filteredPinnedLinks].sort((a, b) => {
         // 如果有pinnedOrder字段，则使用pinnedOrder排序
         if (a.pinnedOrder !== undefined && b.pinnedOrder !== undefined) {
           return a.pinnedOrder - b.pinnedOrder;
@@ -2702,15 +2694,8 @@ function App() {
       }
     }
     
-    // 按照order字段排序，如果没有order字段则按创建时间排序
-    // 修改排序逻辑：order值越大排在越前面，新增的卡片order值最大，会排在最前面
-    // 我们需要反转这个排序，让新增的卡片(order值最大)排在最后面
-    return result.sort((a, b) => {
-      const aOrder = a.order !== undefined ? a.order : a.createdAt;
-      const bOrder = b.order !== undefined ? b.order : b.createdAt;
-      // 改为升序排序，这样order值小(旧卡片)的排在前面，order值大(新卡片)的排在后面
-      return aOrder - bOrder;
-    });
+    // 按照order字段升序排序；没有order的旧数据按创建时间兜底。
+    return sortLinksByDisplayOrder(result);
   }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
 
   const searchResultGroups = useMemo<Array<{
@@ -3670,7 +3655,7 @@ function App() {
                     {isSortingPinned ? (
                         <DndContext
                             sensors={sensors}
-                            collisionDetection={closestCorners}
+                            collisionDetection={closestCenter}
                             onDragEnd={handlePinnedDragEnd}
                         >
                             <SortableContext
@@ -3999,7 +3984,7 @@ function App() {
                     ) : isSortingMode === selectedCategory ? (
                         <DndContext
                             sensors={sensors}
-                            collisionDetection={closestCorners}
+                            collisionDetection={closestCenter}
                             onDragEnd={handleDragEnd}
                         >
                             <SortableContext
