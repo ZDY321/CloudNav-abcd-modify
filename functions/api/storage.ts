@@ -10,6 +10,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, x-auth-password',
 };
 
+const jsonResponse = (body: unknown, init: ResponseInit = {}) => {
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders, ...init.headers },
+  });
+};
+
+const requirePassword = (request: Request, env: Env): Response | null => {
+  const serverPassword = env.PASSWORD;
+  const providedPassword = request.headers.get('x-auth-password');
+
+  if (!serverPassword) {
+    return jsonResponse(
+      { error: 'Server misconfigured: PASSWORD not set' },
+      { status: 500 }
+    );
+  }
+
+  if (!providedPassword || providedPassword !== serverPassword) {
+    return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  return null;
+};
+
 // 处理 OPTIONS 请求（解决跨域预检）
 export const onRequestOptions = async () => {
   return new Response(null, {
@@ -39,6 +64,11 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
     
     // 如果是获取配置请求
     if (getConfig === 'ai') {
+      const unauthorizedResponse = requirePassword(request, env);
+      if (unauthorizedResponse) {
+        return unauthorizedResponse;
+      }
+
       const aiConfig = await env.CLOUDNAV_KV.get('ai_config');
       return new Response(aiConfig || '{}', {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -215,18 +245,9 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     }
     
     // 对于其他操作（保存AI配置、应用数据等），需要密码验证
-    if (serverPassword) {
-      if (!providedPassword || providedPassword !== serverPassword) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-    } else {
-      return new Response(JSON.stringify({ error: 'Server misconfigured: PASSWORD not set' }), { 
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+    const unauthorizedResponse = requirePassword(request, env);
+    if (unauthorizedResponse) {
+      return unauthorizedResponse;
     }
     
     // 如果是保存AI配置

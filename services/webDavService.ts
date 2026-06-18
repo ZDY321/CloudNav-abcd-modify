@@ -1,13 +1,19 @@
 
 import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig } from "../types";
 
+const AUTH_KEY = 'cloudnav_auth_token';
+
 // Helper to call our Cloudflare Proxy
 // This solves the CORS issue by delegating the request to the backend
 const callWebDavProxy = async (operation: 'check' | 'upload' | 'download', config: WebDavConfig, payload?: any, filename?: string) => {
     try {
+        const authToken = localStorage.getItem(AUTH_KEY);
         const response = await fetch('/api/webdav', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(authToken ? { 'x-auth-password': authToken } : {})
+            },
             body: JSON.stringify({
                 operation,
                 config,

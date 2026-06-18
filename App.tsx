@@ -26,7 +26,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, UrlItem } from './types';
-import { parseBookmarks } from './services/bookmarkParser';
 import Icon from './components/Icon';
 import LinkModal from './components/LinkModal';
 import AuthModal from './components/AuthModal';
@@ -1606,7 +1605,11 @@ function App() {
             
             // 登录成功后，从KV空间加载AI配置
             try {
-                const aiConfigRes = await fetch('/api/storage?getConfig=ai');
+                const aiConfigRes = await fetch('/api/storage?getConfig=ai', {
+                    headers: {
+                        'x-auth-password': password
+                    }
+                });
                 if (aiConfigRes.ok) {
                     const aiConfigData = await aiConfigRes.json();
                     if (aiConfigData && Object.keys(aiConfigData).length > 0) {
@@ -1852,14 +1855,16 @@ function App() {
       return;
     }
 
-    const activeIndex = displayedLinks.findIndex(link => link.id === active.id);
-    const overIndex = displayedLinks.findIndex(link => link.id === over.id);
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const activeIndex = displayedLinks.findIndex(link => link.id === activeId);
+    const overIndex = displayedLinks.findIndex(link => link.id === overId);
 
     if (activeIndex === -1 || overIndex === -1) {
       return;
     }
 
-    const reorderedVisibleLinks = arrayMove(displayedLinks, activeIndex, overIndex);
+    const reorderedVisibleLinks = arrayMove<LinkItem>(displayedLinks, activeIndex, overIndex);
     const visibleLinkIds = new Set(reorderedVisibleLinks.map(link => link.id));
     const visibleQueue = [...reorderedVisibleLinks];
     const categoryLinks = sortLinksByDisplayOrder(
@@ -1894,14 +1899,16 @@ function App() {
       return;
     }
 
-    const activeIndex = pinnedLinks.findIndex(link => link.id === active.id);
-    const overIndex = pinnedLinks.findIndex(link => link.id === over.id);
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const activeIndex = pinnedLinks.findIndex(link => link.id === activeId);
+    const overIndex = pinnedLinks.findIndex(link => link.id === overId);
 
     if (activeIndex === -1 || overIndex === -1) {
       return;
     }
 
-    const reorderedPinnedLinks = arrayMove(pinnedLinks, activeIndex, overIndex);
+    const reorderedPinnedLinks = arrayMove<LinkItem>(pinnedLinks, activeIndex, overIndex);
     const pinnedOrderMap = new Map<string, number>();
     reorderedPinnedLinks.forEach((link, index) => {
       pinnedOrderMap.set(link.id, index);
@@ -2141,9 +2148,9 @@ function App() {
           return acc;
         }
 
-        const previousIds = new Set((category.subcategories || []).map(sub => sub.id));
-        const nextIds = new Set((nextCategory.subcategories || []).map(sub => sub.id));
-        const removedIds = [...previousIds].filter(id => !nextIds.has(id));
+        const previousIds = new Set<string>((category.subcategories || []).map(sub => sub.id));
+        const nextIds = new Set<string>((nextCategory.subcategories || []).map(sub => sub.id));
+        const removedIds = Array.from(previousIds).filter(id => !nextIds.has(id));
 
         if (removedIds.length > 0) {
           acc[category.id] = new Set(removedIds);
@@ -2625,10 +2632,10 @@ function App() {
   }, [links, categories, unlockedCategoryIds]);
 
   const categoryLinkStats = useMemo(() => {
-    const categorySubCategoryIds = new Map(
+    const categorySubCategoryIds = new Map<string, Set<string>>(
       categories.map(category => [
         category.id,
-        new Set((category.subcategories || []).map(subCategory => subCategory.id))
+        new Set<string>((category.subcategories || []).map(subCategory => subCategory.id))
       ])
     );
 
@@ -2763,7 +2770,7 @@ function App() {
   // --- Render Components ---
 
   // 创建可排序的链接卡片组件
-  const SortableLinkCard = ({ link }: { link: LinkItem }) => {
+  const SortableLinkCard: React.FC<{ link: LinkItem }> = ({ link }) => {
     const {
       attributes,
       listeners,
