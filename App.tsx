@@ -31,6 +31,8 @@ import Tooltip from './components/Tooltip';
 import AvailabilityControls from './components/AvailabilityControls';
 import type { LoginResult } from './components/AuthModal';
 import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
+import { readLocalStorageJson, readLocalStorageNumber } from './utils/localStorage';
+import { DEFAULT_SITE_SETTINGS, mergeSiteSettings, normalizeSiteSettings, SITE_SETTINGS_STORAGE_KEY } from './utils/siteSettings';
 
 const LinkModal = lazy(() => import('./components/LinkModal'));
 const CategoryManagerModal = lazy(() => import('./components/CategoryManagerModal'));
@@ -52,6 +54,12 @@ const AI_CONFIG_KEY = 'cloudnav_ai_config';
 const SEARCH_CONFIG_KEY = 'cloudnav_search_config';
 const LAST_SYNC_TIME_KEY = 'cloudnav_last_sync_time';
 const UNASSIGNED_SUBCATEGORY_FILTER = '__unassigned__';
+const DEFAULT_WEBDAV_CONFIG: WebDavConfig = {
+  url: '',
+  username: '',
+  password: '',
+  enabled: false
+};
 
 function App() {
   // --- State ---
@@ -70,45 +78,21 @@ function App() {
   const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
 
   // WebDAV Config State
-  const [webDavConfig, setWebDavConfig] = useState<WebDavConfig>({
-      url: '',
-      username: '',
-      password: '',
-      enabled: false
-  });
+  const [webDavConfig, setWebDavConfig] = useState<WebDavConfig>(DEFAULT_WEBDAV_CONFIG);
 
   // AI Config State
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
-      const saved = localStorage.getItem(AI_CONFIG_KEY);
-      if (saved) {
-          try {
-              return JSON.parse(saved);
-          } catch (e) {}
-      }
-      return {
+      return readLocalStorageJson<AIConfig>(AI_CONFIG_KEY, {
           provider: 'gemini',
           apiKey: process.env.API_KEY || '', 
           baseUrl: '',
           model: 'gemini-2.5-flash'
-      };
+      });
   });
 
   // Site Settings State
   const [siteSettings, setSiteSettings] = useState(() => {
-      const saved = localStorage.getItem('cloudnav_site_settings');
-      if (saved) {
-          try {
-              return JSON.parse(saved);
-          } catch (e) {}
-      }
-      return {
-          title: 'CloudNav - 我的导航',
-          navTitle: 'CloudNav',
-          pinnedCategoryIcon: 'LayoutGrid',
-          favicon: '/favicon.png',
-          cardStyle: 'detailed' as const,
-          passwordExpiryDays: 7
-      };
+      return normalizeSiteSettings(readLocalStorageJson(SITE_SETTINGS_STORAGE_KEY, DEFAULT_SITE_SETTINGS));
   });
   
   // Modals
@@ -128,10 +112,7 @@ function App() {
   // Sync State
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'offline'>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
-    const saved = localStorage.getItem(LAST_SYNC_TIME_KEY);
-    if (!saved) return null;
-    const parsed = Number(saved);
-    return Number.isFinite(parsed) ? parsed : null;
+    return readLocalStorageNumber(LAST_SYNC_TIME_KEY);
   });
   const [authToken, setAuthToken] = useState<string>('');
   const [requiresAuth, setRequiresAuth] = useState<boolean | null>(null); // null表示未检查，true表示需要认证，false表示不需要
@@ -494,23 +475,18 @@ function App() {
   };
 
   const loadFromLocal = () => {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const loadedCategories = normalizeCategories(parsed.categories);
-        const loadedLinks = normalizeLinks(parsed.links || INITIAL_LINKS, loadedCategories);
-        
-        setLinks(loadedLinks);
-        setCategories(loadedCategories);
-      } catch (e) {
-        setLinks(INITIAL_LINKS);
-        setCategories(DEFAULT_CATEGORIES);
-      }
-    } else {
+    const parsed = readLocalStorageJson<{ links?: LinkItem[]; categories?: Category[] } | null>(LOCAL_STORAGE_KEY, null);
+    if (!parsed) {
       setLinks(INITIAL_LINKS);
       setCategories(DEFAULT_CATEGORIES);
+      return;
     }
+
+    const loadedCategories = normalizeCategories(parsed.categories);
+    const loadedLinks = normalizeLinks(parsed.links || INITIAL_LINKS, loadedCategories);
+    
+    setLinks(loadedLinks);
+    setCategories(loadedCategories);
   };
 
   const markSynced = (timestamp: number = Date.now()) => {
@@ -860,12 +836,7 @@ function App() {
     }
 
     // Load WebDAV Config
-    const savedWebDav = localStorage.getItem(WEBDAV_CONFIG_KEY);
-    if (savedWebDav) {
-        try {
-            setWebDavConfig(JSON.parse(savedWebDav));
-        } catch (e) {}
-    }
+    setWebDavConfig(readLocalStorageJson<WebDavConfig>(WEBDAV_CONFIG_KEY, DEFAULT_WEBDAV_CONFIG));
 
     // Handle URL Params for Bookmarklet / Deep Link
     const currentUrl = new URL(window.location.href);
@@ -983,15 +954,7 @@ function App() {
             if (websiteConfigRes.ok) {
                 const websiteConfigData = await websiteConfigRes.json();
                 if (websiteConfigData) {
-                    setSiteSettings(prev => ({
-                        ...prev,
-                        title: websiteConfigData.title || prev.title,
-                        navTitle: websiteConfigData.navTitle || prev.navTitle,
-                        pinnedCategoryIcon: websiteConfigData.pinnedCategoryIcon || prev.pinnedCategoryIcon || 'LayoutGrid',
-                        favicon: websiteConfigData.favicon || prev.favicon,
-                        cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                        passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
-                    }));
+                    setSiteSettings(prev => mergeSiteSettings(prev, websiteConfigData));
                 }
             }
         } catch (e) {
@@ -1147,7 +1110,7 @@ function App() {
   const handleViewModeChange = (cardStyle: 'detailed' | 'simple') => {
     const newSiteSettings = { ...siteSettings, cardStyle };
     setSiteSettings(newSiteSettings);
-    localStorage.setItem('cloudnav_site_settings', JSON.stringify(newSiteSettings));
+    localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(newSiteSettings));
   };
 
   // --- Batch Edit Functions ---
@@ -1261,15 +1224,7 @@ function App() {
                 if (websiteConfigRes.ok) {
                     const websiteConfigData = await websiteConfigRes.json();
                     if (websiteConfigData) {
-                        setSiteSettings(prev => ({
-                            ...prev,
-                            title: websiteConfigData.title || prev.title,
-                            navTitle: websiteConfigData.navTitle || prev.navTitle,
-                            pinnedCategoryIcon: websiteConfigData.pinnedCategoryIcon || prev.pinnedCategoryIcon || 'LayoutGrid',
-                            favicon: websiteConfigData.favicon || prev.favicon,
-                            cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                            passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
-                        }));
+                        setSiteSettings(prev => mergeSiteSettings(prev, websiteConfigData));
                     }
                 }
             } catch (e) {
@@ -1722,8 +1677,9 @@ function App() {
       localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
       
       if (newSiteSettings) {
-          setSiteSettings(newSiteSettings);
-          localStorage.setItem('cloudnav_site_settings', JSON.stringify(newSiteSettings));
+          const normalizedSiteSettings = normalizeSiteSettings(newSiteSettings);
+          setSiteSettings(normalizedSiteSettings);
+          localStorage.setItem(SITE_SETTINGS_STORAGE_KEY, JSON.stringify(normalizedSiteSettings));
       }
       
       if (authToken) {

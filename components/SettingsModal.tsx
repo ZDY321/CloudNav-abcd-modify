@@ -3,6 +3,7 @@ import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Che
 import { AIConfig, LinkItem, Category, SiteSettings } from '../types';
 import Icon from './Icon';
 import IconSelector from './IconSelector';
+import { normalizeSiteSettings } from '../utils/siteSettings';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -63,14 +64,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'site' | 'ai' | 'tools'>('site');
   const [localConfig, setLocalConfig] = useState<AIConfig>(config);
   
-  const [localSiteSettings, setLocalSiteSettings] = useState<SiteSettings>(() => ({
-      title: siteSettings?.title || 'CloudNav - 我的导航',
-      navTitle: siteSettings?.navTitle || 'CloudNav',
-      pinnedCategoryIcon: siteSettings?.pinnedCategoryIcon || 'LayoutGrid',
-      favicon: siteSettings?.favicon || '/favicon.png',
-      cardStyle: siteSettings?.cardStyle || 'detailed',
-      passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
-  }));
+  const [localSiteSettings, setLocalSiteSettings] = useState<SiteSettings>(() => normalizeSiteSettings(siteSettings));
   
   const [generatedIcons, setGeneratedIcons] = useState<string[]>([]);
   
@@ -101,14 +95,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLocalConfig(config);
-      const safeSettings = {
-          title: siteSettings?.title || 'CloudNav - 我的导航',
-          navTitle: siteSettings?.navTitle || 'CloudNav',
-          pinnedCategoryIcon: siteSettings?.pinnedCategoryIcon || 'LayoutGrid',
-          favicon: siteSettings?.favicon || '/favicon.png',
-          cardStyle: siteSettings?.cardStyle || 'detailed',
-          passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
-      };
+      const safeSettings = normalizeSiteSettings(siteSettings);
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
           updateGeneratedIcons(safeSettings.navTitle);
@@ -136,7 +123,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         
         // 如果是身份验证过期天数修改，立即保存到 KV 空间
         if (key === 'passwordExpiryDays' && authToken) {
-            saveWebsiteConfigToKV(next);
+            saveWebsiteConfigToKV(normalizeSiteSettings(next));
         }
         
         return next;
@@ -167,9 +154,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSave = () => {
-    onSave(localConfig, localSiteSettings);
+    const normalizedSiteSettings = normalizeSiteSettings(localSiteSettings);
+    onSave(localConfig, normalizedSiteSettings);
     if (authToken) {
-        saveWebsiteConfigToKV(localSiteSettings);
+        saveWebsiteConfigToKV(normalizedSiteSettings);
     }
     onClose();
   };
