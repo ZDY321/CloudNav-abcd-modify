@@ -910,7 +910,8 @@ function notify(title, message) {
         .url-input-row .form-input { flex: 1; min-width: 0; }
         .alt-url-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .alt-url-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
-        .alt-url-grid { display: grid; grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.8fr) 32px 32px; gap: 6px; align-items: center; }
+        .alt-url-grid { display: grid; grid-template-columns: minmax(96px, 0.95fr) minmax(0, 1.8fr) 32px 32px; gap: 6px; align-items: center; }
+        .alt-url-label-select { cursor: pointer; }
         .alt-url-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
         .alt-url-default { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
         .alt-url-default input { margin: 0; }
@@ -991,6 +992,8 @@ function notify(title, message) {
 
   const extSidebarJs = `const CONFIG = ${extConfigLiteral};
 const CACHE_KEY = 'cloudnav_data';
+const ALT_URL_LABELS = ['主站', '备用站', '主题贴', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
+const DEFAULT_ALT_URL_LABEL = '主题贴';
 
 let port = null;
 try {
@@ -1079,6 +1082,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allCategories = [];
     let expandedCats = new Set();
     let currentAltUrls = [];
+    let customAltLabelIds = new Set();
     let editingLinkId = '';
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
@@ -1531,9 +1535,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return category.subcategories.find(sub => sub.id === subCategoryId) || null;
     };
 
+    const normalizeAltLabel = (value = '', fallback = DEFAULT_ALT_URL_LABEL) => {
+        const label = String(value || '').trim();
+        return label || fallback;
+    };
+
     const createAltUrlItem = (item = {}) => ({
         id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
-        label: typeof (item && item.label) === 'string' && item.label.trim() ? item.label.trim() : '备用站',
+        label: normalizeAltLabel(item && item.label),
         url: typeof (item && item.url) === 'string' ? item.url : '',
         isDefault: !!(item && item.isDefault)
     });
@@ -1569,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const nextItem = {
                 id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + index),
-                label: String(item && item.label ? item.label : '备用站').trim() || '备用站',
+                label: normalizeAltLabel(item && item.label),
                 url: finalUrl
             };
 
@@ -1583,8 +1592,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, []);
     };
 
+    const renderAltLabelControl = (item = {}) => {
+        const rawLabel = String(item && item.label ? item.label : '').trim();
+        const label = normalizeAltLabel(rawLabel);
+        const isCustomLabel = customAltLabelIds.has(item.id) || !ALT_URL_LABELS.includes(label);
+
+        if (isCustomLabel) {
+            const inputValue = customAltLabelIds.has(item.id) && !rawLabel ? '' : label;
+            return \`<input class="form-input alt-url-label" type="text" value="\${escapeHtml(inputValue)}" placeholder="输入自定义标签">\`;
+        }
+
+        return \`<select class="form-input alt-url-label-select" title="选择标签">\${ALT_URL_LABELS.map(option => \`<option value="\${escapeHtml(option)}" \${option === label ? 'selected' : ''}>\${escapeHtml(option)}</option>\`).join('')}<option value="__custom__">自定义...</option></select>\`;
+    };
+
     const setAltUrls = (items = []) => {
         const nextItems = Array.isArray(items) ? items.map(createAltUrlItem) : [];
+        const nextIds = new Set(nextItems.map(item => item.id));
+        customAltLabelIds = new Set([...customAltLabelIds].filter(id => nextIds.has(id)));
         const defaultIndex = nextItems.findIndex(item => item.isDefault);
 
         currentAltUrls = nextItems.map((item, index) => ({
@@ -1602,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         altUrlList.innerHTML = currentAltUrls.map(item => \`
             <div class="alt-url-item" data-id="\${escapeHtml(item.id)}">
                 <div class="alt-url-grid">
-                    <input class="form-input alt-url-label" type="text" value="\${escapeHtml(item.label || '')}" placeholder="标签">
+                    \${renderAltLabelControl(item)}
                     <input class="form-input alt-url-url" type="text" value="\${escapeHtml(item.url || '')}" placeholder="备用网址">
                     <button class="icon-btn alt-url-open" type="button" title="直达打开">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
@@ -2098,6 +2122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (e.target.classList.contains('alt-url-label')) {
             item.label = e.target.value;
+            lastSavedFeedback = null;
         } else if (e.target.classList.contains('alt-url-url')) {
             item.url = e.target.value;
             clearSavedFeedbackIfDirty();
@@ -2108,6 +2133,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         const row = e.target.closest('.alt-url-item');
         if (!row) return;
         const id = row.dataset.id;
+        const item = currentAltUrls.find(entry => entry.id === id);
+
+        if (e.target.classList.contains('alt-url-label-select')) {
+            if (!item) return;
+            lastSavedFeedback = null;
+            if (e.target.value === '__custom__') {
+                customAltLabelIds.add(id);
+                item.label = '';
+                setAltUrls(currentAltUrls);
+                requestAnimationFrame(() => {
+                    const targetRow = Array.from(altUrlList.querySelectorAll('.alt-url-item')).find(itemRow => itemRow.dataset.id === id);
+                    const customInput = targetRow ? targetRow.querySelector('.alt-url-label') : null;
+                    if (customInput) customInput.focus();
+                });
+            } else {
+                customAltLabelIds.delete(id);
+                item.label = e.target.value;
+                setAltUrls(currentAltUrls);
+            }
+            return;
+        }
 
         if (e.target.classList.contains('alt-url-default-toggle')) {
             currentAltUrls = currentAltUrls.map(item => ({
@@ -2117,6 +2163,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             lastSavedFeedback = null;
             setAltUrls(currentAltUrls);
             updateDuplicateState();
+        }
+    });
+    altUrlList.addEventListener('focusout', (e) => {
+        if (!e.target.classList.contains('alt-url-label')) return;
+        const row = e.target.closest('.alt-url-item');
+        if (!row) return;
+        const id = row.dataset.id;
+        const item = currentAltUrls.find(entry => entry.id === id);
+        if (!item) return;
+
+        const label = String(e.target.value || '').trim();
+        if (!label) {
+            item.label = DEFAULT_ALT_URL_LABEL;
+            customAltLabelIds.delete(id);
+            setAltUrls(currentAltUrls);
+        } else if (ALT_URL_LABELS.includes(label)) {
+            item.label = label;
+            customAltLabelIds.delete(id);
+            setAltUrls(currentAltUrls);
+        } else {
+            item.label = label;
         }
     });
     altUrlList.addEventListener('click', (e) => {
