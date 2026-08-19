@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle, ExternalLink } from 'lucide-react';
 import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus } from '../types';
+import LinkIcon from './LinkIcon';
 
 interface LinkModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [subCategoryId, setSubCategoryId] = useState('');
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
+  const [iconStatus, setIconStatus] = useState<LinkItem['iconStatus']>();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFetchingIcon, setIsFetchingIcon] = useState(false);
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
@@ -69,6 +71,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setSubCategoryId(initialData.subCategoryId || '');
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
+        setIconStatus(initialData.iconStatus || (initialData.icon ? 'found' : undefined));
         // 加载多网址数据
         if (initialData.urls && initialData.urls.length > 0) {
           setUrls(initialData.urls);
@@ -86,6 +89,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setCategoryId(defaultCategory ? defaultCategoryId : (categories[0]?.id || 'common'));
         setPinned(false);
         setIcon('');
+        setIconStatus(undefined);
         setUrls([]);
         setShowMultiUrl(false);
       }
@@ -168,6 +172,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       url: finalUrl,
       urls: processedUrls.length > 0 ? processedUrls : undefined,
       icon,
+      iconStatus: icon ? 'found' : iconStatus,
       description,
       categoryId,
       subCategoryId: subCategoryId || undefined,
@@ -190,6 +195,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       setTitle('');
       setUrl('');
       setIcon('');
+      setIconStatus(undefined);
       setDescription('');
       setPinned(false);
       // 如果开启自动获取图标，尝试获取新图标
@@ -465,63 +471,28 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
 
   const handleFetchIcon = async () => {
     if (!url) return;
-    
+
     setIsFetchingIcon(true);
     try {
-      // 提取域名
-      let domain = url;
-      // 如果URL没有协议前缀，添加https://作为默认协议
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        domain = 'https://' + url;
+      const response = await fetch(`/api/favicon?url=${encodeURIComponent(url)}`);
+      const data = await response.json().catch(() => ({})) as {
+        status?: LinkItem['iconStatus'];
+        icon?: string;
+      };
+
+      if (response.ok && data.status === 'found' && data.icon) {
+        setIcon(data.icon);
+        setIconStatus('found');
+      } else if (response.ok && data.status === 'missing') {
+        setIcon('');
+        setIconStatus('missing');
+      } else {
+        setIcon('');
+        setIconStatus('failed');
       }
-      
-      if (domain.startsWith('http://') || domain.startsWith('https://')) {
-        const urlObj = new URL(domain);
-        domain = urlObj.hostname;
-      }
-      
-      // 先尝试从KV缓存获取图标
-      try {
-        const response = await fetch(`/api/storage?getConfig=favicon&domain=${encodeURIComponent(domain)}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.cached && data.icon) {
-            setIcon(data.icon);
-            setIsFetchingIcon(false);
-            return;
-          }
-        }
-      } catch (error) {
-        console.log("Failed to fetch cached icon, will generate new one", error);
-      }
-      
-      // 如果缓存中没有，则生成新图标
-      const iconUrl = `https://www.faviconextractor.com/favicon/${domain}?larger=true`;
-      setIcon(iconUrl);
-      
-      // 将图标保存到KV缓存
-      try {
-        const authToken = localStorage.getItem(AUTH_KEY);
-        if (authToken) {
-          await fetch('/api/storage', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-auth-password': authToken
-            },
-            body: JSON.stringify({
-              saveConfig: 'favicon',
-              domain: domain,
-              icon: iconUrl
-            })
-          });
-        }
-      } catch (error) {
-        console.log("Failed to cache icon", error);
-      }
-    } catch (e) {
-      console.error("Failed to fetch icon", e);
-      alert("无法获取图标，请检查URL是否正确");
+    } catch {
+      setIcon('');
+      setIconStatus('failed');
     } finally {
       setIsFetchingIcon(false);
     }
@@ -787,22 +758,22 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300">图标 URL</label>
             <div className="flex gap-2">
-              {icon && (
-                <div className="w-10 h-10 rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden flex-shrink-0 bg-white dark:bg-slate-700">
-                  <img
-                    src={icon}
-                    alt="图标预览"
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
+              {(icon || iconStatus) && (
+                <div className="w-10 h-10 rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden flex-shrink-0 bg-white dark:bg-slate-700 flex items-center justify-center">
+                  <LinkIcon
+                    link={{ title: title || '网站', icon, iconStatus }}
+                    className="w-6 h-6"
+                    iconSize={20}
                   />
                 </div>
               )}
               <input
                 type="url"
                 value={icon}
-                onChange={(e) => setIcon(e.target.value)}
+                onChange={(e) => {
+                  setIcon(e.target.value);
+                  setIconStatus(e.target.value ? 'found' : undefined);
+                }}
                 className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 placeholder="https://example.com/icon.png"
               />
@@ -820,6 +791,12 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 获取图标
               </button>
             </div>
+            {iconStatus === 'missing' && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">该网站没有提供可用图标，已使用默认网站图标。</p>
+            )}
+            {iconStatus === 'failed' && (
+              <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">图标获取失败，已使用失败状态图标。</p>
+            )}
             <div className="flex items-center gap-2 mt-2">
               <input
                 type="checkbox"

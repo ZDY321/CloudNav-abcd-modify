@@ -22,6 +22,7 @@ export interface LinkItem {
   url: string; // 保留主URL字段，用于兼容和默认显示
   urls?: UrlItem[]; // 多网址数组
   icon?: string;
+  iconStatus?: 'found' | 'missing' | 'failed';
   description?: string;
   categoryId: string;
   subCategoryId?: string; // 二级分类ID

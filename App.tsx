@@ -29,6 +29,8 @@ import AuthModal from './components/AuthModal';
 import ContextMenu from './components/ContextMenu';
 import Tooltip from './components/Tooltip';
 import AvailabilityControls from './components/AvailabilityControls';
+import FaviconRefreshControls, { type FaviconRefreshStatus } from './components/FaviconRefreshControls';
+import LinkIcon from './components/LinkIcon';
 import type { LoginResult } from './components/AuthModal';
 import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
 import { readLocalStorageJson, readLocalStorageNumber } from './utils/localStorage';
@@ -65,6 +67,8 @@ function App() {
   // --- State ---
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const linksRef = useRef<LinkItem[]>([]);
+  const categoriesRef = useRef<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
@@ -169,6 +173,12 @@ function App() {
   // 二级分类相关状态
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [faviconRefreshStatus, setFaviconRefreshStatus] = useState<Record<string, FaviconRefreshStatus>>({});
+
+  useEffect(() => {
+    linksRef.current = links;
+    categoriesRef.current = categories;
+  }, [links, categories]);
   
   const {
     checkingLinkIds,
@@ -585,6 +595,91 @@ function App() {
       }
   };
 
+  const getFaviconRefreshScopeKey = (categoryId: string, subCategoryId: string | null = null) => (
+    subCategoryId ? `${categoryId}::sub::${subCategoryId}` : categoryId
+  );
+
+  const getLinksForFaviconRefresh = (categoryId: string, subCategoryId: string | null = null) => {
+    let scopedLinks = links.filter(link => link.categoryId === categoryId && !isCategoryLocked(link.categoryId));
+
+    if (subCategoryId === UNASSIGNED_SUBCATEGORY_FILTER) {
+      const category = categories.find(item => item.id === categoryId);
+      const validSubCategoryIds = new Set((category?.subcategories || []).map(item => item.id));
+      scopedLinks = scopedLinks.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
+    } else if (subCategoryId) {
+      scopedLinks = scopedLinks.filter(link => link.subCategoryId === subCategoryId);
+    }
+
+    return scopedLinks;
+  };
+
+  const refreshCategoryFavicons = async (categoryId: string, subCategoryId: string | null = null) => {
+    const scopeKey = getFaviconRefreshScopeKey(categoryId, subCategoryId);
+    const scopedLinks = getLinksForFaviconRefresh(categoryId, subCategoryId);
+    const total = scopedLinks.length;
+    const nextStatus: FaviconRefreshStatus = {
+      refreshing: total > 0,
+      completed: 0,
+      total,
+      found: 0,
+      missing: 0,
+      failed: 0,
+    };
+
+    setFaviconRefreshStatus(prev => ({ ...prev, [scopeKey]: nextStatus }));
+    if (total === 0) return;
+
+    type FaviconResultStatus = NonNullable<LinkItem['iconStatus']>;
+    const results = new Map<string, { status: FaviconResultStatus; icon?: string }>();
+    const concurrency = 4;
+
+    for (let index = 0; index < scopedLinks.length; index += concurrency) {
+      const chunk = scopedLinks.slice(index, index + concurrency);
+      const chunkResults = await Promise.all(chunk.map(async link => {
+        try {
+          const response = await fetch(`/api/favicon?url=${encodeURIComponent(link.url)}`);
+          const data = await response.json().catch(() => ({})) as {
+            status?: FaviconResultStatus;
+            icon?: string;
+          };
+          const status = response.ok && (data.status === 'found' || data.status === 'missing')
+            ? data.status
+            : 'failed';
+          return {
+            linkId: link.id,
+            status,
+            icon: status === 'found' && data.icon ? data.icon : undefined,
+          };
+        } catch {
+          return { linkId: link.id, status: 'failed' as const, icon: undefined };
+        }
+      }));
+
+      chunkResults.forEach(result => {
+        results.set(result.linkId, { status: result.status, icon: result.icon });
+        nextStatus.completed += 1;
+        nextStatus[result.status] += 1;
+      });
+      setFaviconRefreshStatus(prev => ({ ...prev, [scopeKey]: { ...nextStatus } }));
+    }
+
+    const updatedLinks = linksRef.current.map(link => {
+      const result = results.get(link.id);
+      if (!result) return link;
+      return {
+        ...link,
+        icon: result.status === 'found' ? result.icon : undefined,
+        iconStatus: result.status,
+      };
+    });
+
+    updateData(updatedLinks, categoriesRef.current);
+    setFaviconRefreshStatus(prev => ({
+      ...prev,
+      [scopeKey]: { ...nextStatus, refreshing: false },
+    }));
+  };
+
   // --- Context Menu Functions ---
   const handleContextMenu = (event: React.MouseEvent, link: LinkItem) => {
     event.preventDefault();
@@ -726,6 +821,7 @@ function App() {
     
     // 收集所有链接的域名（包括已有图标的链接）
     for (const link of updatedLinks) {
+      if (link.iconStatus) continue;
       if (link.url) {
         try {
           let domain = link.url;
@@ -2507,7 +2603,7 @@ function App() {
             <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
               isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
             }`}>
-                {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+                <LinkIcon link={link} />
             </div>
             
             {/* 标题 */}
@@ -2603,7 +2699,7 @@ function App() {
               <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
                 isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
               }`}>
-                  {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+                  <LinkIcon link={link} />
               </div>
               
               <div className="min-w-0 flex-1">
@@ -2647,7 +2743,7 @@ function App() {
               <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
                 isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
               }`}>
-                  {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+                  <LinkIcon link={link} />
               </div>
               
               <div className="min-w-0 flex-1">
@@ -2860,9 +2956,14 @@ function App() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-700 shrink-0">
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <a
+              href="/"
+              target="_self"
+              className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+              title="返回网站首页"
+            >
               {siteSettings.navTitle || 'CloudNav'}
-            </span>
+            </a>
         </div>
 
         {/* Categories List */}
@@ -3430,13 +3531,20 @@ function App() {
                                {displayedLinks.length}
                              </span>
                              {!isCategoryLocked(selectedCategory) && (
-                               <AvailabilityControls
-                                 status={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)}
-                                 isSubCategoryScope={!!selectedSubCategory}
-                                 onCheck={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
-                                 onRetryFailed={() => checkCategoryAvailability(selectedCategory, selectedSubCategory, { onlyFailed: true })}
-                               />
-                            )}
+                               <>
+                                 <AvailabilityControls
+                                   status={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)}
+                                   isSubCategoryScope={!!selectedSubCategory}
+                                   onCheck={() => checkCategoryAvailability(selectedCategory, selectedSubCategory)}
+                                   onRetryFailed={() => checkCategoryAvailability(selectedCategory, selectedSubCategory, { onlyFailed: true })}
+                                 />
+                                 <FaviconRefreshControls
+                                   status={faviconRefreshStatus[getFaviconRefreshScopeKey(selectedCategory, selectedSubCategory)]}
+                                   isSubCategoryScope={!!selectedSubCategory}
+                                   onRefresh={() => refreshCategoryFavicons(selectedCategory, selectedSubCategory)}
+                                 />
+                               </>
+                             )}
                            </div>
                          )}
                      </div>
