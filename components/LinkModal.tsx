@@ -768,14 +768,15 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
                 </div>
               )}
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={icon}
                 onChange={(e) => {
                   setIcon(e.target.value);
                   setIconStatus(e.target.value ? 'found' : undefined);
                 }}
                 className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="https://example.com/icon.png"
+                placeholder="https://example.com/icon.png 或 /api/favicon?..."
               />
               <button
                 type="button"
