@@ -8,11 +8,16 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   pinnedCategoryIcon: 'LayoutGrid',
   favicon: '/favicon.png',
   cardStyle: 'detailed',
+  backgroundStyle: 'grid',
   passwordExpiryDays: 7
 };
 
 const isCardStyle = (value: unknown): value is SiteSettings['cardStyle'] => (
   value === 'detailed' || value === 'simple'
+);
+
+const isBackgroundStyle = (value: unknown): value is SiteSettings['backgroundStyle'] => (
+  value === 'plain' || value === 'grid' || value === 'dots'
 );
 
 const normalizePasswordExpiryDays = (value: unknown): number => {
@@ -29,6 +34,9 @@ export const normalizeSiteSettings = (source?: Partial<SiteSettings> | null): Si
     : DEFAULT_SITE_SETTINGS.pinnedCategoryIcon,
   favicon: typeof source?.favicon === 'string' && source.favicon.trim() ? source.favicon : DEFAULT_SITE_SETTINGS.favicon,
   cardStyle: isCardStyle(source?.cardStyle) ? source.cardStyle : DEFAULT_SITE_SETTINGS.cardStyle,
+  backgroundStyle: isBackgroundStyle(source?.backgroundStyle)
+    ? source.backgroundStyle
+    : DEFAULT_SITE_SETTINGS.backgroundStyle,
   passwordExpiryDays: normalizePasswordExpiryDays(source?.passwordExpiryDays)
 });
 

@@ -2404,6 +2404,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">背景主题</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {([
+                                        { value: 'plain', label: '纯色' },
+                                        { value: 'grid', label: '简约网格' },
+                                        { value: 'dots', label: '点阵' }
+                                    ] as const).map(option => {
+                                        const isSelected = localSiteSettings.backgroundStyle === option.value;
+
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                aria-pressed={isSelected}
+                                                onClick={() => handleSiteChange('backgroundStyle', option.value)}
+                                                className={`min-w-0 rounded-lg border p-2 text-left transition-colors ${
+                                                    isSelected
+                                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                                        : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500'
+                                                }`}
+                                            >
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={`site-background site-background-${option.value} block h-14 w-full rounded-md border border-slate-200 dark:border-slate-600`}
+                                                />
+                                                <span className={`mt-2 flex min-w-0 items-center justify-between gap-1 text-xs font-medium ${
+                                                    isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-300'
+                                                }`}>
+                                                    <span className="truncate">{option.label}</span>
+                                                    {isSelected && <Check size={14} className="shrink-0" />}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">置顶分类图标</label>
                                 <div className="flex gap-3 items-center">
                                     <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600">
