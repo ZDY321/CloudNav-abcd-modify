@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Plus, Star, Globe, Wifi, WifiOff, Clock, Shield, AlertTriangle, ExternalLink } from 'lucide-react';
-import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus } from '../types';
+import { LinkItem, Category, AIConfig, UrlItem, MainUrlStatus, AdditionalCategoryLocation } from '../types';
+import { getAdditionalCategoryLocations, normalizeAdditionalCategoryLocations } from '../utils/categoryLocations';
 import LinkIcon from './LinkIcon';
 
 interface LinkModalProps {
@@ -23,7 +24,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'common');
   const [subCategoryId, setSubCategoryId] = useState('');
-  const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>([]);
+  const [additionalCategoryLocations, setAdditionalCategoryLocations] = useState<AdditionalCategoryLocation[]>([]);
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
   const [iconStatus, setIconStatus] = useState<LinkItem['iconStatus']>();
@@ -70,7 +71,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setDescription(initialData.description || '');
         setCategoryId(initialData.categoryId);
         setSubCategoryId(initialData.subCategoryId || '');
-        setAdditionalCategoryIds(initialData.additionalCategoryIds || []);
+        setAdditionalCategoryLocations(normalizeAdditionalCategoryLocations(getAdditionalCategoryLocations(initialData), categories, initialData.categoryId));
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
         setIconStatus(initialData.iconStatus || (initialData.icon ? 'found' : undefined));
@@ -89,7 +90,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         // 如果有默认分类ID且该分类存在，则使用默认分类，否则使用第一个分类
         const defaultCategory = defaultCategoryId && categories.find(cat => cat.id === defaultCategoryId);
         setCategoryId(defaultCategory ? defaultCategoryId : (categories[0]?.id || 'common'));
-        setAdditionalCategoryIds([]);
+        setAdditionalCategoryLocations([]);
         setPinned(false);
         setIcon('');
         setIconStatus(undefined);
@@ -179,7 +180,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       description,
       categoryId,
       subCategoryId: subCategoryId || undefined,
-      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined,
+      additionalCategoryLocations: additionalCategoryLocations.length > 0 ? additionalCategoryLocations : undefined,
       pinned
     });
 
@@ -847,7 +848,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
               const nextCategoryId = e.target.value;
               setCategoryId(nextCategoryId);
               setSubCategoryId(''); // 切换分类时重置二级分类
-              setAdditionalCategoryIds(prev => prev.filter(categoryId => categoryId !== nextCategoryId));
+              setAdditionalCategoryLocations(prev => prev.filter(location => location.categoryId !== nextCategoryId));
             }}
             className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             >
@@ -879,26 +880,46 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">网站仍归属于上面的主分类，这里只添加到其他分类中方便查找。</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {categories.filter(category => category.id !== categoryId).map(category => {
-                const checked = additionalCategoryIds.includes(category.id);
+                const categoryLocations = additionalCategoryLocations.filter(location => location.categoryId === category.id);
+                const checked = categoryLocations.length > 0;
+                const subcategories = category.subcategories || [];
                 return (
-                  <label
+                  <div
                     key={category.id}
-                    className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    className={`min-w-0 rounded-lg border px-3 py-2 text-sm transition-colors ${
                       checked
                         ? 'border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
                         : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => setAdditionalCategoryIds(prev => (
-                        checked ? prev.filter(id => id !== category.id) : [...prev, category.id]
-                      ))}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                    />
-                    <span className="truncate">{category.name}</span>
-                  </label>
+                    <label className="flex min-w-0 cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => setAdditionalCategoryLocations(prev => (
+                          checked
+                            ? prev.filter(location => location.categoryId !== category.id)
+                            : [...prev, { categoryId: category.id }]
+                        ))}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                      />
+                      <span className="truncate">{category.name}</span>
+                    </label>
+                    {checked && subcategories.length > 0 && (
+                      <select
+                        value={categoryLocations.find(location => location.subCategoryId)?.subCategoryId || ''}
+                        onChange={(event) => setAdditionalCategoryLocations(prev => {
+                          const nextSubCategoryId = event.target.value || undefined;
+                          const withoutCategory = prev.filter(location => location.categoryId !== category.id);
+                          return [...withoutCategory, { categoryId: category.id, ...(nextSubCategoryId ? { subCategoryId: nextSubCategoryId } : {}) }];
+                        })}
+                        className="mt-2 w-full rounded-md border border-blue-200 bg-white px-2 py-1.5 text-xs text-slate-700 dark:border-blue-800 dark:bg-slate-800 dark:text-slate-200"
+                      >
+                        <option value="">附加到一级分类主列表</option>
+                        {subcategories.map(sub => <option key={sub.id} value={sub.id}>附加到：{sub.name}</option>)}
+                      </select>
+                    )}
+                  </div>
                 );
               })}
             </div>

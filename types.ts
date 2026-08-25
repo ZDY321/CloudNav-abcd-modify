@@ -26,11 +26,21 @@ export interface LinkItem {
   description?: string;
   categoryId: string;
   subCategoryId?: string; // 二级分类ID
-  additionalCategoryIds?: string[]; // 附加分类ID；主分类仍由 categoryId 负责所有权
+  /** 附加分类位置；不包含主分类。 */
+  additionalCategoryLocations?: AdditionalCategoryLocation[];
+  /** @deprecated 旧数据字段，读取时会转换为一级附加位置。 */
+  additionalCategoryIds?: string[];
   createdAt: number;
   pinned?: boolean; // New field for pinning
   pinnedOrder?: number; // Field for pinned link sorting order
   order?: number; // 排序字段
+  /** 附加位置独立排序，键为 categoryId::subCategoryId。 */
+  additionalCategoryOrders?: Record<string, number>;
+}
+
+export interface AdditionalCategoryLocation {
+  categoryId: string;
+  subCategoryId?: string;
 }
 
 // 二级分类接口

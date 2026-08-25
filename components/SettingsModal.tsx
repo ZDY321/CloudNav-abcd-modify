@@ -423,6 +423,14 @@ function buildMenus() {
                             title: \`附加到：\${additionalCat.name}\`,
                             contexts: ["page", "link", "action"]
                         });
+                        (additionalCat.subcategories || []).forEach(additionalSubCat => {
+                            chrome.contextMenus.create({
+                                id: \`save_to::\${encodeURIComponent(cat.id)}::additionalSub::\${encodeURIComponent(additionalCat.id)}::\${encodeURIComponent(additionalSubCat.id)}\`,
+                                parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
+                                title: \`附加到：\${additionalCat.name} / \${additionalSubCat.name}\`,
+                                contexts: ["page", "link", "action"]
+                            });
+                        });
                     });
                 }
 
@@ -727,22 +735,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const idParts = String(info.menuItemId).replace("save_to::", "").split("::");
         const catId = decodeURIComponent(idParts[0] || '');
         const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const additionalSubCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[3] || '') : null;
+        const additionalSubCategoryCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[2] || '') : null;
         const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId, '', undefined, additionalCategoryId ? [additionalCategoryId] : []);
+        saveLink(title, url, catId, subCatId, '', undefined, additionalCategoryId ? [{ categoryId: additionalCategoryId }] : (additionalSubCategoryCategoryId ? [{ categoryId: additionalSubCategoryCategoryId, subCategoryId: additionalSubCategoryId }] : []));
     } else if (String(info.menuItemId).startsWith("pin_to::")) {
         const idParts = String(info.menuItemId).replace("pin_to::", "").split("::");
         const catId = decodeURIComponent(idParts[0] || '');
         const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const additionalSubCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[3] || '') : null;
+        const additionalSubCategoryCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[2] || '') : null;
         const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId, '', true, additionalCategoryId ? [additionalCategoryId] : []);
+        saveLink(title, url, catId, subCatId, '', true, additionalCategoryId ? [{ categoryId: additionalCategoryId }] : (additionalSubCategoryCategoryId ? [{ categoryId: additionalSubCategoryCategoryId, subCategoryId: additionalSubCategoryId }] : []));
     }
 });
 
-async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined, additionalCategoryIds = []) {
+async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined, additionalCategoryLocations = []) {
     if (!CONFIG.password) {
         notify('保存失败', '未配置密码，请先在侧边栏登录。');
         return;
@@ -752,13 +764,19 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
     const requestUrl = matchedLink && matchedLink.url ? matchedLink.url : url;
     // When the context-menu action explicitly adds a secondary category,
     // keep an existing link's primary category unchanged.
-    const primaryCategoryId = matchedLink && Array.isArray(additionalCategoryIds) && additionalCategoryIds.length > 0
+    const primaryCategoryId = matchedLink && Array.isArray(additionalCategoryLocations) && additionalCategoryLocations.length > 0
         ? matchedLink.categoryId
         : categoryId;
-    const nextAdditionalCategoryIds = Array.from(new Set([
-        ...(matchedLink && Array.isArray(matchedLink.additionalCategoryIds) ? matchedLink.additionalCategoryIds : []),
-        ...(Array.isArray(additionalCategoryIds) ? additionalCategoryIds : [])
-    ])).filter(id => id && id !== primaryCategoryId);
+    const existingLocations = matchedLink && Array.isArray(matchedLink.additionalCategoryLocations)
+        ? matchedLink.additionalCategoryLocations
+        : (matchedLink && Array.isArray(matchedLink.additionalCategoryIds) ? matchedLink.additionalCategoryIds.map(categoryId => ({ categoryId })) : []);
+    const nextAdditionalCategoryLocations = [...existingLocations, ...(Array.isArray(additionalCategoryLocations) ? additionalCategoryLocations : [])]
+        .filter(location => location && location.categoryId && location.categoryId !== primaryCategoryId)
+        .filter((location, index, all) => all.findIndex(item => item.categoryId === location.categoryId && (item.subCategoryId || '') === (location.subCategoryId || '')) === index);
+    const nextAdditionalCategoryIds = Array.from(new Set(nextAdditionalCategoryLocations.map(location => location.categoryId)));
+    const nextSubCategoryId = matchedLink && Array.isArray(additionalCategoryLocations) && additionalCategoryLocations.length > 0
+        ? (matchedLink.subCategoryId || null)
+        : subCategoryId;
 
     if (!icon && matchedLink && matchedLink.icon) {
         icon = matchedLink.icon;
@@ -776,7 +794,8 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
             title: title || '未命名',
             url: requestUrl,
             categoryId: primaryCategoryId,
-            subCategoryId: subCategoryId,
+            subCategoryId: nextSubCategoryId,
+            additionalCategoryLocations: nextAdditionalCategoryLocations,
             additionalCategoryIds: nextAdditionalCategoryIds,
             icon: icon
         };
@@ -803,13 +822,14 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
                     title: title || link.title,
                     url: requestUrl,
                     categoryId: primaryCategoryId,
-                    subCategoryId: subCategoryId || undefined,
+                    subCategoryId: nextSubCategoryId || undefined,
+                    additionalCategoryLocations: nextAdditionalCategoryLocations.length > 0 ? nextAdditionalCategoryLocations : undefined,
                     additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined,
                     icon,
                     pinned: typeof pinned === 'boolean' ? pinned : link.pinned
                 } : link);
             } else {
-                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId: primaryCategoryId, subCategoryId: subCategoryId || undefined, additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined, icon, pinned: pinned === true };
+                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId: primaryCategoryId, subCategoryId: nextSubCategoryId || undefined, additionalCategoryLocations: nextAdditionalCategoryLocations.length > 0 ? nextAdditionalCategoryLocations : undefined, additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined, icon, pinned: pinned === true };
                 linkCache.unshift(newLink);
             }
             refreshActiveTabUi();
@@ -896,7 +916,9 @@ function notify(title, message) {
         .form-textarea { min-height: 64px; resize: vertical; }
         .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
         .additional-category-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-        .additional-category-option { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; cursor: pointer; }
+        .additional-category-option { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; }
+        .additional-category-option label { display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; }
+        .additional-category-sub { width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 11px; }
         .additional-category-option:hover { border-color: var(--accent); background: var(--accent-soft); }
         .additional-category-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .form-toggle input { margin: 0; }
@@ -1119,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentAltUrls = [];
     let customAltLabelIds = new Set();
     let editingLinkId = '';
-    let currentAdditionalCategoryIds = [];
+    let currentAdditionalCategoryLocations = [];
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
     let currentExistingRecordState = { groups: [], total: 0, primaryLink: null };
@@ -1734,7 +1756,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextCategoryId = link.categoryId || categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         renderCategoryOptions(nextCategoryId);
         renderSubCategoryOptions(nextCategoryId, link.subCategoryId || '');
-        renderAdditionalCategoryOptions(link.additionalCategoryIds || []);
+        renderAdditionalCategoryOptions(Array.isArray(link.additionalCategoryLocations)
+            ? link.additionalCategoryLocations
+            : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId })));
         syncSaveActionLabel();
         setStatus(statusText, 'success');
         updateDuplicateState();
@@ -1776,12 +1800,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             : '';
     };
 
-    const renderAdditionalCategoryOptions = (selectedIds = currentAdditionalCategoryIds) => {
+    const renderAdditionalCategoryOptions = (selectedLocations = currentAdditionalCategoryLocations) => {
         const primaryCategoryId = categorySelect.value;
         const availableCategories = allCategories.filter(cat => cat.id !== primaryCategoryId);
-        currentAdditionalCategoryIds = Array.from(new Set((selectedIds || []).filter(id => (
-            availableCategories.some(cat => cat.id === id)
-        ))));
+        currentAdditionalCategoryLocations = (selectedLocations || []).reduce((result, location) => {
+            const categoryId = location && location.categoryId;
+            const subCategoryId = location && location.subCategoryId;
+            const category = availableCategories.find(cat => cat.id === categoryId);
+            const validSub = category && Array.isArray(category.subcategories) && category.subcategories.some(sub => sub.id === subCategoryId);
+            const normalized = category ? { categoryId, ...(validSub ? { subCategoryId } : {}) } : null;
+            const key = normalized ? categoryId + '::' + (normalized.subCategoryId || '') : '';
+            if (!normalized || result.some(item => item.categoryId + '::' + (item.subCategoryId || '') === key)) return result;
+            result.push(normalized);
+            return result;
+        }, []);
 
         if (availableCategories.length === 0) {
             additionalCategoryWrap.style.display = 'none';
@@ -1790,17 +1822,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         additionalCategoryWrap.style.display = 'block';
-        additionalCategoryOptions.innerHTML = availableCategories.map(cat => \`
-            <label class="additional-category-option">
-                <input type="checkbox" data-additional-category-id="\${escapeHtml(cat.id)}" \${currentAdditionalCategoryIds.includes(cat.id) ? 'checked' : ''}>
-                <span>\${escapeHtml(cat.name)}</span>
-            </label>
-        \`).join('');
+        additionalCategoryOptions.innerHTML = availableCategories.map(cat => {
+            const locations = currentAdditionalCategoryLocations.filter(location => location.categoryId === cat.id);
+            const checked = locations.length > 0;
+            const selectedSub = locations.find(location => location.subCategoryId)?.subCategoryId || '';
+            const subOptions = Array.isArray(cat.subcategories) && cat.subcategories.length
+                ? \`<select class="additional-category-sub" data-additional-category-sub="\${escapeHtml(cat.id)}"><option value="">附加到一级分类主列表</option>\${cat.subcategories.map(sub => \`<option value="\${escapeHtml(sub.id)}" \${sub.id === selectedSub ? 'selected' : ''}>附加到：\${escapeHtml(sub.name)}</option>\`).join('')}</select>\`
+                : '';
+            return \`<div class="additional-category-option"><label><input type="checkbox" data-additional-category-id="\${escapeHtml(cat.id)}" \${checked ? 'checked' : ''}><span>\${escapeHtml(cat.name)}</span></label>\${checked ? subOptions : ''}</div>\`;
+        }).join('');
     };
 
-    const getSelectedAdditionalCategoryIds = () => Array.from(
+    const getSelectedAdditionalCategoryLocations = () => Array.from(
         additionalCategoryOptions.querySelectorAll('input[data-additional-category-id]:checked')
-    ).map(input => input.dataset.additionalCategoryId).filter(Boolean);
+    ).map(input => {
+        const categoryId = input.dataset.additionalCategoryId;
+        const select = categoryId ? additionalCategoryOptions.querySelector('select[data-additional-category-sub="' + CSS.escape(categoryId) + '"]') : null;
+        return categoryId ? { categoryId, ...(select && select.value ? { subCategoryId: select.value } : {}) } : null;
+    }).filter(Boolean);
 
     const updateDuplicateState = () => {
         const candidateUrls = getFormUrls();
@@ -1898,7 +1937,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nextSubCategoryId = matchState && matchState.link ? (matchState.link.subCategoryId || '') : '';
                 renderCategoryOptions(nextCategoryId);
                 renderSubCategoryOptions(nextCategoryId, nextSubCategoryId);
-                renderAdditionalCategoryOptions(matchState && matchState.link ? (matchState.link.additionalCategoryIds || []) : []);
+                renderAdditionalCategoryOptions(matchState && matchState.link
+                    ? (matchState.link.additionalCategoryLocations || (matchState.link.additionalCategoryIds || []).map(categoryId => ({ categoryId })))
+                    : []);
                 syncSaveActionLabel();
                 setStatus(getReadCurrentStatus(matchState && matchState.type), matchState ? 'warn' : 'success');
             }
@@ -1916,7 +1957,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         allCategories.forEach(cat => {
             const catLinks = allLinks.filter(link => {
-                if (link.categoryId !== cat.id && !(Array.isArray(link.additionalCategoryIds) && link.additionalCategoryIds.includes(cat.id))) return false;
+                const additionalLocations = Array.isArray(link.additionalCategoryLocations)
+                    ? link.additionalCategoryLocations
+                    : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId }));
+                if (link.categoryId !== cat.id && !additionalLocations.some(location => location.categoryId === cat.id)) return false;
                 if (!q) return true;
 
                 return String(link.title || '').toLowerCase().includes(q) ||
@@ -1942,6 +1986,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             catLinks.forEach(link => {
                 const openUrl = getPreferredOpenUrl(link);
                 const iconSrc = getDisplayIconUrl(openUrl || link.url);
+                const additionalLocations = Array.isArray(link.additionalCategoryLocations)
+                    ? link.additionalCategoryLocations
+                    : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId }));
+                const currentAdditionalLocation = additionalLocations.find(location => location.categoryId === cat.id);
                 const isSecondary = link.categoryId !== cat.id;
                 const primaryLocation = getLocationText(link.categoryId, link.subCategoryId);
                 const hoverTitle = link.description || (isSecondary ? \`主分类：\${primaryLocation}\` : primaryLocation) || openUrl || link.url || '';
@@ -1950,7 +1998,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
                             <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
-                            \${isSecondary ? \`<div class="link-meta">主分类：\${escapeHtml(primaryLocation)}</div>\` : ''}
+                            \${isSecondary ? \`<div class="link-meta">位置：\${escapeHtml(currentAdditionalLocation && currentAdditionalLocation.subCategoryId ? getLocationText(cat.id, currentAdditionalLocation.subCategoryId) : cat.name)} · 主分类：\${escapeHtml(primaryLocation)}</div>\` : ''}
                         </div>
                     </a>
                 \`;
@@ -1986,7 +2034,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     allCategories = data.categories || [];
                     renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
                     renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
-                    renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
+                    renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
                     render(searchInput.value);
                     updateDuplicateState();
                     return;
@@ -2011,7 +2059,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
             renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
-            renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
+            renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
             render(searchInput.value);
             updateDuplicateState();
         } catch (e) {
@@ -2036,7 +2084,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const description = descriptionInput.value.trim();
         const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         const subCategoryId = subCategorySelect.value || '';
-        const additionalCategoryIds = getSelectedAdditionalCategoryIds().filter(id => id !== categoryId);
+        const additionalCategoryLocations = getSelectedAdditionalCategoryLocations().filter(location => location.categoryId !== categoryId);
+        const additionalCategoryIds = Array.from(new Set(additionalCategoryLocations.map(location => location.categoryId)));
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
         const pinned = !!(pinnedInput && pinnedInput.checked);
         const preparedAltUrls = getPreparedAltUrls();
@@ -2076,6 +2125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     description,
                     categoryId,
                     subCategoryId: subCategoryId || null,
+                    additionalCategoryLocations,
                     additionalCategoryIds,
                     icon,
                     pinned
@@ -2281,12 +2331,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateDuplicateState();
     });
     categorySelect.addEventListener('change', () => {
-        currentAdditionalCategoryIds = getSelectedAdditionalCategoryIds().filter(id => id !== categorySelect.value);
+        currentAdditionalCategoryLocations = getSelectedAdditionalCategoryLocations().filter(location => location.categoryId !== categorySelect.value);
         renderSubCategoryOptions(categorySelect.value, '');
-        renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
+        renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
     });
     additionalCategoryOptions.addEventListener('change', () => {
-        currentAdditionalCategoryIds = getSelectedAdditionalCategoryIds();
+        currentAdditionalCategoryLocations = getSelectedAdditionalCategoryLocations();
+        renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
     });
     urlInput.addEventListener('input', () => {
         clearSavedFeedbackIfDirty();

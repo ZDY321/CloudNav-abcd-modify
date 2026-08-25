@@ -321,6 +321,25 @@ const loadCurrentData = async (env: Env) => {
   return currentData;
 };
 
+const sanitizeAdditionalLocations = (rawLocations: unknown, categories: any[], primaryCategoryId: string) => {
+  const seen = new Set<string>();
+  const categoryMap = new Map(categories.map(category => [category.id, category]));
+  const locations = Array.isArray(rawLocations) ? rawLocations : [];
+  return locations.reduce((result: any[], raw: any) => {
+    if (!raw || typeof raw !== 'object') return result;
+    const categoryId = typeof raw.categoryId === 'string' ? raw.categoryId : '';
+    const subCategoryId = typeof raw.subCategoryId === 'string' && raw.subCategoryId ? raw.subCategoryId : undefined;
+    const category = categoryMap.get(categoryId);
+    if (!category || categoryId === primaryCategoryId) return result;
+    if (subCategoryId && !(category.subcategories || []).some((sub: any) => sub.id === subCategoryId)) return result;
+    const key = `${categoryId}::${subCategoryId || ''}`;
+    if (seen.has(key)) return result;
+    seen.add(key);
+    result.push({ categoryId, ...(subCategoryId ? { subCategoryId } : {}) });
+    return result;
+  }, []);
+};
+
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
   const { request, env } = context;
 
@@ -475,17 +494,17 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     const hasIconField = Object.prototype.hasOwnProperty.call(newLinkData, 'icon');
     const hasUrlsField = Object.prototype.hasOwnProperty.call(newLinkData, 'urls');
     const hasAdditionalCategoryIdsField = Object.prototype.hasOwnProperty.call(newLinkData, 'additionalCategoryIds');
+    const hasAdditionalCategoryLocationsField = Object.prototype.hasOwnProperty.call(newLinkData, 'additionalCategoryLocations');
     const sanitizedUrls = hasUrlsField ? sanitizeUrlItems(newLinkData.urls, newLinkData.url) : [];
-    const sanitizedAdditionalCategoryIds = hasAdditionalCategoryIdsField
-      ? Array.from(new Set(
-          (Array.isArray(newLinkData.additionalCategoryIds) ? newLinkData.additionalCategoryIds : [])
-            .filter((categoryId: unknown) => (
-              typeof categoryId === 'string' &&
-              currentData.categories.some((category: any) => category.id === categoryId) &&
-              categoryId !== targetCatId
-            ))
-        ))
-      : [];
+    const rawAdditionalLocations = hasAdditionalCategoryLocationsField
+      ? newLinkData.additionalCategoryLocations
+      : (hasAdditionalCategoryIdsField
+        ? (Array.isArray(newLinkData.additionalCategoryIds) ? newLinkData.additionalCategoryIds.map((categoryId: string) => ({ categoryId })) : [])
+        : undefined);
+    const sanitizedAdditionalCategoryLocations = rawAdditionalLocations === undefined
+      ? []
+      : sanitizeAdditionalLocations(rawAdditionalLocations, currentData.categories, targetCatId);
+    const sanitizedAdditionalCategoryIds = Array.from(new Set(sanitizedAdditionalCategoryLocations.map((location: any) => location.categoryId)));
 
     const normalizedCandidateUrls = new Set<string>(
       [newLinkData.url, ...sanitizedUrls.map(item => item.url)]
@@ -527,7 +546,10 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
         if (hasDescriptionField) updatedLink.description = newLinkData.description || '';
         if (hasSubCategoryField) updatedLink.subCategoryId = newLinkData.subCategoryId || undefined;
-        if (hasAdditionalCategoryIdsField) {
+        if (hasAdditionalCategoryIdsField || hasAdditionalCategoryLocationsField) {
+            updatedLink.additionalCategoryLocations = sanitizedAdditionalCategoryLocations.length > 0
+              ? sanitizedAdditionalCategoryLocations
+              : undefined;
             updatedLink.additionalCategoryIds = sanitizedAdditionalCategoryIds.length > 0
               ? sanitizedAdditionalCategoryIds
               : undefined;
@@ -582,6 +604,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         description: hasDescriptionField ? (newLinkData.description || '') : '',
         categoryId: targetCatId, 
         subCategoryId: hasSubCategoryField ? (newLinkData.subCategoryId || undefined) : undefined,
+        additionalCategoryLocations: sanitizedAdditionalCategoryLocations.length > 0 ? sanitizedAdditionalCategoryLocations : undefined,
         additionalCategoryIds: sanitizedAdditionalCategoryIds.length > 0 ? sanitizedAdditionalCategoryIds : undefined,
         createdAt: Date.now(),
         pinned: pinned,

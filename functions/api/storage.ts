@@ -35,6 +35,43 @@ const requirePassword = (request: Request, env: Env): Response | null => {
   return null;
 };
 
+const normalizeAppData = (rawData: any) => {
+  const categories = Array.isArray(rawData?.categories) ? rawData.categories : [];
+  const categoryMap = new Map(categories.map((category: any) => [category.id, category]));
+  const links = Array.isArray(rawData?.links) ? rawData.links : [];
+  const normalizedLinks = links.map((link: any) => {
+    const categoryId = categoryMap.has(link?.categoryId) ? link.categoryId : (categories[0]?.id || 'common');
+    const category: any = categoryMap.get(categoryId);
+    const primarySubCategoryId = link?.subCategoryId && (category?.subcategories || []).some((sub: any) => sub.id === link.subCategoryId)
+      ? link.subCategoryId
+      : undefined;
+    const rawLocations = Array.isArray(link?.additionalCategoryLocations)
+      ? link.additionalCategoryLocations
+      : (Array.isArray(link?.additionalCategoryIds) ? link.additionalCategoryIds.map((id: string) => ({ categoryId: id })) : []);
+    const seen = new Set<string>();
+    const locations = rawLocations.reduce((result: any[], location: any) => {
+      const additionalCategory: any = categoryMap.get(location?.categoryId);
+      const subCategoryId = typeof location?.subCategoryId === 'string' && location.subCategoryId ? location.subCategoryId : undefined;
+      if (!additionalCategory || location.categoryId === categoryId) return result;
+      if (subCategoryId && !(additionalCategory.subcategories || []).some((sub: any) => sub.id === subCategoryId)) return result;
+      const key = `${location.categoryId}::${subCategoryId || ''}`;
+      if (seen.has(key)) return result;
+      seen.add(key);
+      result.push({ categoryId: location.categoryId, ...(subCategoryId ? { subCategoryId } : {}) });
+      return result;
+    }, []);
+    const additionalCategoryIds = Array.from(new Set(locations.map((location: any) => location.categoryId)));
+    return {
+      ...link,
+      categoryId,
+      subCategoryId: primarySubCategoryId,
+      additionalCategoryLocations: locations.length > 0 ? locations : undefined,
+      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+    };
+  });
+  return { ...rawData, links: normalizedLinks, categories };
+};
+
 // 处理 OPTIONS 请求（解决跨域预检）
 export const onRequestOptions = async () => {
   return new Response(null, {
@@ -163,7 +200,8 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
       });
     }
 
-    return new Response(data, {
+    const normalizedData = normalizeAppData(JSON.parse(data));
+    return new Response(JSON.stringify(normalizedData), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (err) {
@@ -285,8 +323,11 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       });
     }
     
-    // 将数据写入 KV
-    await env.CLOUDNAV_KV.put('app_data', JSON.stringify(body));
+    // 将数据写入 KV，并在服务端统一清理无效附加位置引用
+    const appData = body && Array.isArray(body.links) && Array.isArray(body.categories)
+      ? normalizeAppData(body)
+      : body;
+    await env.CLOUDNAV_KV.put('app_data', JSON.stringify(appData));
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

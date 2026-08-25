@@ -24,6 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, UrlItem } from './types';
+import { getAdditionalCategoryLocations, normalizeAdditionalCategoryLocations, normalizeLinkCategoryLocations, removeCategoryLocations } from './utils/categoryLocations';
 import Icon from './components/Icon';
 import AuthModal from './components/AuthModal';
 import ContextMenu from './components/ContextMenu';
@@ -298,18 +299,29 @@ function App() {
     return [category?.name || '未分类', subCategory?.name].filter(Boolean).join(' / ');
   };
 
+  const getAdditionalLocations = (link: LinkItem) => getAdditionalCategoryLocations(link);
+
   const isLinkInCategory = (link: LinkItem, categoryId: string): boolean => (
-    link.categoryId === categoryId || (link.additionalCategoryIds || []).includes(categoryId)
+    link.categoryId === categoryId || getAdditionalLocations(link).some(location => location.categoryId === categoryId)
   );
 
   const isLinkSecondaryInCategory = (link: LinkItem, categoryId: string): boolean => (
-    link.categoryId !== categoryId && (link.additionalCategoryIds || []).includes(categoryId)
+    link.categoryId !== categoryId && getAdditionalLocations(link).some(location => location.categoryId === categoryId)
   );
 
+  const isLinkInSubCategory = (link: LinkItem, categoryId: string, subCategoryId: string): boolean => {
+    if (link.categoryId === categoryId) return link.subCategoryId === subCategoryId;
+    return getAdditionalLocations(link).some(location => location.categoryId === categoryId && location.subCategoryId === subCategoryId);
+  };
+
   const getAdditionalCategoryNames = (link: LinkItem): string[] => (
-    (link.additionalCategoryIds || [])
-      .map(categoryId => categories.find(category => category.id === categoryId)?.name)
-      .filter((name): name is string => !!name)
+    getAdditionalLocations(link)
+      .map(location => {
+        const category = categories.find(item => item.id === location.categoryId);
+        const sub = category?.subcategories?.find(item => item.id === location.subCategoryId);
+        return [category?.name, sub?.name].filter(Boolean).join(' / ');
+      })
+      .filter(Boolean)
   );
 
   const getLinkCategorySummary = (link: LinkItem): string => {
@@ -510,17 +522,11 @@ function App() {
     const validCategoryIds = new Set(sourceCategories.map(category => category.id));
     return sourceLinks.map(link => {
       const primaryCategoryId = validCategoryIds.has(link.categoryId) ? link.categoryId : 'common';
-      const additionalCategoryIds = Array.from(new Set(
-        (Array.isArray(link.additionalCategoryIds) ? link.additionalCategoryIds : [])
-          .filter(categoryId => validCategoryIds.has(categoryId) && categoryId !== primaryCategoryId)
-      ));
-
-      return {
+      return normalizeLinkCategoryLocations({
         ...link,
         categoryId: primaryCategoryId,
         subCategoryId: primaryCategoryId === link.categoryId ? link.subCategoryId : undefined,
-        additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
-      };
+      }, sourceCategories);
     });
   };
 
@@ -1313,13 +1319,13 @@ function App() {
       if (!selectedLinks.has(link.id) || (selectedCategory !== 'all' && isLinkSecondaryInCategory(link, selectedCategory))) {
         return link;
       }
-      const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== targetCategoryId);
-      return {
+      const additionalCategoryLocations = getAdditionalLocations(link).filter(location => location.categoryId !== targetCategoryId);
+      return normalizeLinkCategoryLocations({
         ...link,
         categoryId: targetCategoryId,
         subCategoryId: undefined,
-        additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
-      };
+        additionalCategoryLocations,
+      }, categories);
     }
     );
     updateData(newLinks, categories);
@@ -1566,14 +1572,15 @@ function App() {
       }
       return candidate;
     });
-    const additionalCategoryIds = Array.from(new Set(
-      (data.additionalCategoryIds || []).filter(categoryId => (
-        categories.some(category => category.id === categoryId) && categoryId !== data.categoryId
-      ))
-    ));
+    const additionalCategoryLocations = normalizeAdditionalCategoryLocations(
+      data.additionalCategoryLocations || data.additionalCategoryIds?.map(categoryId => ({ categoryId })),
+      categories,
+      data.categoryId
+    );
     const normalizedData = {
       ...data,
-      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+      additionalCategoryLocations: additionalCategoryLocations.length > 0 ? additionalCategoryLocations : undefined,
+      additionalCategoryIds: additionalCategoryLocations.length > 0 ? Array.from(new Set(additionalCategoryLocations.map(location => location.categoryId))) : undefined
     };
     const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls]);
     if (duplicateGroups.length > 0) {
@@ -1661,14 +1668,15 @@ function App() {
       }
       return candidate;
     });
-    const additionalCategoryIds = Array.from(new Set(
-      (data.additionalCategoryIds || []).filter(categoryId => (
-        categories.some(category => category.id === categoryId) && categoryId !== data.categoryId
-      ))
-    ));
+    const additionalCategoryLocations = normalizeAdditionalCategoryLocations(
+      data.additionalCategoryLocations || data.additionalCategoryIds?.map(categoryId => ({ categoryId })),
+      categories,
+      data.categoryId
+    );
     const normalizedData = {
       ...data,
-      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+      additionalCategoryLocations: additionalCategoryLocations.length > 0 ? additionalCategoryLocations : undefined,
+      additionalCategoryIds: additionalCategoryLocations.length > 0 ? Array.from(new Set(additionalCategoryLocations.map(location => location.categoryId))) : undefined
     };
     const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls], editingLink.id);
     if (duplicateGroups.length > 0) {
@@ -1697,10 +1705,16 @@ function App() {
     applyLinkAvailabilityResult(targetLink, isOnline);
   };
 
-  const getLinkDisplayOrder = (link: LinkItem) => link.order ?? link.createdAt;
+  const getLinkDisplayOrder = (link: LinkItem, categoryId?: string, subCategoryId?: string | null) => {
+    if (categoryId && categoryId !== link.categoryId) {
+      const key = `${categoryId}::${subCategoryId || ''}`;
+      return link.additionalCategoryOrders?.[key] ?? link.createdAt;
+    }
+    return link.order ?? link.createdAt;
+  };
 
-  const sortLinksByDisplayOrder = (items: LinkItem[]) => {
-    return [...items].sort((a, b) => getLinkDisplayOrder(a) - getLinkDisplayOrder(b));
+  const sortLinksByDisplayOrder = (items: LinkItem[], categoryId?: string, subCategoryId?: string | null) => {
+    return [...items].sort((a, b) => getLinkDisplayOrder(a, categoryId, subCategoryId) - getLinkDisplayOrder(b, categoryId, subCategoryId));
   };
 
   // 拖拽结束事件处理函数
@@ -1713,7 +1727,7 @@ function App() {
 
     const activeId = String(active.id);
     const overId = String(over.id);
-    const sortableDisplayedLinks = displayedLinks.filter(link => link.categoryId === selectedCategory);
+    const sortableDisplayedLinks = displayedLinks.filter(link => isLinkInCategory(link, selectedCategory));
     const activeIndex = sortableDisplayedLinks.findIndex(link => link.id === activeId);
     const overIndex = sortableDisplayedLinks.findIndex(link => link.id === overId);
 
@@ -1723,26 +1737,17 @@ function App() {
 
     const reorderedVisibleLinks = arrayMove<LinkItem>(sortableDisplayedLinks, activeIndex, overIndex);
     const visibleLinkIds = new Set(reorderedVisibleLinks.map(link => link.id));
-    const visibleQueue = [...reorderedVisibleLinks];
-    const categoryLinks = sortLinksByDisplayOrder(
-      links.filter(link => link.categoryId === selectedCategory && !isCategoryLocked(link.categoryId))
-    );
-
-    const reorderedCategoryLinks = categoryLinks.map(link => {
-      if (!visibleLinkIds.has(link.id)) {
-        return link;
-      }
-
-      return visibleQueue.shift() || link;
-    });
     const orderByLinkId = new Map<string, number>();
-    reorderedCategoryLinks.forEach((link, index) => {
+    reorderedVisibleLinks.forEach((link, index) => {
       orderByLinkId.set(link.id, index);
     });
 
     const updatedLinks = links.map(link => {
       const nextOrder = orderByLinkId.get(link.id);
-      return nextOrder !== undefined ? { ...link, order: nextOrder } : link;
+      if (nextOrder === undefined) return link;
+      if (link.categoryId === selectedCategory) return { ...link, order: nextOrder };
+      const key = `${selectedCategory}::${selectedSubCategory || ''}`;
+      return { ...link, additionalCategoryOrders: { ...(link.additionalCategoryOrders || {}), [key]: nextOrder } };
     });
 
     updateData(updatedLinks, categories);
@@ -2022,25 +2027,12 @@ function App() {
         return acc;
       }, {} as Record<string, Set<string>>);
 
-      const newLinks = links.map(link => {
-        const removedIds = removedSubCategoryIdsByCategory[link.categoryId];
-        return removedIds && link.subCategoryId && removedIds.has(link.subCategoryId)
-          ? { ...link, subCategoryId: undefined }
-          : link;
-      });
-
-      const validCategoryIds = new Set(newCats.map(category => category.id));
-      const linksWithValidAdditionalCategories = newLinks.map(link => {
-        const additionalCategoryIds = Array.from(new Set(
-          (link.additionalCategoryIds || []).filter(categoryId => (
-            validCategoryIds.has(categoryId) && categoryId !== link.categoryId
-          ))
-        ));
-        return {
-          ...link,
-          additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
-        };
-      });
+      const removedCategoryIds = new Set<string>(categories.map(category => category.id).filter(id => !newCats.some(category => category.id === id)));
+      const linksWithValidAdditionalCategories = removeCategoryLocations(
+        links,
+        removedCategoryIds,
+        new Map<string, Set<string>>(Object.entries(removedSubCategoryIdsByCategory))
+      ).map(link => normalizeLinkCategoryLocations(link, newCats));
 
       if (
         selectedCategory !== 'all' &&
@@ -2078,15 +2070,13 @@ function App() {
         return c;
       });
 
-      const newLinks = links.map(l =>
-        l.categoryId === fromCategoryId && l.subCategoryId === subCategoryId
-          ? {
-              ...l,
-              categoryId: toCategoryId,
-              additionalCategoryIds: (l.additionalCategoryIds || []).filter(categoryId => categoryId !== toCategoryId)
-            }
-          : l
-      );
+       const newLinks = links.map(l => l.categoryId === fromCategoryId && l.subCategoryId === subCategoryId
+         ? normalizeLinkCategoryLocations({
+             ...l,
+             categoryId: toCategoryId,
+             additionalCategoryLocations: getAdditionalLocations(l).filter(location => location.categoryId !== toCategoryId)
+           }, newCats)
+         : l);
 
       if (selectedCategory === fromCategoryId && selectedSubCategory === subCategoryId) {
         setSelectedCategory(toCategoryId);
@@ -2125,12 +2115,12 @@ function App() {
 
       const newLinks = links.map(l => {
         if (l.categoryId !== fromCategoryId) return l;
-        return {
-          ...l,
-          categoryId: toCategoryId,
-          subCategoryId: newSubId,
-          additionalCategoryIds: (l.additionalCategoryIds || []).filter(categoryId => categoryId !== toCategoryId)
-        };
+         return normalizeLinkCategoryLocations({
+           ...l,
+           categoryId: toCategoryId,
+           subCategoryId: newSubId,
+           additionalCategoryLocations: getAdditionalLocations(l).filter(location => location.categoryId !== toCategoryId)
+         }, newCats);
       });
 
       setUnlockedCategoryIds(prev => {
@@ -2163,22 +2153,20 @@ function App() {
       
       // Move links to common or first available
       const targetId = 'common'; 
-      const newLinks = links.map(link => {
+       const newLinks = links.map(link => {
         if (link.categoryId === catId) {
-          const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== targetId);
-          return {
+          return normalizeLinkCategoryLocations({
             ...link,
             categoryId: targetId,
             subCategoryId: undefined,
-            additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
-          };
+            additionalCategoryLocations: getAdditionalLocations(link).filter(location => location.categoryId !== targetId && location.categoryId !== catId)
+          }, newCats);
         }
 
-        const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== catId);
-        return {
+        return normalizeLinkCategoryLocations({
           ...link,
-          additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
-        };
+          additionalCategoryLocations: getAdditionalLocations(link).filter(location => location.categoryId !== catId)
+        }, newCats);
       });
       
       updateData(newLinks, newCats);
@@ -2559,9 +2547,15 @@ function App() {
 
       stats[link.categoryId].totalCount += 1;
 
-      (link.additionalCategoryIds || []).forEach(categoryId => {
-        if (!stats[categoryId] || isCategoryLocked(categoryId)) return;
-        stats[categoryId].totalCount += 1;
+      getAdditionalLocations(link).forEach(location => {
+        if (!stats[location.categoryId] || isCategoryLocked(location.categoryId)) return;
+        stats[location.categoryId].totalCount += 1;
+        if (location.subCategoryId && categorySubCategoryIds.get(location.categoryId)?.has(location.subCategoryId)) {
+          stats[location.categoryId].subCategoryCounts[location.subCategoryId] =
+            (stats[location.categoryId].subCategoryCounts[location.subCategoryId] || 0) + 1;
+        } else {
+          stats[location.categoryId].unassignedCount += 1;
+        }
       });
 
       const validSubCategoryIds = categorySubCategoryIds.get(link.categoryId);
@@ -2600,18 +2594,24 @@ function App() {
         const currentCategory = categories.find(category => category.id === selectedCategory);
         const validSubCategoryIds = new Set((currentCategory?.subcategories || []).map(subCategory => subCategory.id));
         result = result.filter(link => (
-          isLinkSecondaryInCategory(link, selectedCategory) ||
-          !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId)
+          (isLinkSecondaryInCategory(link, selectedCategory)
+            ? !getAdditionalLocations(link).some(location => location.categoryId === selectedCategory && location.subCategoryId)
+            : !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId))
         ));
       } else if (selectedSubCategory) {
         result = result.filter(l => (
-          isLinkSecondaryInCategory(l, selectedCategory) || l.subCategoryId === selectedSubCategory
+          isLinkInSubCategory(l, selectedCategory, selectedSubCategory)
+        ));
+      } else if (selectedCategory !== 'all') {
+        result = result.filter(link => (
+          link.categoryId === selectedCategory ||
+          !getAdditionalLocations(link).some(location => location.categoryId === selectedCategory && location.subCategoryId)
         ));
       }
     }
     
     // 按照order字段升序排序；没有order的旧数据按创建时间兜底。
-    return sortLinksByDisplayOrder(result);
+    return sortLinksByDisplayOrder(result, selectedCategory !== 'all' ? selectedCategory : undefined, selectedSubCategory);
   }, [links, selectedCategory, selectedSubCategory, searchQuery, categories, unlockedCategoryIds]);
 
   const searchResultGroups = useMemo<Array<{
@@ -2691,7 +2691,7 @@ function App() {
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: link.id, disabled: isSecondaryView });
+    } = useSortable({ id: link.id, disabled: isSecondaryView && isSortingMode !== selectedCategory });
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
@@ -2736,6 +2736,13 @@ function App() {
           >
             重复
           </div>
+        )}
+        {isSecondaryView && (
+          <div
+            className="absolute right-2 top-2 z-20 h-0 w-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-blue-500 drop-shadow-sm"
+            title={`主分类：${getLinkLocationText(link)}`}
+            aria-label={`主分类：${getLinkLocationText(link)}`}
+          />
         )}
         {/* 链接内容 - 移除a标签，改为div防止点击跳转 */}
         <div className={`flex flex-1 min-w-0 overflow-hidden ${
@@ -2795,7 +2802,7 @@ function App() {
     const isSecondaryView = selectedCategory !== 'all' && !isSearchActive && isLinkSecondaryInCategory(link, selectedCategory);
     const locationText = isSearchActive
       ? getLinkCategorySummary(link)
-      : isSecondaryView
+      : isDetailedView && isSecondaryView
         ? `主分类：${getLinkLocationText(link)}`
         : '';
 
@@ -2838,6 +2845,13 @@ function App() {
           >
             重复
           </div>
+        )}
+        {isSecondaryView && (
+          <div
+            className="absolute right-2 top-2 z-20 h-0 w-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-blue-500 drop-shadow-sm"
+            title={`主分类：${getLinkLocationText(link)}`}
+            aria-label={`主分类：${getLinkLocationText(link)}`}
+          />
         )}
         {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
         {isBatchSelectionMode ? (
