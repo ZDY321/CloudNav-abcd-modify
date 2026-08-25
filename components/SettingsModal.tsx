@@ -916,6 +916,7 @@ function notify(title, message) {
         .form-textarea { min-height: 64px; resize: vertical; }
         .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
         .additional-category-toggle { list-style: none; cursor: pointer; user-select: none; }
+        .additional-category-toggle .alt-url-hint { margin-top: 0; }
         .additional-category-toggle::-webkit-details-marker { display: none; }
         .additional-category-toggle::after { content: "展开"; margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 600; }
         #additionalCategoryWrap[open] .additional-category-toggle::after { content: "收起"; }
