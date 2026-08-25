@@ -1,41 +1,36 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/jszip.min-CLqR4n9G.js","assets/index-sSqCuR1D.js","assets/index-CRFdxfRK.css"])))=>i.map(i=>d[i]);
-import{g as b,r as o,N as U,j as e,O as fe,Q as ke,X,I as ve,n as ye,G as ee,d as we,R as Ce,V as Ie,w as te,Y as ae,H as B,Z as Se,$ as je,a0 as Ue,B as Le,_ as ne}from"./index-sSqCuR1D.js";import{I as Me}from"./IconSelector-B5HLEvcr.js";/**
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/jszip.min-B_45_Y5Q.js","assets/index-0UG25una.js","assets/index-CSycRMXG.css"])))=>i.map(i=>d[i]);
+import{i as U,r as l,R as S,j as e,V as fe,Y as ye,X as ee,z as $,I as ke,q as ve,G as te,Z as Ce,e as we,$ as Ie,a0 as Le,a1 as ae,M as B,a2 as Se,a3 as Ue,a4 as je,J as Ae,_ as ne}from"./index-0UG25una.js";import{I as Me}from"./IconSelector-C4asJley.js";/**
  * @license lucide-react v0.554.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ne=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["line",{x1:"10",x2:"10",y1:"15",y2:"9",key:"c1nkhi"}],["line",{x1:"14",x2:"14",y1:"15",y2:"9",key:"h65svq"}]],Ee=b("circle-pause",Ne);/**
+ */const Ne=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["line",{x1:"10",x2:"10",y1:"15",y2:"9",key:"c1nkhi"}],["line",{x1:"14",x2:"14",y1:"15",y2:"9",key:"h65svq"}]],Ee=U("circle-pause",Ne);/**
  * @license lucide-react v0.554.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ae=[["path",{d:"m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4",key:"g0fldk"}],["path",{d:"m21 2-9.6 9.6",key:"1j0ho8"}],["circle",{cx:"7.5",cy:"15.5",r:"5.5",key:"yqb3hr"}]],Te=b("key",Ae);/**
+ */const Re=[["path",{d:"m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4",key:"g0fldk"}],["path",{d:"m21 2-9.6 9.6",key:"1j0ho8"}],["circle",{cx:"7.5",cy:"15.5",r:"5.5",key:"yqb3hr"}]],Te=U("key",Re);/**
  * @license lucide-react v0.554.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Re=[["path",{d:"M10 8h.01",key:"1r9ogq"}],["path",{d:"M12 12h.01",key:"1mp3jc"}],["path",{d:"M14 8h.01",key:"1primd"}],["path",{d:"M16 12h.01",key:"1l6xoz"}],["path",{d:"M18 8h.01",key:"emo2bl"}],["path",{d:"M6 8h.01",key:"x9i8wu"}],["path",{d:"M7 16h10",key:"wp8him"}],["path",{d:"M8 12h.01",key:"czm47f"}],["rect",{width:"20",height:"16",x:"2",y:"4",rx:"2",key:"18n3k1"}]],Be=b("keyboard",Re);/**
+ */const $e=[["path",{d:"M10 8h.01",key:"1r9ogq"}],["path",{d:"M12 12h.01",key:"1mp3jc"}],["path",{d:"M14 8h.01",key:"1primd"}],["path",{d:"M16 12h.01",key:"1l6xoz"}],["path",{d:"M18 8h.01",key:"emo2bl"}],["path",{d:"M6 8h.01",key:"x9i8wu"}],["path",{d:"M7 16h10",key:"wp8him"}],["path",{d:"M8 12h.01",key:"czm47f"}],["rect",{width:"20",height:"16",x:"2",y:"4",rx:"2",key:"18n3k1"}]],Be=U("keyboard",$e);/**
  * @license lucide-react v0.554.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const _e=[["rect",{width:"18",height:"7",x:"3",y:"3",rx:"1",key:"f1a2em"}],["rect",{width:"9",height:"7",x:"3",y:"14",rx:"1",key:"jqznyg"}],["rect",{width:"5",height:"7",x:"16",y:"14",rx:"1",key:"q5h2i8"}]],ze=b("layout-template",_e);/**
- * @license lucide-react v0.554.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */const $e=[["path",{d:"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8",key:"v9h5vc"}],["path",{d:"M21 3v5h-5",key:"1q7to0"}],["path",{d:"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16",key:"3uifl3"}],["path",{d:"M8 16H3v5",key:"1cv678"}]],De=b("refresh-cw",$e),Pe=()=>{const c=Math.floor(Math.random()*360),m=70+Math.random()*20,p=45+Math.random()*15;return`hsl(${c}, ${m}%, ${p}%)`},He=(c,m,p)=>{let d="";c&&c.length>0?(d=c.charAt(0),/^[a-zA-Z]$/.test(d)&&(d="云")):d="云";const f="g_"+Math.random().toString(36).substr(2,9),k=`
+ */const _e=[["rect",{width:"18",height:"7",x:"3",y:"3",rx:"1",key:"f1a2em"}],["rect",{width:"9",height:"7",x:"3",y:"14",rx:"1",key:"jqznyg"}],["rect",{width:"5",height:"7",x:"16",y:"14",rx:"1",key:"q5h2i8"}]],ze=U("layout-template",_e),Pe=()=>{const d=Math.floor(Math.random()*360),m=70+Math.random()*20,p=45+Math.random()*15;return`hsl(${d}, ${m}%, ${p}%)`},De=(d,m,p)=>{let c="";d&&d.length>0?(c=d.charAt(0),/^[a-zA-Z]$/.test(c)&&(c="云")):c="云";const h="g_"+Math.random().toString(36).substr(2,9),f=`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
         <defs>
-            <linearGradient id="${f}" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id="${h}" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="${m}"/>
                 <stop offset="100%" stop-color="${p}"/>
             </linearGradient>
         </defs>
-        <rect width="100%" height="100%" fill="url(#${f})" rx="16"/>
-        <text x="50%" y="50%" dy=".35em" fill="white" font-family="Arial, sans-serif" font-weight="bold" font-size="32" text-anchor="middle">${d}</text>
-    </svg>`.trim();try{return`data:image/svg+xml;base64,${window.btoa(unescape(encodeURIComponent(k)))}`}catch(L){return console.error("SVG Icon Generation Failed",L),""}},Ke=({isOpen:c,onClose:m,config:p,siteSettings:d,onSave:f,links:k,categories:L,onUpdateLinks:re,authToken:M})=>{const[v,ie]=o.useState("site"),[u,_]=o.useState(p),[l,z]=o.useState(()=>U(d)),[$,se]=o.useState([]),[oe,y]=o.useState(!1),[w,N]=o.useState({current:0,total:0}),C=o.useRef(!1),[E,le]=o.useState(""),[A,D]=o.useState(!1),[P,ce]=o.useState(""),[x,H]=o.useState("chrome"),[O,T]=o.useState(!1),[de,I]=o.useState(!1),[R,F]=o.useState({}),K=t=>{const a=[];for(let n=0;n<6;n++){const r=Pe(),s=`hsl(${(parseInt(r.split(",")[0].split("(")[1])+30+Math.random()*30)%360}, 70%, 50%)`;a.push(He(t,r,s))}se(a)};o.useEffect(()=>{if(c){_(p);const t=U(d);z(t),$.length===0&&K(t.navTitle),y(!1),T(!1),N({current:0,total:0}),C.current=!1,D(!1),I(!1),ce(window.location.origin);const a=localStorage.getItem("cloudnav_auth_token");a&&le(a)}},[c,p,d]);const S=(t,a)=>{_(n=>({...n,[t]:a}))},g=async(t,a)=>{z(n=>{const r={...n,[t]:a};return t==="passwordExpiryDays"&&M&&G(U(r)),r})},G=async t=>{try{const a=await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json","x-auth-password":M||""},body:JSON.stringify({saveConfig:"website",config:t})});a.ok||console.error("Failed to save website config to KV:",a.statusText)}catch(a){console.error("Error saving website config to KV:",a)}},ue=()=>{const t=U(l);f(u,t),M&&G(t),m()},pe=async()=>{if(!u.apiKey){alert("请先配置并保存 API Key");return}const t=k.filter(r=>!r.description);if(t.length===0){alert("所有链接都已有描述！");return}if(!confirm(`发现 ${t.length} 个链接缺少描述，确定要使用 AI 自动生成吗？这可能需要一些时间。`))return;y(!0),C.current=!1,N({current:0,total:t.length});let a=[...k];const{generateLinkDescription:n}=await ne(async()=>{const{generateLinkDescription:r}=await import("./geminiService-p6bqhxgA.js");return{generateLinkDescription:r}},[]);for(let r=0;r<t.length&&!C.current;r++){const i=t[r];try{const s=await n(i.title,i.url,u);a=a.map(h=>h.id===i.id?{...h,description:s}:h),re(a),N({current:r+1,total:t.length})}catch(s){console.error(`Failed to generate for ${i.title}`,s)}}y(!1)},q=(t,a)=>{navigator.clipboard.writeText(t),F(n=>({...n,[a]:!0})),setTimeout(()=>{F(n=>({...n,[a]:!1}))},2e3)},ge=(t,a)=>{const n=new Blob([a],{type:"text/plain;charset=utf-8"}),r=URL.createObjectURL(n),i=document.createElement("a");i.href=r,i.download=t,document.body.appendChild(i),i.click(),document.body.removeChild(i),URL.revokeObjectURL(r)},V=()=>{const t={manifest_version:3,name:(l.navTitle||"CloudNav")+" Pro",version:"7.6",minimum_chrome_version:"116",description:"CloudNav - 极速侧边栏与智能收藏",permissions:["activeTab","scripting","sidePanel","storage","favicon","contextMenus","notifications","tabs"],background:{service_worker:"background.js"},action:{default_title:"打开侧边栏 (Ctrl+Shift+E)"},side_panel:{default_path:"sidebar.html"},icons:{128:"icon.png"},commands:{_execute_action:{suggested_key:{default:"Ctrl+Shift+E",mac:"Command+Shift+E"},description:"打开 CloudNav 侧边栏"}}};return x==="firefox"&&(t.browser_specific_settings={gecko:{id:"cloudnav@example.com",strict_min_version:"109.0"}}),JSON.stringify(t,null,2)},W=JSON.stringify({apiBase:P,appUrl:typeof window<"u"?`${window.location.origin}${window.location.pathname}`:"",password:E}),J=`// background.js - CloudNav Assistant v7.6
-const CONFIG = ${W};
+        <rect width="100%" height="100%" fill="url(#${h})" rx="16"/>
+        <text x="50%" y="50%" dy=".35em" fill="white" font-family="Arial, sans-serif" font-weight="bold" font-size="32" text-anchor="middle">${c}</text>
+    </svg>`.trim();try{return`data:image/svg+xml;base64,${window.btoa(unescape(encodeURIComponent(f)))}`}catch(j){return console.error("SVG Icon Generation Failed",j),""}},Fe=({isOpen:d,onClose:m,config:p,siteSettings:c,onSave:h,links:f,categories:j,onUpdateLinks:re,authToken:A})=>{const[y,ie]=l.useState("site"),[u,_]=l.useState(p),[o,z]=l.useState(()=>S(c)),[P,oe]=l.useState([]),[se,k]=l.useState(!1),[v,M]=l.useState({current:0,total:0}),C=l.useRef(!1),[N,le]=l.useState(""),[E,D]=l.useState(!1),[H,de]=l.useState(""),[b,O]=l.useState("chrome"),[F,R]=l.useState(!1),[ce,w]=l.useState(!1),[T,K]=l.useState({}),q=t=>{const a=[];for(let n=0;n<6;n++){const r=Pe(),s=`hsl(${(parseInt(r.split(",")[0].split("(")[1])+30+Math.random()*30)%360}, 70%, 50%)`;a.push(De(t,r,s))}oe(a)};l.useEffect(()=>{if(d){_(p);const t=S(c);z(t),P.length===0&&q(t.navTitle),k(!1),R(!1),M({current:0,total:0}),C.current=!1,D(!1),w(!1),de(window.location.origin);const a=localStorage.getItem("cloudnav_auth_token");a&&le(a)}},[d,p,c]);const I=(t,a)=>{_(n=>({...n,[t]:a}))},g=async(t,a)=>{z(n=>{const r={...n,[t]:a};return t==="passwordExpiryDays"&&A&&G(S(r)),r})},G=async t=>{try{const a=await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json","x-auth-password":A||""},body:JSON.stringify({saveConfig:"website",config:t})});a.ok||console.error("Failed to save website config to KV:",a.statusText)}catch(a){console.error("Error saving website config to KV:",a)}},ue=()=>{const t=S(o);h(u,t),A&&G(t),m()},ge=async()=>{if(!u.apiKey){alert("请先配置并保存 API Key");return}const t=f.filter(r=>!r.description);if(t.length===0){alert("所有链接都已有描述！");return}if(!confirm(`发现 ${t.length} 个链接缺少描述，确定要使用 AI 自动生成吗？这可能需要一些时间。`))return;k(!0),C.current=!1,M({current:0,total:t.length});let a=[...f];const{generateLinkDescription:n}=await ne(async()=>{const{generateLinkDescription:r}=await import("./geminiService-p6bqhxgA.js");return{generateLinkDescription:r}},[]);for(let r=0;r<t.length&&!C.current;r++){const i=t[r];try{const s=await n(i.title,i.url,u);a=a.map(x=>x.id===i.id?{...x,description:s}:x),re(a),M({current:r+1,total:t.length})}catch(s){console.error(`Failed to generate for ${i.title}`,s)}}k(!1)},W=(t,a)=>{navigator.clipboard.writeText(t),K(n=>({...n,[a]:!0})),setTimeout(()=>{K(n=>({...n,[a]:!1}))},2e3)},pe=(t,a)=>{const n=new Blob([a],{type:"text/plain;charset=utf-8"}),r=URL.createObjectURL(n),i=document.createElement("a");i.href=r,i.download=t,document.body.appendChild(i),i.click(),document.body.removeChild(i),URL.revokeObjectURL(r)},V=()=>{const t={manifest_version:3,name:(o.navTitle||"CloudNav")+" Pro",version:"7.6",minimum_chrome_version:"116",description:"CloudNav - 极速侧边栏与智能收藏",permissions:["activeTab","scripting","sidePanel","storage","favicon","contextMenus","notifications","tabs"],background:{service_worker:"background.js"},action:{default_title:"打开侧边栏 (Ctrl+Shift+E)"},side_panel:{default_path:"sidebar.html"},icons:{128:"icon.png"},commands:{_execute_action:{suggested_key:{default:"Ctrl+Shift+E",mac:"Command+Shift+E"},description:"打开 CloudNav 侧边栏"}}};return b==="firefox"&&(t.browser_specific_settings={gecko:{id:"cloudnav@example.com",strict_min_version:"109.0"}}),JSON.stringify(t,null,2)},J=JSON.stringify({apiBase:H,appUrl:typeof window<"u"?`${window.location.origin}${window.location.pathname}`:"",password:N}),Z=`// background.js - CloudNav Assistant v7.6
+const CONFIG = ${J};
 
 let linkCache = [];
 let categoryCache = [];
@@ -167,30 +162,50 @@ function buildMenus() {
             categoryCache.forEach(cat => {
                 // 创建一级分类菜单
                 chrome.contextMenus.create({
-                    id: \`save_to_\${cat.id}\`,
+                    id: \`save_to::\${encodeURIComponent(cat.id)}\`,
                     parentId: "cloudnav_root",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
                 chrome.contextMenus.create({
-                    id: \`pin_to_\${cat.id}\`,
+                    id: \`pin_to::\${encodeURIComponent(cat.id)}\`,
                     parentId: "cloudnav_root_pin",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
                 
+                // 附加分类也作为可选目标；服务端会保留当前主分类并写入附加分类
+                if (categoryCache.length > 1) {
+                    categoryCache.filter(additionalCat => additionalCat.id !== cat.id).forEach(additionalCat => {
+                        chrome.contextMenus.create({
+                            id: \`save_to::\${encodeURIComponent(cat.id)}::additional::\${encodeURIComponent(additionalCat.id)}\`,
+                            parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
+                            title: \`附加到：\${additionalCat.name}\`,
+                            contexts: ["page", "link", "action"]
+                        });
+                        (additionalCat.subcategories || []).forEach(additionalSubCat => {
+                            chrome.contextMenus.create({
+                                id: \`save_to::\${encodeURIComponent(cat.id)}::additionalSub::\${encodeURIComponent(additionalCat.id)}::\${encodeURIComponent(additionalSubCat.id)}\`,
+                                parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
+                                title: \`附加到：\${additionalCat.name} / \${additionalSubCat.name}\`,
+                                contexts: ["page", "link", "action"]
+                            });
+                        });
+                    });
+                }
+
                 // 如果有二级分类，创建子菜单
                 if (cat.subcategories && cat.subcategories.length > 0) {
                     cat.subcategories.forEach(subCat => {
                         chrome.contextMenus.create({
-                            id: \`save_to_\${cat.id}_\${subCat.id}\`,
-                            parentId: \`save_to_\${cat.id}\`,
+                            id: \`save_to::\${encodeURIComponent(cat.id)}::sub::\${encodeURIComponent(subCat.id)}\`,
+                            parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
                             title: subCat.name,
                             contexts: ["page", "link", "action"]
                         });
                         chrome.contextMenus.create({
-                            id: \`pin_to_\${cat.id}_\${subCat.id}\`,
-                            parentId: \`pin_to_\${cat.id}\`,
+                            id: \`pin_to::\${encodeURIComponent(cat.id)}::sub::\${encodeURIComponent(subCat.id)}\`,
+                            parentId: \`pin_to::\${encodeURIComponent(cat.id)}\`,
                             title: subCat.name,
                             contexts: ["page", "link", "action"]
                         });
@@ -199,13 +214,13 @@ function buildMenus() {
             });
         } else {
             chrome.contextMenus.create({
-                id: "save_to_common",
+                id: "save_to::common",
                 parentId: "cloudnav_root",
                 title: "默认分类",
                 contexts: ["page", "link", "action"]
             });
             chrome.contextMenus.create({
-                id: "pin_to_common",
+                id: "pin_to::common",
                 parentId: "cloudnav_root_pin",
                 title: "默认分类",
                 contexts: ["page", "link", "action"]
@@ -476,24 +491,30 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (String(info.menuItemId).startsWith("save_to_")) {
-        const idParts = String(info.menuItemId).replace("save_to_", "").split("_");
-        const catId = idParts[0];
-        const subCatId = idParts.length > 1 ? idParts[1] : null;
+    if (String(info.menuItemId).startsWith("save_to::")) {
+        const idParts = String(info.menuItemId).replace("save_to::", "").split("::");
+        const catId = decodeURIComponent(idParts[0] || '');
+        const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const additionalSubCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[3] || '') : null;
+        const additionalSubCategoryCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[2] || '') : null;
+        const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId);
-    } else if (String(info.menuItemId).startsWith("pin_to_")) {
-        const idParts = String(info.menuItemId).replace("pin_to_", "").split("_");
-        const catId = idParts[0];
-        const subCatId = idParts.length > 1 ? idParts[1] : null;
+        saveLink(title, url, catId, subCatId, '', undefined, additionalCategoryId ? [{ categoryId: additionalCategoryId }] : (additionalSubCategoryCategoryId ? [{ categoryId: additionalSubCategoryCategoryId, subCategoryId: additionalSubCategoryId }] : []));
+    } else if (String(info.menuItemId).startsWith("pin_to::")) {
+        const idParts = String(info.menuItemId).replace("pin_to::", "").split("::");
+        const catId = decodeURIComponent(idParts[0] || '');
+        const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const additionalSubCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[3] || '') : null;
+        const additionalSubCategoryCategoryId = idParts[1] === 'additionalSub' ? decodeURIComponent(idParts[2] || '') : null;
+        const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId, '', true);
+        saveLink(title, url, catId, subCatId, '', true, additionalCategoryId ? [{ categoryId: additionalCategoryId }] : (additionalSubCategoryCategoryId ? [{ categoryId: additionalSubCategoryCategoryId, subCategoryId: additionalSubCategoryId }] : []));
     }
 });
 
-async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined) {
+async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined, additionalCategoryLocations = []) {
     if (!CONFIG.password) {
         notify('保存失败', '未配置密码，请先在侧边栏登录。');
         return;
@@ -501,6 +522,21 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
 
     const matchedLink = findExactLinkByUrl(url);
     const requestUrl = matchedLink && matchedLink.url ? matchedLink.url : url;
+    // When the context-menu action explicitly adds a secondary category,
+    // keep an existing link's primary category unchanged.
+    const primaryCategoryId = matchedLink && Array.isArray(additionalCategoryLocations) && additionalCategoryLocations.length > 0
+        ? matchedLink.categoryId
+        : categoryId;
+    const existingLocations = matchedLink && Array.isArray(matchedLink.additionalCategoryLocations)
+        ? matchedLink.additionalCategoryLocations
+        : (matchedLink && Array.isArray(matchedLink.additionalCategoryIds) ? matchedLink.additionalCategoryIds.map(categoryId => ({ categoryId })) : []);
+    const nextAdditionalCategoryLocations = [...existingLocations, ...(Array.isArray(additionalCategoryLocations) ? additionalCategoryLocations : [])]
+        .filter(location => location && location.categoryId && location.categoryId !== primaryCategoryId)
+        .filter((location, index, all) => all.findIndex(item => item.categoryId === location.categoryId && (item.subCategoryId || '') === (location.subCategoryId || '')) === index);
+    const nextAdditionalCategoryIds = Array.from(new Set(nextAdditionalCategoryLocations.map(location => location.categoryId)));
+    const nextSubCategoryId = matchedLink && Array.isArray(additionalCategoryLocations) && additionalCategoryLocations.length > 0
+        ? (matchedLink.subCategoryId || null)
+        : subCategoryId;
 
     if (!icon && matchedLink && matchedLink.icon) {
         icon = matchedLink.icon;
@@ -517,8 +553,10 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
         const payload = {
             title: title || '未命名',
             url: requestUrl,
-            categoryId: categoryId,
-            subCategoryId: subCategoryId,
+            categoryId: primaryCategoryId,
+            subCategoryId: nextSubCategoryId,
+            additionalCategoryLocations: nextAdditionalCategoryLocations,
+            additionalCategoryIds: nextAdditionalCategoryIds,
             icon: icon
         };
 
@@ -543,13 +581,15 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
                     ...link,
                     title: title || link.title,
                     url: requestUrl,
-                    categoryId,
-                    subCategoryId: subCategoryId || undefined,
+                    categoryId: primaryCategoryId,
+                    subCategoryId: nextSubCategoryId || undefined,
+                    additionalCategoryLocations: nextAdditionalCategoryLocations.length > 0 ? nextAdditionalCategoryLocations : undefined,
+                    additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined,
                     icon,
                     pinned: typeof pinned === 'boolean' ? pinned : link.pinned
                 } : link);
             } else {
-                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId, subCategoryId: subCategoryId || undefined, icon, pinned: pinned === true };
+                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId: primaryCategoryId, subCategoryId: nextSubCategoryId || undefined, additionalCategoryLocations: nextAdditionalCategoryLocations.length > 0 ? nextAdditionalCategoryLocations : undefined, additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined, icon, pinned: pinned === true };
                 linkCache.unshift(newLink);
             }
             refreshActiveTabUi();
@@ -570,7 +610,7 @@ function notify(title, message) {
         priority: 1
     });
 }
-`,Z=`<!DOCTYPE html>
+`,Y=`<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -633,6 +673,16 @@ function notify(title, message) {
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
         .form-textarea { min-height: 64px; resize: vertical; }
         .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+        .additional-category-toggle { list-style: none; cursor: pointer; user-select: none; }
+        .additional-category-toggle::-webkit-details-marker { display: none; }
+        .additional-category-toggle::after { content: "展开"; margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 600; }
+        #additionalCategoryWrap[open] .additional-category-toggle::after { content: "收起"; }
+        .additional-category-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .additional-category-option { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; }
+        .additional-category-option label { display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; }
+        .additional-category-sub { width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 11px; }
+        .additional-category-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .additional-category-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .form-toggle input { margin: 0; }
         .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .primary-btn, .secondary-btn { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
@@ -673,7 +723,8 @@ function notify(title, message) {
         .url-input-row .form-input { flex: 1; min-width: 0; }
         .alt-url-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .alt-url-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
-        .alt-url-grid { display: grid; grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.8fr) 32px 32px; gap: 6px; align-items: center; }
+        .alt-url-grid { display: grid; grid-template-columns: minmax(96px, 0.95fr) minmax(0, 1.8fr) 32px 32px; gap: 6px; align-items: center; }
+        .alt-url-label-select { cursor: pointer; }
         .alt-url-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
         .alt-url-default { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
         .alt-url-default input { margin: 0; }
@@ -694,6 +745,7 @@ function notify(title, message) {
         .link-icon img { width: 100%; height: 100%; object-fit: contain; }
         .link-info { min-width: 0; flex: 1; }
         .link-title { font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .link-meta { margin-top: 2px; color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .empty { text-align: center; padding: 20px; color: var(--muted); font-size: 12px; }
         .loading { display: flex; justify-content: center; padding: 40px; color: var(--accent); font-size: 12px; }
     </style>
@@ -733,6 +785,7 @@ function notify(title, message) {
         <div class="form-row"><textarea id="pageDescription" class="form-textarea" placeholder="网页描述（可选）"></textarea></div>
         <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
         <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
+        <details class="form-row" id="additionalCategoryWrap" style="display:none;"><summary class="form-row-head additional-category-toggle"><span>附加分类</span><span class="alt-url-hint">网站仍归属于主分类</span></summary><div id="additionalCategoryOptions" class="additional-category-options"></div></details>
         <div class="form-row"><input id="pageIcon" class="form-input" type="text" placeholder="图标地址（可选）"></div>
         <div class="form-row">
             <label class="form-toggle" title="置顶后会显示在首页顶部的「置顶/常用」区域">
@@ -750,8 +803,10 @@ function notify(title, message) {
     </div>
     <script src="sidebar.js"><\/script>
 </body>
-</html>`,Y=`const CONFIG = ${W};
+</html>`,X=`const CONFIG = ${J};
 const CACHE_KEY = 'cloudnav_data';
+const ALT_URL_LABELS = ['主站', '备用站', '主题贴', '镜像站', '发布页', '官网', '下载页', '文档', 'API'];
+const DEFAULT_ALT_URL_LABEL = '主题贴';
 
 let port = null;
 try {
@@ -786,6 +841,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const categorySelect = document.getElementById('pageCategory');
     const subCategoryWrap = document.getElementById('subCategoryWrap');
     const subCategorySelect = document.getElementById('pageSubCategory');
+    const additionalCategoryWrap = document.getElementById('additionalCategoryWrap');
+    const additionalCategoryOptions = document.getElementById('additionalCategoryOptions');
     const addAltUrlBtn = document.getElementById('addAltUrl');
     const altUrlList = document.getElementById('altUrlList');
     const iconInput = document.getElementById('pageIcon');
@@ -826,6 +883,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             !categorySelect ||
             !subCategoryWrap ||
             !subCategorySelect ||
+            !additionalCategoryWrap ||
+            !additionalCategoryOptions ||
             !addAltUrlBtn ||
             !altUrlList ||
             !iconInput ||
@@ -840,7 +899,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allCategories = [];
     let expandedCats = new Set();
     let currentAltUrls = [];
+    let customAltLabelIds = new Set();
     let editingLinkId = '';
+    let currentAdditionalCategoryLocations = [];
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
     let currentExistingRecordState = { groups: [], total: 0, primaryLink: null };
@@ -1292,9 +1353,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return category.subcategories.find(sub => sub.id === subCategoryId) || null;
     };
 
+    const normalizeAltLabel = (value = '', fallback = DEFAULT_ALT_URL_LABEL) => {
+        const label = String(value || '').trim();
+        return label || fallback;
+    };
+
     const createAltUrlItem = (item = {}) => ({
         id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
-        label: typeof (item && item.label) === 'string' && item.label.trim() ? item.label.trim() : '备用站',
+        label: normalizeAltLabel(item && item.label),
         url: typeof (item && item.url) === 'string' ? item.url : '',
         isDefault: !!(item && item.isDefault)
     });
@@ -1330,7 +1396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const nextItem = {
                 id: item && item.id ? String(item.id) : ('url_' + Date.now() + '_' + index),
-                label: String(item && item.label ? item.label : '备用站').trim() || '备用站',
+                label: normalizeAltLabel(item && item.label),
                 url: finalUrl
             };
 
@@ -1344,8 +1410,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, []);
     };
 
+    const renderAltLabelControl = (item = {}) => {
+        const rawLabel = String(item && item.label ? item.label : '').trim();
+        const label = normalizeAltLabel(rawLabel);
+        const isCustomLabel = customAltLabelIds.has(item.id) || !ALT_URL_LABELS.includes(label);
+
+        if (isCustomLabel) {
+            const inputValue = customAltLabelIds.has(item.id) && !rawLabel ? '' : label;
+            return \`<input class="form-input alt-url-label" type="text" value="\${escapeHtml(inputValue)}" placeholder="输入自定义标签">\`;
+        }
+
+        return \`<select class="form-input alt-url-label-select" title="选择标签">\${ALT_URL_LABELS.map(option => \`<option value="\${escapeHtml(option)}" \${option === label ? 'selected' : ''}>\${escapeHtml(option)}</option>\`).join('')}<option value="__custom__">自定义...</option></select>\`;
+    };
+
     const setAltUrls = (items = []) => {
         const nextItems = Array.isArray(items) ? items.map(createAltUrlItem) : [];
+        const nextIds = new Set(nextItems.map(item => item.id));
+        customAltLabelIds = new Set([...customAltLabelIds].filter(id => nextIds.has(id)));
         const defaultIndex = nextItems.findIndex(item => item.isDefault);
 
         currentAltUrls = nextItems.map((item, index) => ({
@@ -1363,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         altUrlList.innerHTML = currentAltUrls.map(item => \`
             <div class="alt-url-item" data-id="\${escapeHtml(item.id)}">
                 <div class="alt-url-grid">
-                    <input class="form-input alt-url-label" type="text" value="\${escapeHtml(item.label || '')}" placeholder="标签">
+                    \${renderAltLabelControl(item)}
                     <input class="form-input alt-url-url" type="text" value="\${escapeHtml(item.url || '')}" placeholder="备用网址">
                     <button class="icon-btn alt-url-open" type="button" title="直达打开">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
@@ -1435,6 +1516,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextCategoryId = link.categoryId || categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         renderCategoryOptions(nextCategoryId);
         renderSubCategoryOptions(nextCategoryId, link.subCategoryId || '');
+        renderAdditionalCategoryOptions(Array.isArray(link.additionalCategoryLocations)
+            ? link.additionalCategoryLocations
+            : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId })));
         syncSaveActionLabel();
         setStatus(statusText, 'success');
         updateDuplicateState();
@@ -1475,6 +1559,47 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? selectedSubCategoryId
             : '';
     };
+
+    const renderAdditionalCategoryOptions = (selectedLocations = currentAdditionalCategoryLocations) => {
+        const primaryCategoryId = categorySelect.value;
+        const availableCategories = allCategories.filter(cat => cat.id !== primaryCategoryId);
+        currentAdditionalCategoryLocations = (selectedLocations || []).reduce((result, location) => {
+            const categoryId = location && location.categoryId;
+            const subCategoryId = location && location.subCategoryId;
+            const category = availableCategories.find(cat => cat.id === categoryId);
+            const validSub = category && Array.isArray(category.subcategories) && category.subcategories.some(sub => sub.id === subCategoryId);
+            const normalized = category ? { categoryId, ...(validSub ? { subCategoryId } : {}) } : null;
+            const key = normalized ? categoryId + '::' + (normalized.subCategoryId || '') : '';
+            if (!normalized || result.some(item => item.categoryId + '::' + (item.subCategoryId || '') === key)) return result;
+            result.push(normalized);
+            return result;
+        }, []);
+
+        if (availableCategories.length === 0) {
+            additionalCategoryWrap.style.display = 'none';
+            additionalCategoryOptions.innerHTML = '';
+            return;
+        }
+
+        additionalCategoryWrap.style.display = 'block';
+        additionalCategoryOptions.innerHTML = availableCategories.map(cat => {
+            const locations = currentAdditionalCategoryLocations.filter(location => location.categoryId === cat.id);
+            const checked = locations.length > 0;
+            const selectedSub = locations.find(location => location.subCategoryId)?.subCategoryId || '';
+            const subOptions = Array.isArray(cat.subcategories) && cat.subcategories.length
+                ? \`<select class="additional-category-sub" data-additional-category-sub="\${escapeHtml(cat.id)}"><option value="">附加到一级分类主列表</option>\${cat.subcategories.map(sub => \`<option value="\${escapeHtml(sub.id)}" \${sub.id === selectedSub ? 'selected' : ''}>附加到：\${escapeHtml(sub.name)}</option>\`).join('')}</select>\`
+                : '';
+            return \`<div class="additional-category-option"><label><input type="checkbox" data-additional-category-id="\${escapeHtml(cat.id)}" \${checked ? 'checked' : ''}><span>\${escapeHtml(cat.name)}</span></label>\${checked ? subOptions : ''}</div>\`;
+        }).join('');
+    };
+
+    const getSelectedAdditionalCategoryLocations = () => Array.from(
+        additionalCategoryOptions.querySelectorAll('input[data-additional-category-id]:checked')
+    ).map(input => {
+        const categoryId = input.dataset.additionalCategoryId;
+        const select = categoryId ? additionalCategoryOptions.querySelector('select[data-additional-category-sub="' + CSS.escape(categoryId) + '"]') : null;
+        return categoryId ? { categoryId, ...(select && select.value ? { subCategoryId: select.value } : {}) } : null;
+    }).filter(Boolean);
 
     const updateDuplicateState = () => {
         const candidateUrls = getFormUrls();
@@ -1572,6 +1697,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nextSubCategoryId = matchState && matchState.link ? (matchState.link.subCategoryId || '') : '';
                 renderCategoryOptions(nextCategoryId);
                 renderSubCategoryOptions(nextCategoryId, nextSubCategoryId);
+                renderAdditionalCategoryOptions(matchState && matchState.link
+                    ? (matchState.link.additionalCategoryLocations || (matchState.link.additionalCategoryIds || []).map(categoryId => ({ categoryId })))
+                    : []);
                 syncSaveActionLabel();
                 setStatus(getReadCurrentStatus(matchState && matchState.type), matchState ? 'warn' : 'success');
             }
@@ -1589,7 +1717,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         allCategories.forEach(cat => {
             const catLinks = allLinks.filter(link => {
-                if (link.categoryId !== cat.id) return false;
+                const additionalLocations = Array.isArray(link.additionalCategoryLocations)
+                    ? link.additionalCategoryLocations
+                    : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId }));
+                if (link.categoryId !== cat.id && !additionalLocations.some(location => location.categoryId === cat.id)) return false;
                 if (!q) return true;
 
                 return String(link.title || '').toLowerCase().includes(q) ||
@@ -1615,12 +1746,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             catLinks.forEach(link => {
                 const openUrl = getPreferredOpenUrl(link);
                 const iconSrc = getDisplayIconUrl(openUrl || link.url);
-                const hoverTitle = link.description || openUrl || link.url || '';
+                const additionalLocations = Array.isArray(link.additionalCategoryLocations)
+                    ? link.additionalCategoryLocations
+                    : (link.additionalCategoryIds || []).map(categoryId => ({ categoryId }));
+                const currentAdditionalLocation = additionalLocations.find(location => location.categoryId === cat.id);
+                const isSecondary = link.categoryId !== cat.id;
+                const primaryLocation = getLocationText(link.categoryId, link.subCategoryId);
+                const hoverTitle = link.description || (isSecondary ? \`主分类：\${primaryLocation}\` : primaryLocation) || openUrl || link.url || '';
                 html += \`
                     <a href="\${escapeHtml(openUrl || link.url)}" target="_blank" class="link-item" title="\${escapeHtml(hoverTitle)}">
                         <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
                             <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
+                            \${isSecondary ? \`<div class="link-meta">位置：\${escapeHtml(currentAdditionalLocation && currentAdditionalLocation.subCategoryId ? getLocationText(cat.id, currentAdditionalLocation.subCategoryId) : cat.name)} · 主分类：\${escapeHtml(primaryLocation)}</div>\` : ''}
                         </div>
                     </a>
                 \`;
@@ -1656,6 +1794,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     allCategories = data.categories || [];
                     renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
                     renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
+                    renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
                     render(searchInput.value);
                     updateDuplicateState();
                     return;
@@ -1680,6 +1819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
             renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
+            renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
             render(searchInput.value);
             updateDuplicateState();
         } catch (e) {
@@ -1704,6 +1844,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const description = descriptionInput.value.trim();
         const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         const subCategoryId = subCategorySelect.value || '';
+        const additionalCategoryLocations = getSelectedAdditionalCategoryLocations().filter(location => location.categoryId !== categoryId);
+        const additionalCategoryIds = Array.from(new Set(additionalCategoryLocations.map(location => location.categoryId)));
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
         const pinned = !!(pinnedInput && pinnedInput.checked);
         const preparedAltUrls = getPreparedAltUrls();
@@ -1743,6 +1885,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     description,
                     categoryId,
                     subCategoryId: subCategoryId || null,
+                    additionalCategoryLocations,
+                    additionalCategoryIds,
                     icon,
                     pinned
                 })
@@ -1859,6 +2003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (e.target.classList.contains('alt-url-label')) {
             item.label = e.target.value;
+            lastSavedFeedback = null;
         } else if (e.target.classList.contains('alt-url-url')) {
             item.url = e.target.value;
             clearSavedFeedbackIfDirty();
@@ -1869,6 +2014,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         const row = e.target.closest('.alt-url-item');
         if (!row) return;
         const id = row.dataset.id;
+        const item = currentAltUrls.find(entry => entry.id === id);
+
+        if (e.target.classList.contains('alt-url-label-select')) {
+            if (!item) return;
+            lastSavedFeedback = null;
+            if (e.target.value === '__custom__') {
+                customAltLabelIds.add(id);
+                item.label = '';
+                setAltUrls(currentAltUrls);
+                requestAnimationFrame(() => {
+                    const targetRow = Array.from(altUrlList.querySelectorAll('.alt-url-item')).find(itemRow => itemRow.dataset.id === id);
+                    const customInput = targetRow ? targetRow.querySelector('.alt-url-label') : null;
+                    if (customInput) customInput.focus();
+                });
+            } else {
+                customAltLabelIds.delete(id);
+                item.label = e.target.value;
+                setAltUrls(currentAltUrls);
+            }
+            return;
+        }
 
         if (e.target.classList.contains('alt-url-default-toggle')) {
             currentAltUrls = currentAltUrls.map(item => ({
@@ -1878,6 +2044,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             lastSavedFeedback = null;
             setAltUrls(currentAltUrls);
             updateDuplicateState();
+        }
+    });
+    altUrlList.addEventListener('focusout', (e) => {
+        if (!e.target.classList.contains('alt-url-label')) return;
+        const row = e.target.closest('.alt-url-item');
+        if (!row) return;
+        const id = row.dataset.id;
+        const item = currentAltUrls.find(entry => entry.id === id);
+        if (!item) return;
+
+        const label = String(e.target.value || '').trim();
+        if (!label) {
+            item.label = DEFAULT_ALT_URL_LABEL;
+            customAltLabelIds.delete(id);
+            setAltUrls(currentAltUrls);
+        } else if (ALT_URL_LABELS.includes(label)) {
+            item.label = label;
+            customAltLabelIds.delete(id);
+            setAltUrls(currentAltUrls);
+        } else {
+            item.label = label;
         }
     });
     altUrlList.addEventListener('click', (e) => {
@@ -1903,7 +2090,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         setAltUrls(currentAltUrls);
         updateDuplicateState();
     });
-    categorySelect.addEventListener('change', () => renderSubCategoryOptions(categorySelect.value, ''));
+    categorySelect.addEventListener('change', () => {
+        currentAdditionalCategoryLocations = getSelectedAdditionalCategoryLocations().filter(location => location.categoryId !== categorySelect.value);
+        renderSubCategoryOptions(categorySelect.value, '');
+        renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
+    });
+    additionalCategoryOptions.addEventListener('change', () => {
+        currentAdditionalCategoryLocations = getSelectedAdditionalCategoryLocations();
+        renderAdditionalCategoryOptions(currentAdditionalCategoryLocations);
+    });
     urlInput.addEventListener('input', () => {
         clearSavedFeedbackIfDirty();
         updateDuplicateState();
@@ -1918,6 +2113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Sidebar init failed', e);
         showFatalError(e && e.message ? e.message : 'Unknown error');
     }
-});`,j=(t,a)=>e.jsxs("div",{className:"rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0",children:[e.jsxs("div",{className:"flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 px-3 py-2 border-b border-slate-200 dark:border-slate-700",children:[e.jsx("span",{className:"text-xs font-mono font-medium text-slate-600 dark:text-slate-300",children:t}),e.jsxs("div",{className:"flex items-center gap-2",children:[e.jsxs("button",{onClick:()=>ge(t,a),className:"text-xs flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline",title:"下载文件",children:[e.jsx(B,{size:12}),"Download"]}),e.jsx("div",{className:"w-px h-3 bg-slate-300 dark:bg-slate-600"}),e.jsxs("button",{onClick:()=>q(a,t),className:"text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline",children:[R[t]?e.jsx(te,{size:12}):e.jsx(ae,{size:12}),R[t]?"Copied":"Copy"]})]})]}),e.jsx("div",{className:"bg-slate-900 p-3 overflow-x-auto",children:e.jsx("pre",{className:"text-[10px] md:text-xs font-mono text-slate-300 leading-relaxed whitespace-pre",children:a})})]}),Q=async()=>{const t=l.favicon;if(!t)return null;try{const a=new Image;a.crossOrigin="anonymous",a.src=t,await new Promise((i,s)=>{a.onload=i,a.onerror=s});const n=document.createElement("canvas");n.width=128,n.height=128;const r=n.getContext("2d");if(!r)throw new Error("Canvas error");return r.drawImage(a,0,0,128,128),new Promise(i=>{n.toBlob(s=>{i(s)},"image/png")})}catch(a){return console.error(a),null}},me=async()=>{const t=await Q();if(!t){alert(`生成图片失败 (可能是跨域限制)。
+});`,L=(t,a)=>e.jsxs("div",{className:"rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0",children:[e.jsxs("div",{className:"flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 px-3 py-2 border-b border-slate-200 dark:border-slate-700",children:[e.jsx("span",{className:"text-xs font-mono font-medium text-slate-600 dark:text-slate-300",children:t}),e.jsxs("div",{className:"flex items-center gap-2",children:[e.jsxs("button",{onClick:()=>pe(t,a),className:"text-xs flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline",title:"下载文件",children:[e.jsx(B,{size:12}),"Download"]}),e.jsx("div",{className:"w-px h-3 bg-slate-300 dark:bg-slate-600"}),e.jsxs("button",{onClick:()=>W(a,t),className:"text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline",children:[T[t]?e.jsx($,{size:12}):e.jsx(ae,{size:12}),T[t]?"Copied":"Copy"]})]})]}),e.jsx("div",{className:"bg-slate-900 p-3 overflow-x-auto",children:e.jsx("pre",{className:"text-[10px] md:text-xs font-mono text-slate-300 leading-relaxed whitespace-pre",children:a})})]}),Q=async()=>{const t=o.favicon;if(!t)return null;try{const a=new Image;a.crossOrigin="anonymous",a.src=t,await new Promise((i,s)=>{a.onload=i,a.onerror=s});const n=document.createElement("canvas");n.width=128,n.height=128;const r=n.getContext("2d");if(!r)throw new Error("Canvas error");return r.drawImage(a,0,0,128,128),new Promise(i=>{n.toBlob(s=>{i(s)},"image/png")})}catch(a){return console.error(a),null}},me=async()=>{const t=await Q();if(!t){alert(`生成图片失败 (可能是跨域限制)。
 
-请尝试右键点击下方的预览图片，选择 '图片另存为...' 保存。`);return}const a=window.URL.createObjectURL(t),n=document.createElement("a");n.href=a,n.download="icon.png",document.body.appendChild(n),n.click(),document.body.removeChild(n),window.URL.revokeObjectURL(a)},xe=async()=>{T(!0);try{const{default:t}=await ne(async()=>{const{default:h}=await import("./jszip.min-CLqR4n9G.js").then(be=>be.j);return{default:h}},__vite__mapDeps([0,1,2])),a=new t;a.file("manifest.json",V()),a.file("background.js",J),a.file("sidebar.html",Z),a.file("sidebar.js",Y);const n=await Q();n?a.file("icon.png",n):(console.warn("Could not generate icon for zip"),a.file("icon_missing.txt","Icon generation failed due to CORS. Please save the icon manually."));const r=await a.generateAsync({type:"blob"}),i=window.URL.createObjectURL(r),s=document.createElement("a");s.href=i,s.download="CloudNav-Ext.zip",document.body.appendChild(s),s.click(),document.body.removeChild(s),window.URL.revokeObjectURL(i)}catch(t){console.error(t),alert("打包下载失败")}finally{T(!1)}};if(!c)return null;const he=[{id:"site",label:"网站设置",icon:ze},{id:"ai",label:"AI 设置",icon:fe},{id:"tools",label:"扩展工具",icon:ke}];return e.jsxs("div",{className:"fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm",children:[e.jsxs("div",{className:"bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 dark:border-slate-700 flex max-h-[90vh] flex-col md:flex-row",children:[e.jsx("div",{className:"w-full md:w-48 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col p-2 gap-1 overflow-x-auto shrink-0",children:he.map(t=>e.jsxs("button",{onClick:()=>ie(t.id),className:`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${v===t.id?"bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300":"text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"}`,children:[e.jsx(t.icon,{size:18}),t.label]},t.id))}),e.jsxs("div",{className:"flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-white dark:bg-slate-800",children:[e.jsxs("div",{className:"flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0",children:[e.jsx("h3",{className:"text-lg font-semibold dark:text-white",children:"设置"}),e.jsx("button",{onClick:m,className:"p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors",children:e.jsx(X,{className:"w-5 h-5 dark:text-slate-400"})})]}),e.jsxs("div",{className:"flex-1 overflow-y-auto p-6 pb-12",children:[v==="site"&&e.jsx("div",{className:"space-y-6 animate-in fade-in duration-300",children:e.jsxs("div",{className:"space-y-4",children:[e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"网页标题 (Title)"}),e.jsx("input",{type:"text",value:l.title,onChange:t=>g("title",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"导航栏标题"}),e.jsx("input",{type:"text",value:l.navTitle,onChange:t=>g("navTitle",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"置顶分类图标"}),e.jsxs("div",{className:"flex gap-3 items-center",children:[e.jsx("div",{className:"w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600",children:e.jsx(ve,{name:l.pinnedCategoryIcon||"LayoutGrid",size:20})}),e.jsx("input",{type:"text",value:l.pinnedCategoryIcon||"LayoutGrid",onChange:t=>g("pinnedCategoryIcon",t.target.value),placeholder:"LayoutGrid / Star / 📌",className:"flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"}),e.jsx("button",{type:"button",onClick:()=>I(!0),className:"px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded-lg text-slate-600 dark:text-slate-300 transition-colors",title:"选择图标",children:e.jsx(ye,{size:16})})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"网站图标 (Favicon URL)"}),e.jsxs("div",{className:"flex gap-3 items-center",children:[e.jsx("div",{className:"w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-600",children:l.favicon?e.jsx("img",{src:l.favicon,className:"w-full h-full object-cover"}):e.jsx(ee,{size:20,className:"text-slate-400"})}),e.jsx("input",{type:"text",value:l.favicon,onChange:t=>g("favicon",t.target.value),placeholder:"https://example.com/favicon.ico",className:"flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{className:"mt-3",children:[e.jsxs("div",{className:"flex items-center justify-between mb-2",children:[e.jsx("p",{className:"text-xs text-slate-500",children:"选择生成的随机图标 (点击右侧按钮刷新):"}),e.jsxs("button",{type:"button",onClick:()=>K(l.navTitle),className:"text-xs flex items-center gap-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 px-2 py-1 rounded transition-colors",children:[e.jsx(De,{size:12})," 随机生成"]})]}),e.jsx("div",{className:"flex gap-2",children:$.map((t,a)=>e.jsx("button",{onClick:()=>g("favicon",t),className:"w-8 h-8 rounded hover:ring-2 ring-blue-500 transition-all border border-slate-100 dark:border-slate-600",children:e.jsx("img",{src:t,className:"w-full h-full rounded"})},a))})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"身份验证过期天数"}),e.jsx("div",{className:"relative",children:e.jsx("input",{type:"number",min:"0",value:l.passwordExpiryDays,onChange:t=>g("passwordExpiryDays",parseInt(t.target.value)||0),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})}),e.jsx("p",{className:"text-xs text-slate-500 mt-1",children:"设置为 0 表示永久不退出，默认 7 天后自动退出"})]})]})}),v==="ai"&&e.jsxs("div",{className:"space-y-6 animate-in fade-in duration-300",children:[e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"AI 提供商"}),e.jsxs("select",{value:u.provider,onChange:t=>S("provider",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500",children:[e.jsx("option",{value:"gemini",children:"Google Gemini"}),e.jsx("option",{value:"openai",children:"OpenAI Compatible (ChatGPT, DeepSeek, Claude...)"})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"API Key"}),e.jsxs("div",{className:"relative",children:[e.jsx(Te,{size:16,className:"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"}),e.jsx("input",{type:"password",value:u.apiKey,onChange:t=>S("apiKey",t.target.value),placeholder:"sk-...",className:"w-full pl-10 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-mono"})]}),e.jsx("p",{className:"text-xs text-slate-500 mt-1",children:"Key 仅存储在本地浏览器缓存中，不会发送到我们的服务器。"})]}),u.provider==="openai"&&e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"Base URL (API 地址)"}),e.jsx("input",{type:"text",value:u.baseUrl,onChange:t=>S("baseUrl",t.target.value),placeholder:"https://api.openai.com/v1",className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"模型名称 (Model Name)"}),e.jsx("input",{type:"text",value:u.model,onChange:t=>S("model",t.target.value),placeholder:u.provider==="gemini"?"gemini-2.5-flash":"gpt-3.5-turbo",className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{className:"pt-4 border-t border-slate-100 dark:border-slate-700",children:[e.jsx("h4",{className:"text-sm font-semibold mb-2 dark:text-slate-200",children:"批量操作"}),oe?e.jsxs("div",{className:"space-y-2",children:[e.jsxs("div",{className:"flex justify-between text-xs text-slate-600 dark:text-slate-400",children:[e.jsxs("span",{children:["正在生成描述... (",w.current,"/",w.total,")"]}),e.jsxs("button",{onClick:()=>{C.current=!0,y(!1)},className:"text-red-500 flex items-center gap-1 hover:underline",children:[e.jsx(Ee,{size:12})," 停止"]})]}),e.jsx("div",{className:"w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden",children:e.jsx("div",{className:"h-full bg-blue-500 transition-all duration-300",style:{width:`${w.current/w.total*100}%`}})})]}):e.jsxs("button",{onClick:pe,className:"flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-2 rounded-lg transition-colors border border-purple-200 dark:border-purple-800",children:[e.jsx(we,{size:16})," 一键补全所有缺失的描述"]})]})]}),v==="tools"&&e.jsxs("div",{className:"space-y-8 animate-in fade-in duration-300",children:[e.jsxs("div",{className:"space-y-3",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-                                -6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"1"}),"输入访问密码"]}),e.jsx("div",{className:"bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700",children:e.jsxs("div",{className:"space-y-3",children:[e.jsxs("div",{children:[e.jsx("label",{className:"text-xs text-slate-500 mb-1 block",children:"API 域名 (自动获取)"}),e.jsx("code",{className:"block w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-600 dark:text-slate-400 font-mono truncate",children:P})]}),e.jsxs("div",{children:[e.jsx("label",{className:"text-xs text-slate-500 mb-1 block",children:"访问密码 (Password)"}),e.jsxs("div",{className:"flex gap-2",children:[e.jsxs("div",{className:"relative flex-1",children:[e.jsx("input",{type:A?"text":"password",value:E,readOnly:!0,className:"w-full p-2 pr-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm outline-none font-mono",placeholder:"未登录 / 未设置"}),e.jsx("button",{type:"button",onClick:()=>D(t=>!t),className:"absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-500 transition-colors",title:A?"隐藏密码":"显示密码",children:A?e.jsx(Ce,{size:16}):e.jsx(Ie,{size:16})})]}),e.jsx("button",{onClick:()=>q(E,"pwd"),className:"px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded text-slate-600 dark:text-slate-400 transition-colors",children:R.pwd?e.jsx(te,{size:16}):e.jsx(ae,{size:16})})]}),e.jsx("p",{className:"text-[10px] text-slate-400 mt-1",children:"此密码对应您部署时设置的 PASSWORD 环境变量。"})]})]})})]}),e.jsxs("div",{className:"space-y-3",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"2"}),"选择浏览器类型"]}),e.jsxs("div",{className:"grid grid-cols-2 gap-4",children:[e.jsx("button",{onClick:()=>H("chrome"),className:`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${x==="chrome"?"border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":"border-slate-200 dark:border-slate-700 hover:border-blue-300 bg-white dark:bg-slate-800"}`,children:e.jsx("span",{className:"font-semibold",children:"Chrome / Edge"})}),e.jsx("button",{onClick:()=>H("firefox"),className:`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${x==="firefox"?"border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":"border-slate-200 dark:border-slate-700 hover:border-blue-300 bg-white dark:bg-slate-800"}`,children:e.jsx("span",{className:"font-semibold",children:"Mozilla Firefox"})})]})]}),e.jsxs("div",{className:"space-y-4",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"3"}),"配置步骤与代码"]}),e.jsxs("div",{className:"bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700",children:[e.jsxs("h5",{className:"font-semibold text-sm mb-3 dark:text-slate-200",children:["安装指南 (",x==="chrome"?"Chrome/Edge":"Firefox","):"]}),e.jsxs("ol",{className:"list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2 leading-relaxed",children:[e.jsxs("li",{children:["在电脑上新建文件夹 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono text-xs",children:"CloudNav-Pro"}),"。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"[重要]"})," 将下方图标保存为 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono text-xs",children:"icon.png"}),"。"]}),e.jsxs("li",{children:["获取插件代码文件：",e.jsxs("ul",{className:"list-disc list-inside ml-4 mt-1 space-y-1 text-slate-500",children:[e.jsxs("li",{children:[e.jsx("strong",{children:"方式一 (推荐)："}),"点击下方的 ",e.jsx("span",{className:"text-blue-600 dark:text-blue-400 font-bold",children:'"📦 一键下载所有文件"'})," 按钮，解压到该文件夹。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"方式二 (备用)："}),"分别点击下方代码块的 ",e.jsx(B,{size:12,className:"inline"})," 按钮下载或复制 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1 rounded",children:"manifest.json"}),", ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1 rounded",children:"background.js"})," 等文件到该文件夹。"]})]})]}),e.jsxs("li",{children:["打开浏览器扩展管理页面",x==="chrome"?e.jsxs(e.Fragment,{children:[" (Chrome: ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"chrome://extensions"}),")"]}):e.jsxs(e.Fragment,{children:[" (Firefox: ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"about:debugging"}),")"]}),"。"]}),e.jsx("li",{className:"text-blue-600 font-bold",children:"操作关键点："}),e.jsx("li",{children:'1. 开启右上角的 "开发者模式" (Chrome)。'}),e.jsx("li",{children:'2. 点击 "加载已解压的扩展程序"，选择包含上述文件的文件夹。'}),e.jsxs("li",{children:["3. 前往 ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"chrome://extensions/shortcuts"}),"。"]}),e.jsxs("li",{children:["4. ",e.jsx("strong",{children:"[重要]"}),' 找到 "打开 CloudNav 侧边栏"，设置快捷键 (如 Ctrl+Shift+E)。']})]}),e.jsx("div",{className:"mt-4 mb-4",children:e.jsxs("button",{onClick:xe,disabled:O,className:"w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-blue-500/20",children:[e.jsx(Se,{size:20}),O?"打包中...":"📦 一键下载所有文件 (v7.6 Pro)"]})}),e.jsxs("div",{className:"p-3 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded border border-green-200 dark:border-green-900/50 text-sm space-y-2",children:[e.jsxs("div",{className:"font-bold flex items-center gap-2",children:[e.jsx(je,{size:16})," 完美交互方案 (v7.6):"]}),e.jsxs("ul",{className:"list-disc list-inside text-xs space-y-1",children:[e.jsxs("li",{children:[e.jsx("strong",{children:"左键 / 快捷键:"})," 稳定打开侧边栏，首次点击也可直接拉起。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"网页右键:"})," 直接展示分类列表 (支持判重警告)。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"图标右键:"})," 同上，统一为级联菜单，直接保存。"]})]})]})]}),e.jsxs("div",{className:"p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between",children:[e.jsxs("div",{className:"flex items-center gap-4",children:[e.jsx("div",{className:"w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-600",children:l.favicon?e.jsx("img",{src:l.favicon,className:"w-full h-full object-cover"}):e.jsx(ee,{size:24,className:"text-slate-400"})}),e.jsxs("div",{children:[e.jsx("div",{className:"font-medium text-sm dark:text-white",children:"插件图标 (icon.png)"}),e.jsx("div",{className:"text-xs text-slate-500",children:"请保存此图片为 icon.png"})]})]}),e.jsxs("button",{onClick:me,className:"flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 rounded-lg transition-colors",children:[e.jsx(B,{size:16})," 下载图标"]})]}),e.jsxs("div",{className:"space-y-4",children:[e.jsxs("div",{className:"flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-700",children:[e.jsx(Ue,{size:18,className:"text-purple-500"})," 核心配置"]}),j("manifest.json",V()),j("background.js",J),e.jsxs("div",{className:"flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-700",children:[e.jsx(Be,{size:18,className:"text-green-500"})," 侧边栏导航功能 (Sidebar)"]}),j("sidebar.html",Z),j("sidebar.js",Y)]})]})]})]}),e.jsx("div",{className:"p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end bg-slate-50 dark:bg-slate-800/50 shrink-0",children:e.jsxs("button",{onClick:ue,className:"flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/20",children:[e.jsx(Le,{size:18})," 保存更改"]})})]})]}),de&&e.jsx("div",{className:"fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm",children:e.jsxs("div",{className:"bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col",children:[e.jsxs("div",{className:"flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700",children:[e.jsx("h3",{className:"text-lg font-semibold text-slate-800 dark:text-slate-200",children:"选择置顶分类图标"}),e.jsx("button",{type:"button",onClick:()=>I(!1),className:"p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",children:e.jsx(X,{size:20})})]}),e.jsx("div",{className:"flex-1 overflow-auto p-4",children:e.jsx(Me,{onSelectIcon:t=>{g("pinnedCategoryIcon",t),I(!1)}})})]})})]})};export{Ke as default};
+请尝试右键点击下方的预览图片，选择 '图片另存为...' 保存。`);return}const a=window.URL.createObjectURL(t),n=document.createElement("a");n.href=a,n.download="icon.png",document.body.appendChild(n),n.click(),document.body.removeChild(n),window.URL.revokeObjectURL(a)},be=async()=>{R(!0);try{const{default:t}=await ne(async()=>{const{default:x}=await import("./jszip.min-B_45_Y5Q.js").then(he=>he.j);return{default:x}},__vite__mapDeps([0,1,2])),a=new t;a.file("manifest.json",V()),a.file("background.js",Z),a.file("sidebar.html",Y),a.file("sidebar.js",X);const n=await Q();n?a.file("icon.png",n):(console.warn("Could not generate icon for zip"),a.file("icon_missing.txt","Icon generation failed due to CORS. Please save the icon manually."));const r=await a.generateAsync({type:"blob"}),i=window.URL.createObjectURL(r),s=document.createElement("a");s.href=i,s.download="CloudNav-Ext.zip",document.body.appendChild(s),s.click(),document.body.removeChild(s),window.URL.revokeObjectURL(i)}catch(t){console.error(t),alert("打包下载失败")}finally{R(!1)}};if(!d)return null;const xe=[{id:"site",label:"网站设置",icon:ze},{id:"ai",label:"AI 设置",icon:fe},{id:"tools",label:"扩展工具",icon:ye}];return e.jsxs("div",{className:"fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm",children:[e.jsxs("div",{className:"bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 dark:border-slate-700 flex max-h-[90vh] flex-col md:flex-row",children:[e.jsx("div",{className:"w-full md:w-48 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col p-2 gap-1 overflow-x-auto shrink-0",children:xe.map(t=>e.jsxs("button",{onClick:()=>ie(t.id),className:`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${y===t.id?"bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300":"text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"}`,children:[e.jsx(t.icon,{size:18}),t.label]},t.id))}),e.jsxs("div",{className:"flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-white dark:bg-slate-800",children:[e.jsxs("div",{className:"flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0",children:[e.jsx("h3",{className:"text-lg font-semibold dark:text-white",children:"设置"}),e.jsx("button",{onClick:m,className:"p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors",children:e.jsx(ee,{className:"w-5 h-5 dark:text-slate-400"})})]}),e.jsxs("div",{className:"flex-1 overflow-y-auto p-6 pb-12",children:[y==="site"&&e.jsx("div",{className:"space-y-6 animate-in fade-in duration-300",children:e.jsxs("div",{className:"space-y-4",children:[e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"网页标题 (Title)"}),e.jsx("input",{type:"text",value:o.title,onChange:t=>g("title",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"导航栏标题"}),e.jsx("input",{type:"text",value:o.navTitle,onChange:t=>g("navTitle",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2",children:"背景主题"}),e.jsx("div",{className:"grid grid-cols-3 gap-3",children:[{value:"plain",label:"纯色"},{value:"grid",label:"简约网格"},{value:"dots",label:"点阵"}].map(t=>{const a=o.backgroundStyle===t.value;return e.jsxs("button",{type:"button","aria-pressed":a,onClick:()=>g("backgroundStyle",t.value),className:`min-w-0 rounded-lg border p-2 text-left transition-colors ${a?"border-blue-500 bg-blue-50 dark:bg-blue-900/20":"border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500"}`,children:[e.jsx("span",{"aria-hidden":"true",className:`site-background site-background-${t.value} block h-14 w-full rounded-md border border-slate-200 dark:border-slate-600`}),e.jsxs("span",{className:`mt-2 flex min-w-0 items-center justify-between gap-1 text-xs font-medium ${a?"text-blue-700 dark:text-blue-300":"text-slate-600 dark:text-slate-300"}`,children:[e.jsx("span",{className:"truncate",children:t.label}),a&&e.jsx($,{size:14,className:"shrink-0"})]})]},t.value)})})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"置顶分类图标"}),e.jsxs("div",{className:"flex gap-3 items-center",children:[e.jsx("div",{className:"w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600",children:e.jsx(ke,{name:o.pinnedCategoryIcon||"LayoutGrid",size:20})}),e.jsx("input",{type:"text",value:o.pinnedCategoryIcon||"LayoutGrid",onChange:t=>g("pinnedCategoryIcon",t.target.value),placeholder:"LayoutGrid / Star / 📌",className:"flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"}),e.jsx("button",{type:"button",onClick:()=>w(!0),className:"px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded-lg text-slate-600 dark:text-slate-300 transition-colors",title:"选择图标",children:e.jsx(ve,{size:16})})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"网站图标 (Favicon URL)"}),e.jsxs("div",{className:"flex gap-3 items-center",children:[e.jsx("div",{className:"w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-600",children:o.favicon?e.jsx("img",{src:o.favicon,className:"w-full h-full object-cover"}):e.jsx(te,{size:20,className:"text-slate-400"})}),e.jsx("input",{type:"text",value:o.favicon,onChange:t=>g("favicon",t.target.value),placeholder:"https://example.com/favicon.ico",className:"flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{className:"mt-3",children:[e.jsxs("div",{className:"flex items-center justify-between mb-2",children:[e.jsx("p",{className:"text-xs text-slate-500",children:"选择生成的随机图标 (点击右侧按钮刷新):"}),e.jsxs("button",{type:"button",onClick:()=>q(o.navTitle),className:"text-xs flex items-center gap-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 px-2 py-1 rounded transition-colors",children:[e.jsx(Ce,{size:12})," 随机生成"]})]}),e.jsx("div",{className:"flex gap-2",children:P.map((t,a)=>e.jsx("button",{onClick:()=>g("favicon",t),className:"w-8 h-8 rounded hover:ring-2 ring-blue-500 transition-all border border-slate-100 dark:border-slate-600",children:e.jsx("img",{src:t,className:"w-full h-full rounded"})},a))})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"身份验证过期天数"}),e.jsx("div",{className:"relative",children:e.jsx("input",{type:"number",min:"0",value:o.passwordExpiryDays,onChange:t=>g("passwordExpiryDays",parseInt(t.target.value)||0),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})}),e.jsx("p",{className:"text-xs text-slate-500 mt-1",children:"设置为 0 表示永久不退出，默认 7 天后自动退出"})]})]})}),y==="ai"&&e.jsxs("div",{className:"space-y-6 animate-in fade-in duration-300",children:[e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"AI 提供商"}),e.jsxs("select",{value:u.provider,onChange:t=>I("provider",t.target.value),className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500",children:[e.jsx("option",{value:"gemini",children:"Google Gemini"}),e.jsx("option",{value:"openai",children:"OpenAI Compatible (ChatGPT, DeepSeek, Claude...)"})]})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"API Key"}),e.jsxs("div",{className:"relative",children:[e.jsx(Te,{size:16,className:"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"}),e.jsx("input",{type:"password",value:u.apiKey,onChange:t=>I("apiKey",t.target.value),placeholder:"sk-...",className:"w-full pl-10 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-mono"})]}),e.jsx("p",{className:"text-xs text-slate-500 mt-1",children:"Key 仅存储在本地浏览器缓存中，不会发送到我们的服务器。"})]}),u.provider==="openai"&&e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"Base URL (API 地址)"}),e.jsx("input",{type:"text",value:u.baseUrl,onChange:t=>I("baseUrl",t.target.value),placeholder:"https://api.openai.com/v1",className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{children:[e.jsx("label",{className:"block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1",children:"模型名称 (Model Name)"}),e.jsx("input",{type:"text",value:u.model,onChange:t=>I("model",t.target.value),placeholder:u.provider==="gemini"?"gemini-2.5-flash":"gpt-3.5-turbo",className:"w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"})]}),e.jsxs("div",{className:"pt-4 border-t border-slate-100 dark:border-slate-700",children:[e.jsx("h4",{className:"text-sm font-semibold mb-2 dark:text-slate-200",children:"批量操作"}),se?e.jsxs("div",{className:"space-y-2",children:[e.jsxs("div",{className:"flex justify-between text-xs text-slate-600 dark:text-slate-400",children:[e.jsxs("span",{children:["正在生成描述... (",v.current,"/",v.total,")"]}),e.jsxs("button",{onClick:()=>{C.current=!0,k(!1)},className:"text-red-500 flex items-center gap-1 hover:underline",children:[e.jsx(Ee,{size:12})," 停止"]})]}),e.jsx("div",{className:"w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden",children:e.jsx("div",{className:"h-full bg-blue-500 transition-all duration-300",style:{width:`${v.current/v.total*100}%`}})})]}):e.jsxs("button",{onClick:ge,className:"flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-3 py-2 rounded-lg transition-colors border border-purple-200 dark:border-purple-800",children:[e.jsx(we,{size:16})," 一键补全所有缺失的描述"]})]})]}),y==="tools"&&e.jsxs("div",{className:"space-y-8 animate-in fade-in duration-300",children:[e.jsxs("div",{className:"space-y-3",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-                                -6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"1"}),"输入访问密码"]}),e.jsx("div",{className:"bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700",children:e.jsxs("div",{className:"space-y-3",children:[e.jsxs("div",{children:[e.jsx("label",{className:"text-xs text-slate-500 mb-1 block",children:"API 域名 (自动获取)"}),e.jsx("code",{className:"block w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-600 dark:text-slate-400 font-mono truncate",children:H})]}),e.jsxs("div",{children:[e.jsx("label",{className:"text-xs text-slate-500 mb-1 block",children:"访问密码 (Password)"}),e.jsxs("div",{className:"flex gap-2",children:[e.jsxs("div",{className:"relative flex-1",children:[e.jsx("input",{type:E?"text":"password",value:N,readOnly:!0,className:"w-full p-2 pr-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm outline-none font-mono",placeholder:"未登录 / 未设置"}),e.jsx("button",{type:"button",onClick:()=>D(t=>!t),className:"absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-500 transition-colors",title:E?"隐藏密码":"显示密码",children:E?e.jsx(Ie,{size:16}):e.jsx(Le,{size:16})})]}),e.jsx("button",{onClick:()=>W(N,"pwd"),className:"px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-blue-500 rounded text-slate-600 dark:text-slate-400 transition-colors",children:T.pwd?e.jsx($,{size:16}):e.jsx(ae,{size:16})})]}),e.jsx("p",{className:"text-[10px] text-slate-400 mt-1",children:"此密码对应您部署时设置的 PASSWORD 环境变量。"})]})]})})]}),e.jsxs("div",{className:"space-y-3",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"2"}),"选择浏览器类型"]}),e.jsxs("div",{className:"grid grid-cols-2 gap-4",children:[e.jsx("button",{onClick:()=>O("chrome"),className:`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${b==="chrome"?"border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":"border-slate-200 dark:border-slate-700 hover:border-blue-300 bg-white dark:bg-slate-800"}`,children:e.jsx("span",{className:"font-semibold",children:"Chrome / Edge"})}),e.jsx("button",{onClick:()=>O("firefox"),className:`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${b==="firefox"?"border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":"border-slate-200 dark:border-slate-700 hover:border-blue-300 bg-white dark:bg-slate-800"}`,children:e.jsx("span",{className:"font-semibold",children:"Mozilla Firefox"})})]})]}),e.jsxs("div",{className:"space-y-4",children:[e.jsxs("h4",{className:"font-medium text-slate-800 dark:text-slate-200 flex items-center gap-2",children:[e.jsx("span",{className:"flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold",children:"3"}),"配置步骤与代码"]}),e.jsxs("div",{className:"bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700",children:[e.jsxs("h5",{className:"font-semibold text-sm mb-3 dark:text-slate-200",children:["安装指南 (",b==="chrome"?"Chrome/Edge":"Firefox","):"]}),e.jsxs("ol",{className:"list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2 leading-relaxed",children:[e.jsxs("li",{children:["在电脑上新建文件夹 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono text-xs",children:"CloudNav-Pro"}),"。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"[重要]"})," 将下方图标保存为 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono text-xs",children:"icon.png"}),"。"]}),e.jsxs("li",{children:["获取插件代码文件：",e.jsxs("ul",{className:"list-disc list-inside ml-4 mt-1 space-y-1 text-slate-500",children:[e.jsxs("li",{children:[e.jsx("strong",{children:"方式一 (推荐)："}),"点击下方的 ",e.jsx("span",{className:"text-blue-600 dark:text-blue-400 font-bold",children:'"📦 一键下载所有文件"'})," 按钮，解压到该文件夹。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"方式二 (备用)："}),"分别点击下方代码块的 ",e.jsx(B,{size:12,className:"inline"})," 按钮下载或复制 ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1 rounded",children:"manifest.json"}),", ",e.jsx("code",{className:"bg-white dark:bg-slate-900 px-1 rounded",children:"background.js"})," 等文件到该文件夹。"]})]})]}),e.jsxs("li",{children:["打开浏览器扩展管理页面",b==="chrome"?e.jsxs(e.Fragment,{children:[" (Chrome: ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"chrome://extensions"}),")"]}):e.jsxs(e.Fragment,{children:[" (Firefox: ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"about:debugging"}),")"]}),"。"]}),e.jsx("li",{className:"text-blue-600 font-bold",children:"操作关键点："}),e.jsx("li",{children:'1. 开启右上角的 "开发者模式" (Chrome)。'}),e.jsx("li",{children:'2. 点击 "加载已解压的扩展程序"，选择包含上述文件的文件夹。'}),e.jsxs("li",{children:["3. 前往 ",e.jsx("code",{className:"select-all bg-white dark:bg-slate-900 px-1 rounded",children:"chrome://extensions/shortcuts"}),"。"]}),e.jsxs("li",{children:["4. ",e.jsx("strong",{children:"[重要]"}),' 找到 "打开 CloudNav 侧边栏"，设置快捷键 (如 Ctrl+Shift+E)。']})]}),e.jsx("div",{className:"mt-4 mb-4",children:e.jsxs("button",{onClick:be,disabled:F,className:"w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-blue-500/20",children:[e.jsx(Se,{size:20}),F?"打包中...":"📦 一键下载所有文件 (v7.6 Pro)"]})}),e.jsxs("div",{className:"p-3 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded border border-green-200 dark:border-green-900/50 text-sm space-y-2",children:[e.jsxs("div",{className:"font-bold flex items-center gap-2",children:[e.jsx(Ue,{size:16})," 完美交互方案 (v7.6):"]}),e.jsxs("ul",{className:"list-disc list-inside text-xs space-y-1",children:[e.jsxs("li",{children:[e.jsx("strong",{children:"左键 / 快捷键:"})," 稳定打开侧边栏，首次点击也可直接拉起。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"网页右键:"})," 直接展示分类列表 (支持判重警告)。"]}),e.jsxs("li",{children:[e.jsx("strong",{children:"图标右键:"})," 同上，统一为级联菜单，直接保存。"]})]})]})]}),e.jsxs("div",{className:"p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between",children:[e.jsxs("div",{className:"flex items-center gap-4",children:[e.jsx("div",{className:"w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-600",children:o.favicon?e.jsx("img",{src:o.favicon,className:"w-full h-full object-cover"}):e.jsx(te,{size:24,className:"text-slate-400"})}),e.jsxs("div",{children:[e.jsx("div",{className:"font-medium text-sm dark:text-white",children:"插件图标 (icon.png)"}),e.jsx("div",{className:"text-xs text-slate-500",children:"请保存此图片为 icon.png"})]})]}),e.jsxs("button",{onClick:me,className:"flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 rounded-lg transition-colors",children:[e.jsx(B,{size:16})," 下载图标"]})]}),e.jsxs("div",{className:"space-y-4",children:[e.jsxs("div",{className:"flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-700",children:[e.jsx(je,{size:18,className:"text-purple-500"})," 核心配置"]}),L("manifest.json",V()),L("background.js",Z),e.jsxs("div",{className:"flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-700",children:[e.jsx(Be,{size:18,className:"text-green-500"})," 侧边栏导航功能 (Sidebar)"]}),L("sidebar.html",Y),L("sidebar.js",X)]})]})]})]}),e.jsx("div",{className:"p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end bg-slate-50 dark:bg-slate-800/50 shrink-0",children:e.jsxs("button",{onClick:ue,className:"flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/20",children:[e.jsx(Ae,{size:18})," 保存更改"]})})]})]}),ce&&e.jsx("div",{className:"fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm",children:e.jsxs("div",{className:"bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col",children:[e.jsxs("div",{className:"flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700",children:[e.jsx("h3",{className:"text-lg font-semibold text-slate-800 dark:text-slate-200",children:"选择置顶分类图标"}),e.jsx("button",{type:"button",onClick:()=>w(!1),className:"p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",children:e.jsx(ee,{size:20})})]}),e.jsx("div",{className:"flex-1 overflow-auto p-4",children:e.jsx(Me,{onSelectIcon:t=>{g("pinnedCategoryIcon",t),w(!1)}})})]})})]})};export{Fe as default};

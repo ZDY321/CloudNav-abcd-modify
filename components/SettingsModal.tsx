@@ -915,6 +915,10 @@ function notify(title, message) {
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
         .form-textarea { min-height: 64px; resize: vertical; }
         .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+        .additional-category-toggle { list-style: none; cursor: pointer; user-select: none; }
+        .additional-category-toggle::-webkit-details-marker { display: none; }
+        .additional-category-toggle::after { content: "展开"; margin-left: auto; color: var(--accent); font-size: 11px; font-weight: 600; }
+        #additionalCategoryWrap[open] .additional-category-toggle::after { content: "收起"; }
         .additional-category-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
         .additional-category-option { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; }
         .additional-category-option label { display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; }
@@ -1023,7 +1027,7 @@ function notify(title, message) {
         <div class="form-row"><textarea id="pageDescription" class="form-textarea" placeholder="网页描述（可选）"></textarea></div>
         <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
         <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
-        <div class="form-row" id="additionalCategoryWrap" style="display:none;"><div class="form-row-head"><span>附加分类</span><span class="alt-url-hint">网站仍归属于主分类</span></div><div id="additionalCategoryOptions" class="additional-category-options"></div></div>
+        <details class="form-row" id="additionalCategoryWrap" style="display:none;"><summary class="form-row-head additional-category-toggle"><span>附加分类</span><span class="alt-url-hint">网站仍归属于主分类</span></summary><div id="additionalCategoryOptions" class="additional-category-options"></div></details>
         <div class="form-row"><input id="pageIcon" class="form-input" type="text" placeholder="图标地址（可选）"></div>
         <div class="form-row">
             <label class="form-toggle" title="置顶后会显示在首页顶部的「置顶/常用」区域">
