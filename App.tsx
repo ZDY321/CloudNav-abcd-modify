@@ -2740,7 +2740,7 @@ function App() {
         )}
         {isSecondaryView && (
           <div
-            className="pointer-events-none absolute right-0 top-0 z-20 h-6 w-6 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
+            className="pointer-events-none absolute right-0 top-0 z-20 h-3 w-3 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
             style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
             title={`主分类：${getLinkLocationText(link)}`}
             aria-label={`主分类：${getLinkLocationText(link)}`}
@@ -2851,7 +2851,7 @@ function App() {
         )}
         {isSecondaryView && (
           <div
-            className="pointer-events-none absolute right-0 top-0 z-20 h-6 w-6 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
+            className="pointer-events-none absolute right-0 top-0 z-20 h-3 w-3 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
             style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
             title={`主分类：${getLinkLocationText(link)}`}
             aria-label={`主分类：${getLinkLocationText(link)}`}
