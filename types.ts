@@ -26,6 +26,7 @@ export interface LinkItem {
   description?: string;
   categoryId: string;
   subCategoryId?: string; // 二级分类ID
+  additionalCategoryIds?: string[]; // 附加分类ID；主分类仍由 categoryId 负责所有权
   createdAt: number;
   pinned?: boolean; // New field for pinning
   pinnedOrder?: number; // Field for pinned link sorting order

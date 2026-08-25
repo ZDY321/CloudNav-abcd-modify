@@ -474,7 +474,18 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     const hasSubCategoryField = Object.prototype.hasOwnProperty.call(newLinkData, 'subCategoryId');
     const hasIconField = Object.prototype.hasOwnProperty.call(newLinkData, 'icon');
     const hasUrlsField = Object.prototype.hasOwnProperty.call(newLinkData, 'urls');
+    const hasAdditionalCategoryIdsField = Object.prototype.hasOwnProperty.call(newLinkData, 'additionalCategoryIds');
     const sanitizedUrls = hasUrlsField ? sanitizeUrlItems(newLinkData.urls, newLinkData.url) : [];
+    const sanitizedAdditionalCategoryIds = hasAdditionalCategoryIdsField
+      ? Array.from(new Set(
+          (Array.isArray(newLinkData.additionalCategoryIds) ? newLinkData.additionalCategoryIds : [])
+            .filter((categoryId: unknown) => (
+              typeof categoryId === 'string' &&
+              currentData.categories.some((category: any) => category.id === categoryId) &&
+              categoryId !== targetCatId
+            ))
+        ))
+      : [];
 
     const normalizedCandidateUrls = new Set<string>(
       [newLinkData.url, ...sanitizedUrls.map(item => item.url)]
@@ -516,6 +527,11 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
         if (hasDescriptionField) updatedLink.description = newLinkData.description || '';
         if (hasSubCategoryField) updatedLink.subCategoryId = newLinkData.subCategoryId || undefined;
+        if (hasAdditionalCategoryIdsField) {
+            updatedLink.additionalCategoryIds = sanitizedAdditionalCategoryIds.length > 0
+              ? sanitizedAdditionalCategoryIds
+              : undefined;
+        }
         if (hasIconField) updatedLink.icon = newLinkData.icon || undefined;
         if (hasUrlsField) {
             if (sanitizedUrls.length > 0) {
@@ -566,6 +582,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         description: hasDescriptionField ? (newLinkData.description || '') : '',
         categoryId: targetCatId, 
         subCategoryId: hasSubCategoryField ? (newLinkData.subCategoryId || undefined) : undefined,
+        additionalCategoryIds: sanitizedAdditionalCategoryIds.length > 0 ? sanitizedAdditionalCategoryIds : undefined,
         createdAt: Date.now(),
         pinned: pinned,
         pinnedOrder: pinnedOrder,

@@ -402,30 +402,42 @@ function buildMenus() {
             categoryCache.forEach(cat => {
                 // 创建一级分类菜单
                 chrome.contextMenus.create({
-                    id: \`save_to_\${cat.id}\`,
+                    id: \`save_to::\${encodeURIComponent(cat.id)}\`,
                     parentId: "cloudnav_root",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
                 chrome.contextMenus.create({
-                    id: \`pin_to_\${cat.id}\`,
+                    id: \`pin_to::\${encodeURIComponent(cat.id)}\`,
                     parentId: "cloudnav_root_pin",
                     title: cat.name,
                     contexts: ["page", "link", "action"]
                 });
                 
+                // 附加分类也作为可选目标；服务端会保留当前主分类并写入附加分类
+                if (categoryCache.length > 1) {
+                    categoryCache.filter(additionalCat => additionalCat.id !== cat.id).forEach(additionalCat => {
+                        chrome.contextMenus.create({
+                            id: \`save_to::\${encodeURIComponent(cat.id)}::additional::\${encodeURIComponent(additionalCat.id)}\`,
+                            parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
+                            title: \`附加到：\${additionalCat.name}\`,
+                            contexts: ["page", "link", "action"]
+                        });
+                    });
+                }
+
                 // 如果有二级分类，创建子菜单
                 if (cat.subcategories && cat.subcategories.length > 0) {
                     cat.subcategories.forEach(subCat => {
                         chrome.contextMenus.create({
-                            id: \`save_to_\${cat.id}_\${subCat.id}\`,
-                            parentId: \`save_to_\${cat.id}\`,
+                            id: \`save_to::\${encodeURIComponent(cat.id)}::sub::\${encodeURIComponent(subCat.id)}\`,
+                            parentId: \`save_to::\${encodeURIComponent(cat.id)}\`,
                             title: subCat.name,
                             contexts: ["page", "link", "action"]
                         });
                         chrome.contextMenus.create({
-                            id: \`pin_to_\${cat.id}_\${subCat.id}\`,
-                            parentId: \`pin_to_\${cat.id}\`,
+                            id: \`pin_to::\${encodeURIComponent(cat.id)}::sub::\${encodeURIComponent(subCat.id)}\`,
+                            parentId: \`pin_to::\${encodeURIComponent(cat.id)}\`,
                             title: subCat.name,
                             contexts: ["page", "link", "action"]
                         });
@@ -434,13 +446,13 @@ function buildMenus() {
             });
         } else {
             chrome.contextMenus.create({
-                id: "save_to_common",
+                id: "save_to::common",
                 parentId: "cloudnav_root",
                 title: "默认分类",
                 contexts: ["page", "link", "action"]
             });
             chrome.contextMenus.create({
-                id: "pin_to_common",
+                id: "pin_to::common",
                 parentId: "cloudnav_root_pin",
                 title: "默认分类",
                 contexts: ["page", "link", "action"]
@@ -711,24 +723,26 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (String(info.menuItemId).startsWith("save_to_")) {
-        const idParts = String(info.menuItemId).replace("save_to_", "").split("_");
-        const catId = idParts[0];
-        const subCatId = idParts.length > 1 ? idParts[1] : null;
+    if (String(info.menuItemId).startsWith("save_to::")) {
+        const idParts = String(info.menuItemId).replace("save_to::", "").split("::");
+        const catId = decodeURIComponent(idParts[0] || '');
+        const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId);
-    } else if (String(info.menuItemId).startsWith("pin_to_")) {
-        const idParts = String(info.menuItemId).replace("pin_to_", "").split("_");
-        const catId = idParts[0];
-        const subCatId = idParts.length > 1 ? idParts[1] : null;
+        saveLink(title, url, catId, subCatId, '', undefined, additionalCategoryId ? [additionalCategoryId] : []);
+    } else if (String(info.menuItemId).startsWith("pin_to::")) {
+        const idParts = String(info.menuItemId).replace("pin_to::", "").split("::");
+        const catId = decodeURIComponent(idParts[0] || '');
+        const additionalCategoryId = idParts[1] === 'additional' ? decodeURIComponent(idParts[2] || '') : null;
+        const subCatId = idParts[1] === 'sub' ? decodeURIComponent(idParts[2] || '') : null;
         const title = tab.title;
         const url = info.linkUrl || tab.url;
-        saveLink(title, url, catId, subCatId, '', true);
+        saveLink(title, url, catId, subCatId, '', true, additionalCategoryId ? [additionalCategoryId] : []);
     }
 });
 
-async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined) {
+async function saveLink(title, url, categoryId, subCategoryId = null, icon = '', pinned = undefined, additionalCategoryIds = []) {
     if (!CONFIG.password) {
         notify('保存失败', '未配置密码，请先在侧边栏登录。');
         return;
@@ -736,6 +750,15 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
 
     const matchedLink = findExactLinkByUrl(url);
     const requestUrl = matchedLink && matchedLink.url ? matchedLink.url : url;
+    // When the context-menu action explicitly adds a secondary category,
+    // keep an existing link's primary category unchanged.
+    const primaryCategoryId = matchedLink && Array.isArray(additionalCategoryIds) && additionalCategoryIds.length > 0
+        ? matchedLink.categoryId
+        : categoryId;
+    const nextAdditionalCategoryIds = Array.from(new Set([
+        ...(matchedLink && Array.isArray(matchedLink.additionalCategoryIds) ? matchedLink.additionalCategoryIds : []),
+        ...(Array.isArray(additionalCategoryIds) ? additionalCategoryIds : [])
+    ])).filter(id => id && id !== primaryCategoryId);
 
     if (!icon && matchedLink && matchedLink.icon) {
         icon = matchedLink.icon;
@@ -752,8 +775,9 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
         const payload = {
             title: title || '未命名',
             url: requestUrl,
-            categoryId: categoryId,
+            categoryId: primaryCategoryId,
             subCategoryId: subCategoryId,
+            additionalCategoryIds: nextAdditionalCategoryIds,
             icon: icon
         };
 
@@ -778,13 +802,14 @@ async function saveLink(title, url, categoryId, subCategoryId = null, icon = '',
                     ...link,
                     title: title || link.title,
                     url: requestUrl,
-                    categoryId,
+                    categoryId: primaryCategoryId,
                     subCategoryId: subCategoryId || undefined,
+                    additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined,
                     icon,
                     pinned: typeof pinned === 'boolean' ? pinned : link.pinned
                 } : link);
             } else {
-                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId, subCategoryId: subCategoryId || undefined, icon, pinned: pinned === true };
+                const newLink = { id: Date.now().toString(), title, url: requestUrl, categoryId: primaryCategoryId, subCategoryId: subCategoryId || undefined, additionalCategoryIds: nextAdditionalCategoryIds.length > 0 ? nextAdditionalCategoryIds : undefined, icon, pinned: pinned === true };
                 linkCache.unshift(newLink);
             }
             refreshActiveTabUi();
@@ -870,6 +895,10 @@ function notify(title, message) {
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
         .form-textarea { min-height: 64px; resize: vertical; }
         .form-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+        .additional-category-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .additional-category-option { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; cursor: pointer; }
+        .additional-category-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .additional-category-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .form-toggle input { margin: 0; }
         .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .primary-btn, .secondary-btn { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
@@ -932,6 +961,7 @@ function notify(title, message) {
         .link-icon img { width: 100%; height: 100%; object-fit: contain; }
         .link-info { min-width: 0; flex: 1; }
         .link-title { font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .link-meta { margin-top: 2px; color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .empty { text-align: center; padding: 20px; color: var(--muted); font-size: 12px; }
         .loading { display: flex; justify-content: center; padding: 40px; color: var(--accent); font-size: 12px; }
     </style>
@@ -971,6 +1001,7 @@ function notify(title, message) {
         <div class="form-row"><textarea id="pageDescription" class="form-textarea" placeholder="网页描述（可选）"></textarea></div>
         <div class="form-row"><select id="pageCategory" class="form-select"></select></div>
         <div class="form-row" id="subCategoryWrap" style="display:none;"><select id="pageSubCategory" class="form-select"></select></div>
+        <div class="form-row" id="additionalCategoryWrap" style="display:none;"><div class="form-row-head"><span>附加分类</span><span class="alt-url-hint">网站仍归属于主分类</span></div><div id="additionalCategoryOptions" class="additional-category-options"></div></div>
         <div class="form-row"><input id="pageIcon" class="form-input" type="text" placeholder="图标地址（可选）"></div>
         <div class="form-row">
             <label class="form-toggle" title="置顶后会显示在首页顶部的「置顶/常用」区域">
@@ -1028,6 +1059,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const categorySelect = document.getElementById('pageCategory');
     const subCategoryWrap = document.getElementById('subCategoryWrap');
     const subCategorySelect = document.getElementById('pageSubCategory');
+    const additionalCategoryWrap = document.getElementById('additionalCategoryWrap');
+    const additionalCategoryOptions = document.getElementById('additionalCategoryOptions');
     const addAltUrlBtn = document.getElementById('addAltUrl');
     const altUrlList = document.getElementById('altUrlList');
     const iconInput = document.getElementById('pageIcon');
@@ -1068,6 +1101,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             !categorySelect ||
             !subCategoryWrap ||
             !subCategorySelect ||
+            !additionalCategoryWrap ||
+            !additionalCategoryOptions ||
             !addAltUrlBtn ||
             !altUrlList ||
             !iconInput ||
@@ -1084,6 +1119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentAltUrls = [];
     let customAltLabelIds = new Set();
     let editingLinkId = '';
+    let currentAdditionalCategoryIds = [];
     let isSavingCurrent = false;
     let lastSavedFeedback = null;
     let currentExistingRecordState = { groups: [], total: 0, primaryLink: null };
@@ -1698,6 +1734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextCategoryId = link.categoryId || categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         renderCategoryOptions(nextCategoryId);
         renderSubCategoryOptions(nextCategoryId, link.subCategoryId || '');
+        renderAdditionalCategoryOptions(link.additionalCategoryIds || []);
         syncSaveActionLabel();
         setStatus(statusText, 'success');
         updateDuplicateState();
@@ -1738,6 +1775,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? selectedSubCategoryId
             : '';
     };
+
+    const renderAdditionalCategoryOptions = (selectedIds = currentAdditionalCategoryIds) => {
+        const primaryCategoryId = categorySelect.value;
+        const availableCategories = allCategories.filter(cat => cat.id !== primaryCategoryId);
+        currentAdditionalCategoryIds = Array.from(new Set((selectedIds || []).filter(id => (
+            availableCategories.some(cat => cat.id === id)
+        ))));
+
+        if (availableCategories.length === 0) {
+            additionalCategoryWrap.style.display = 'none';
+            additionalCategoryOptions.innerHTML = '';
+            return;
+        }
+
+        additionalCategoryWrap.style.display = 'block';
+        additionalCategoryOptions.innerHTML = availableCategories.map(cat => \`
+            <label class="additional-category-option">
+                <input type="checkbox" data-additional-category-id="\${escapeHtml(cat.id)}" \${currentAdditionalCategoryIds.includes(cat.id) ? 'checked' : ''}>
+                <span>\${escapeHtml(cat.name)}</span>
+            </label>
+        \`).join('');
+    };
+
+    const getSelectedAdditionalCategoryIds = () => Array.from(
+        additionalCategoryOptions.querySelectorAll('input[data-additional-category-id]:checked')
+    ).map(input => input.dataset.additionalCategoryId).filter(Boolean);
 
     const updateDuplicateState = () => {
         const candidateUrls = getFormUrls();
@@ -1835,6 +1898,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nextSubCategoryId = matchState && matchState.link ? (matchState.link.subCategoryId || '') : '';
                 renderCategoryOptions(nextCategoryId);
                 renderSubCategoryOptions(nextCategoryId, nextSubCategoryId);
+                renderAdditionalCategoryOptions(matchState && matchState.link ? (matchState.link.additionalCategoryIds || []) : []);
                 syncSaveActionLabel();
                 setStatus(getReadCurrentStatus(matchState && matchState.type), matchState ? 'warn' : 'success');
             }
@@ -1852,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         allCategories.forEach(cat => {
             const catLinks = allLinks.filter(link => {
-                if (link.categoryId !== cat.id) return false;
+                if (link.categoryId !== cat.id && !(Array.isArray(link.additionalCategoryIds) && link.additionalCategoryIds.includes(cat.id))) return false;
                 if (!q) return true;
 
                 return String(link.title || '').toLowerCase().includes(q) ||
@@ -1878,12 +1942,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             catLinks.forEach(link => {
                 const openUrl = getPreferredOpenUrl(link);
                 const iconSrc = getDisplayIconUrl(openUrl || link.url);
-                const hoverTitle = link.description || openUrl || link.url || '';
+                const isSecondary = link.categoryId !== cat.id;
+                const primaryLocation = getLocationText(link.categoryId, link.subCategoryId);
+                const hoverTitle = link.description || (isSecondary ? \`主分类：\${primaryLocation}\` : primaryLocation) || openUrl || link.url || '';
                 html += \`
                     <a href="\${escapeHtml(openUrl || link.url)}" target="_blank" class="link-item" title="\${escapeHtml(hoverTitle)}">
                         <div class="link-icon"><img src="\${escapeHtml(iconSrc)}" /></div>
                         <div class="link-info">
                             <div class="link-title">\${escapeHtml(link.title || link.url)}</div>
+                            \${isSecondary ? \`<div class="link-meta">主分类：\${escapeHtml(primaryLocation)}</div>\` : ''}
                         </div>
                     </a>
                 \`;
@@ -1919,6 +1986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     allCategories = data.categories || [];
                     renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
                     renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
+                    renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
                     render(searchInput.value);
                     updateDuplicateState();
                     return;
@@ -1943,6 +2011,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderCategoryOptions(keepCategoryId || ((allCategories[0] && allCategories[0].id) || 'common'));
             renderSubCategoryOptions(categorySelect.value, keepSubCategoryId);
+            renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
             render(searchInput.value);
             updateDuplicateState();
         } catch (e) {
@@ -1967,6 +2036,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const description = descriptionInput.value.trim();
         const categoryId = categorySelect.value || ((allCategories[0] && allCategories[0].id) || 'common');
         const subCategoryId = subCategorySelect.value || '';
+        const additionalCategoryIds = getSelectedAdditionalCategoryIds().filter(id => id !== categoryId);
         const icon = iconInput.value.trim() || getCloudNavIconUrl(finalUrl);
         const pinned = !!(pinnedInput && pinnedInput.checked);
         const preparedAltUrls = getPreparedAltUrls();
@@ -2006,6 +2076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     description,
                     categoryId,
                     subCategoryId: subCategoryId || null,
+                    additionalCategoryIds,
                     icon,
                     pinned
                 })
@@ -2209,7 +2280,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         setAltUrls(currentAltUrls);
         updateDuplicateState();
     });
-    categorySelect.addEventListener('change', () => renderSubCategoryOptions(categorySelect.value, ''));
+    categorySelect.addEventListener('change', () => {
+        currentAdditionalCategoryIds = getSelectedAdditionalCategoryIds().filter(id => id !== categorySelect.value);
+        renderSubCategoryOptions(categorySelect.value, '');
+        renderAdditionalCategoryOptions(currentAdditionalCategoryIds);
+    });
+    additionalCategoryOptions.addEventListener('change', () => {
+        currentAdditionalCategoryIds = getSelectedAdditionalCategoryIds();
+    });
     urlInput.addEventListener('input', () => {
         clearSavedFeedbackIfDirty();
         updateDuplicateState();

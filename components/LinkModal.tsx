@@ -23,6 +23,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'common');
   const [subCategoryId, setSubCategoryId] = useState('');
+  const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>([]);
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
   const [iconStatus, setIconStatus] = useState<LinkItem['iconStatus']>();
@@ -69,6 +70,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setDescription(initialData.description || '');
         setCategoryId(initialData.categoryId);
         setSubCategoryId(initialData.subCategoryId || '');
+        setAdditionalCategoryIds(initialData.additionalCategoryIds || []);
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
         setIconStatus(initialData.iconStatus || (initialData.icon ? 'found' : undefined));
@@ -87,6 +89,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         // 如果有默认分类ID且该分类存在，则使用默认分类，否则使用第一个分类
         const defaultCategory = defaultCategoryId && categories.find(cat => cat.id === defaultCategoryId);
         setCategoryId(defaultCategory ? defaultCategoryId : (categories[0]?.id || 'common'));
+        setAdditionalCategoryIds([]);
         setPinned(false);
         setIcon('');
         setIconStatus(undefined);
@@ -176,6 +179,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       description,
       categoryId,
       subCategoryId: subCategoryId || undefined,
+      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined,
       pinned
     });
 
@@ -840,8 +844,10 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
             <select
             value={categoryId}
             onChange={(e) => {
-              setCategoryId(e.target.value);
+              const nextCategoryId = e.target.value;
+              setCategoryId(nextCategoryId);
               setSubCategoryId(''); // 切换分类时重置二级分类
+              setAdditionalCategoryIds(prev => prev.filter(categoryId => categoryId !== nextCategoryId));
             }}
             className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             >
@@ -867,6 +873,36 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
               </select>
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300">附加分类 (可选)</label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">网站仍归属于上面的主分类，这里只添加到其他分类中方便查找。</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {categories.filter(category => category.id !== categoryId).map(category => {
+                const checked = additionalCategoryIds.includes(category.id);
+                return (
+                  <label
+                    key={category.id}
+                    className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      checked
+                        ? 'border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setAdditionalCategoryIds(prev => (
+                        checked ? prev.filter(id => id !== category.id) : [...prev, category.id]
+                      ))}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                    />
+                    <span className="truncate">{category.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="pt-2 relative">
             {/* 成功提示 */}

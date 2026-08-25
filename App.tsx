@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X,
-  ChevronDown, ChevronRight, Star
+  ChevronDown, ChevronRight, Star, CornerUpLeft
 } from 'lucide-react';
 import {
   DndContext,
@@ -298,6 +298,43 @@ function App() {
     return [category?.name || '未分类', subCategory?.name].filter(Boolean).join(' / ');
   };
 
+  const isLinkInCategory = (link: LinkItem, categoryId: string): boolean => (
+    link.categoryId === categoryId || (link.additionalCategoryIds || []).includes(categoryId)
+  );
+
+  const isLinkSecondaryInCategory = (link: LinkItem, categoryId: string): boolean => (
+    link.categoryId !== categoryId && (link.additionalCategoryIds || []).includes(categoryId)
+  );
+
+  const getAdditionalCategoryNames = (link: LinkItem): string[] => (
+    (link.additionalCategoryIds || [])
+      .map(categoryId => categories.find(category => category.id === categoryId)?.name)
+      .filter((name): name is string => !!name)
+  );
+
+  const getLinkCategorySummary = (link: LinkItem): string => {
+    const primary = getLinkLocationText(link);
+    const additional = getAdditionalCategoryNames(link);
+    return additional.length > 0 ? `${primary} · 附加：${additional.join('、')}` : primary;
+  };
+
+  const jumpToPrimaryCategory = (link: LinkItem) => {
+    const primaryCategory = categories.find(category => category.id === link.categoryId);
+    if (!primaryCategory) return;
+
+    if (primaryCategory.password && !unlockedCategoryIds.has(primaryCategory.id)) {
+      setSelectedCategory(primaryCategory.id);
+      setSelectedSubCategory(null);
+      setCatAuthModalData(primaryCategory);
+      return;
+    }
+
+    setSearchQuery('');
+    setSelectedCategory(primaryCategory.id);
+    setSelectedSubCategory(link.subCategoryId || null);
+    setSidebarOpen(false);
+  };
+
   const getCurrentBrowseLocationText = (): string => {
     if (selectedCategory === 'all') {
       return '全部分类';
@@ -472,14 +509,17 @@ function App() {
   const normalizeLinks = (sourceLinks: LinkItem[], sourceCategories: Category[]) => {
     const validCategoryIds = new Set(sourceCategories.map(category => category.id));
     return sourceLinks.map(link => {
-      if (validCategoryIds.has(link.categoryId)) {
-        return link;
-      }
+      const primaryCategoryId = validCategoryIds.has(link.categoryId) ? link.categoryId : 'common';
+      const additionalCategoryIds = Array.from(new Set(
+        (Array.isArray(link.additionalCategoryIds) ? link.additionalCategoryIds : [])
+          .filter(categoryId => validCategoryIds.has(categoryId) && categoryId !== primaryCategoryId)
+      ));
 
       return {
         ...link,
-        categoryId: 'common',
-        subCategoryId: undefined
+        categoryId: primaryCategoryId,
+        subCategoryId: primaryCategoryId === link.categoryId ? link.subCategoryId : undefined,
+        additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
       };
     });
   };
@@ -771,6 +811,11 @@ function App() {
 
   const editLinkFromContextMenu = () => {
     if (!contextMenu.link) return;
+    if (selectedCategory !== 'all' && isLinkSecondaryInCategory(contextMenu.link, selectedCategory)) {
+      jumpToPrimaryCategory(contextMenu.link);
+      closeContextMenu();
+      return;
+    }
     
     setEditingLink(contextMenu.link);
     setIsModalOpen(true);
@@ -779,6 +824,11 @@ function App() {
 
   const deleteLinkFromContextMenu = () => {
     if (!contextMenu.link) return;
+    if (selectedCategory !== 'all' && isLinkSecondaryInCategory(contextMenu.link, selectedCategory)) {
+      alert('附加分类下不能删除网站，请前往主分类操作。');
+      closeContextMenu();
+      return;
+    }
     
     if (window.confirm(`确定要删除"${contextMenu.link.title}"吗？`)) {
       const newLinks = links.filter(link => link.id !== contextMenu.link!.id);
@@ -1216,6 +1266,11 @@ function App() {
   };
 
   const toggleLinkSelection = (linkId: string) => {
+    const targetLink = links.find(link => link.id === linkId);
+    if (targetLink && selectedCategory !== 'all' && isLinkSecondaryInCategory(targetLink, selectedCategory)) {
+      return;
+    }
+
     setSelectedLinks(prev => {
       const newSet = new Set(prev);
       if (newSet.has(linkId)) {
@@ -1236,7 +1291,10 @@ function App() {
     }
     
     if (confirm(`确定要删除选中的 ${selectedLinks.size} 个链接吗？`)) {
-      const newLinks = links.filter(link => !selectedLinks.has(link.id));
+      const newLinks = links.filter(link => (
+        !selectedLinks.has(link.id) ||
+        (selectedCategory !== 'all' && isLinkSecondaryInCategory(link, selectedCategory))
+      ));
       updateData(newLinks, categories);
       setSelectedLinks(new Set());
       setIsBatchEditMode(false);
@@ -1251,8 +1309,18 @@ function App() {
       return;
     }
     
-    const newLinks = links.map(link => 
-      selectedLinks.has(link.id) ? { ...link, categoryId: targetCategoryId } : link
+    const newLinks = links.map(link => {
+      if (!selectedLinks.has(link.id) || (selectedCategory !== 'all' && isLinkSecondaryInCategory(link, selectedCategory))) {
+        return link;
+      }
+      const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== targetCategoryId);
+      return {
+        ...link,
+        categoryId: targetCategoryId,
+        subCategoryId: undefined,
+        additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+      };
+    }
     );
     updateData(newLinks, categories);
     setSelectedLinks(new Set());
@@ -1261,7 +1329,9 @@ function App() {
 
   const handleSelectAll = () => {
     // 获取当前显示的所有链接ID
-    const currentLinkIds = displayedLinks.map(link => link.id);
+    const currentLinkIds = displayedLinks
+      .filter(link => selectedCategory === 'all' || link.categoryId === selectedCategory)
+      .map(link => link.id);
     
     // 如果已选中的链接数量等于当前显示的链接数量，则取消全选
     if (selectedLinks.size === currentLinkIds.length && currentLinkIds.every(id => selectedLinks.has(id))) {
@@ -1496,6 +1566,15 @@ function App() {
       }
       return candidate;
     });
+    const additionalCategoryIds = Array.from(new Set(
+      (data.additionalCategoryIds || []).filter(categoryId => (
+        categories.some(category => category.id === categoryId) && categoryId !== data.categoryId
+      ))
+    ));
+    const normalizedData = {
+      ...data,
+      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+    };
     const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls]);
     if (duplicateGroups.length > 0) {
       const involvedLinkIds = new Set<string>();
@@ -1523,7 +1602,7 @@ function App() {
       : -1;
     
     const newLink: LinkItem = {
-      ...data,
+      ...normalizedData,
       url: processedUrl, // 使用处理后的URL
       id: Date.now().toString(),
       createdAt: Date.now(),
@@ -1582,6 +1661,15 @@ function App() {
       }
       return candidate;
     });
+    const additionalCategoryIds = Array.from(new Set(
+      (data.additionalCategoryIds || []).filter(categoryId => (
+        categories.some(category => category.id === categoryId) && categoryId !== data.categoryId
+      ))
+    ));
+    const normalizedData = {
+      ...data,
+      additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+    };
     const duplicateGroups = getDuplicateGroupsByUrls([processedUrl, ...processedUrls], editingLink.id);
     if (duplicateGroups.length > 0) {
       const involvedLinkIds = new Set<string>();
@@ -1597,7 +1685,7 @@ function App() {
     }
 
     setSaveDuplicateModal(prev => ({ ...prev, isOpen: false, targetTotal: 0, involvedTotal: 0, groups: [] }));
-    const updated = links.map(l => l.id === editingLink.id ? { ...l, ...data, url: processedUrl } : l);
+    const updated = links.map(l => l.id === editingLink.id ? { ...l, ...normalizedData, url: processedUrl } : l);
     updateData(updated, categories);
     setEditingLink(undefined);
     return true;
@@ -1625,14 +1713,15 @@ function App() {
 
     const activeId = String(active.id);
     const overId = String(over.id);
-    const activeIndex = displayedLinks.findIndex(link => link.id === activeId);
-    const overIndex = displayedLinks.findIndex(link => link.id === overId);
+    const sortableDisplayedLinks = displayedLinks.filter(link => link.categoryId === selectedCategory);
+    const activeIndex = sortableDisplayedLinks.findIndex(link => link.id === activeId);
+    const overIndex = sortableDisplayedLinks.findIndex(link => link.id === overId);
 
     if (activeIndex === -1 || overIndex === -1) {
       return;
     }
 
-    const reorderedVisibleLinks = arrayMove<LinkItem>(displayedLinks, activeIndex, overIndex);
+    const reorderedVisibleLinks = arrayMove<LinkItem>(sortableDisplayedLinks, activeIndex, overIndex);
     const visibleLinkIds = new Set(reorderedVisibleLinks.map(link => link.id));
     const visibleQueue = [...reorderedVisibleLinks];
     const categoryLinks = sortLinksByDisplayOrder(
@@ -1738,6 +1827,11 @@ function App() {
 
   const handleDeleteLink = (id: string) => {
     if (!authToken) { setIsAuthOpen(true); return; }
+    const targetLink = links.find(link => link.id === id);
+    if (targetLink && selectedCategory !== 'all' && isLinkSecondaryInCategory(targetLink, selectedCategory)) {
+      alert('附加分类下不能删除网站，请前往主分类操作。');
+      return;
+    }
     if (confirm('确定删除此链接吗?')) {
       updateData(links.filter(l => l.id !== id), categories);
     }
@@ -1930,13 +2024,21 @@ function App() {
 
       const newLinks = links.map(link => {
         const removedIds = removedSubCategoryIdsByCategory[link.categoryId];
-        if (!removedIds || !link.subCategoryId || !removedIds.has(link.subCategoryId)) {
-          return link;
-        }
+        return removedIds && link.subCategoryId && removedIds.has(link.subCategoryId)
+          ? { ...link, subCategoryId: undefined }
+          : link;
+      });
 
+      const validCategoryIds = new Set(newCats.map(category => category.id));
+      const linksWithValidAdditionalCategories = newLinks.map(link => {
+        const additionalCategoryIds = Array.from(new Set(
+          (link.additionalCategoryIds || []).filter(categoryId => (
+            validCategoryIds.has(categoryId) && categoryId !== link.categoryId
+          ))
+        ));
         return {
           ...link,
-          subCategoryId: undefined
+          additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
         };
       });
 
@@ -1948,7 +2050,7 @@ function App() {
         setSelectedSubCategory(null);
       }
 
-      updateData(newLinks, newCats);
+      updateData(linksWithValidAdditionalCategories, newCats);
   };
 
   const handleMoveSubCategory = (fromCategoryId: string, subCategoryId: string, toCategoryId: string) => {
@@ -1978,7 +2080,11 @@ function App() {
 
       const newLinks = links.map(l =>
         l.categoryId === fromCategoryId && l.subCategoryId === subCategoryId
-          ? { ...l, categoryId: toCategoryId }
+          ? {
+              ...l,
+              categoryId: toCategoryId,
+              additionalCategoryIds: (l.additionalCategoryIds || []).filter(categoryId => categoryId !== toCategoryId)
+            }
           : l
       );
 
@@ -2019,7 +2125,12 @@ function App() {
 
       const newLinks = links.map(l => {
         if (l.categoryId !== fromCategoryId) return l;
-        return { ...l, categoryId: toCategoryId, subCategoryId: newSubId };
+        return {
+          ...l,
+          categoryId: toCategoryId,
+          subCategoryId: newSubId,
+          additionalCategoryIds: (l.additionalCategoryIds || []).filter(categoryId => categoryId !== toCategoryId)
+        };
       });
 
       setUnlockedCategoryIds(prev => {
@@ -2052,7 +2163,23 @@ function App() {
       
       // Move links to common or first available
       const targetId = 'common'; 
-      const newLinks = links.map(l => l.categoryId === catId ? { ...l, categoryId: targetId, subCategoryId: undefined } : l);
+      const newLinks = links.map(link => {
+        if (link.categoryId === catId) {
+          const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== targetId);
+          return {
+            ...link,
+            categoryId: targetId,
+            subCategoryId: undefined,
+            additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+          };
+        }
+
+        const additionalCategoryIds = (link.additionalCategoryIds || []).filter(categoryId => categoryId !== catId);
+        return {
+          ...link,
+          additionalCategoryIds: additionalCategoryIds.length > 0 ? additionalCategoryIds : undefined
+        };
+      });
       
       updateData(newLinks, newCats);
   };
@@ -2432,6 +2559,11 @@ function App() {
 
       stats[link.categoryId].totalCount += 1;
 
+      (link.additionalCategoryIds || []).forEach(categoryId => {
+        if (!stats[categoryId] || isCategoryLocked(categoryId)) return;
+        stats[categoryId].totalCount += 1;
+      });
+
       const validSubCategoryIds = categorySubCategoryIds.get(link.categoryId);
       if (link.subCategoryId && validSubCategoryIds?.has(link.subCategoryId)) {
         stats[link.categoryId].subCategoryCounts[link.subCategoryId] =
@@ -2448,8 +2580,11 @@ function App() {
   const displayedLinks = useMemo(() => {
     let result = links;
     
-    // Security Filter: Always hide links from locked categories
-    result = result.filter(l => !isCategoryLocked(l.categoryId));
+    // Security Filter: hide links whose primary or currently browsed category is locked
+    result = result.filter(l => (
+      !isCategoryLocked(l.categoryId) &&
+      (selectedCategory === 'all' || !isCategoryLocked(selectedCategory))
+    ));
 
     // Search Filter
     if (searchQuery.trim()) {
@@ -2457,16 +2592,21 @@ function App() {
     } else {
       // Category Filter
       if (selectedCategory !== 'all') {
-        result = result.filter(l => l.categoryId === selectedCategory);
+        result = result.filter(l => isLinkInCategory(l, selectedCategory));
       }
 
       // 二级分类过滤
       if (selectedSubCategory === UNASSIGNED_SUBCATEGORY_FILTER) {
         const currentCategory = categories.find(category => category.id === selectedCategory);
         const validSubCategoryIds = new Set((currentCategory?.subcategories || []).map(subCategory => subCategory.id));
-        result = result.filter(link => !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId));
+        result = result.filter(link => (
+          isLinkSecondaryInCategory(link, selectedCategory) ||
+          !link.subCategoryId || !validSubCategoryIds.has(link.subCategoryId)
+        ));
       } else if (selectedSubCategory) {
-        result = result.filter(l => l.subCategoryId === selectedSubCategory);
+        result = result.filter(l => (
+          isLinkSecondaryInCategory(l, selectedCategory) || l.subCategoryId === selectedSubCategory
+        ));
       }
     }
     
@@ -2535,11 +2675,15 @@ function App() {
   const linkGridClassName = siteSettings.cardStyle === 'detailed'
     ? 'grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
     : 'grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8';
+  const hasPrimaryLinksInSelectedCategory = selectedCategory !== 'all' && displayedLinks.some(link => (
+    link.categoryId === selectedCategory
+  ));
 
   // --- Render Components ---
 
   // 创建可排序的链接卡片组件
   const SortableLinkCard: React.FC<{ link: LinkItem }> = ({ link }) => {
+    const isSecondaryView = selectedCategory !== 'all' && !isSearchActive && isLinkSecondaryInCategory(link, selectedCategory);
     const {
       attributes,
       listeners,
@@ -2547,7 +2691,7 @@ function App() {
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: link.id });
+    } = useSortable({ id: link.id, disabled: isSecondaryView });
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
@@ -2570,7 +2714,9 @@ function App() {
         ref={setNodeRef}
         data-link-id={link.id}
         style={style}
-        className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
+        className={`group relative transition-all duration-200 min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
+          isSecondaryView ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
+        } ${
           isSortingMode || isSortingPinned
             ? 'bg-green-20 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
@@ -2646,7 +2792,12 @@ function App() {
         : '检测到连接失败，点击重试';
     
     const targetUrl = getPreferredOpenUrl(link);
-    const locationText = isSearchActive ? getLinkLocationText(link) : '';
+    const isSecondaryView = selectedCategory !== 'all' && !isSearchActive && isLinkSecondaryInCategory(link, selectedCategory);
+    const locationText = isSearchActive
+      ? getLinkCategorySummary(link)
+      : isSecondaryView
+        ? `主分类：${getLinkLocationText(link)}`
+        : '';
 
     return (
       <Tooltip
@@ -2775,7 +2926,7 @@ function App() {
 
 
         {/* 离线状态下的快速重试按钮 - 检测中时显示旋转动画 */}
-        {!isBatchSelectionMode && (isOfflineLink || checkingLinkIds.has(link.id)) && (
+        {!isBatchSelectionMode && !isSecondaryView && (isOfflineLink || checkingLinkIds.has(link.id)) && (
           <div className={`absolute z-20 ${
             isDetailedView
               ? 'top-1/2 right-3 -translate-y-1/2'
@@ -2820,7 +2971,7 @@ function App() {
           <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 dark:bg-blue-900/20 backdrop-blur-sm rounded-md p-1 absolute ${
             isDetailedView ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
           }`}>
-              <button 
+              {!isSecondaryView && (<button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingLink(link); setIsModalOpen(true); }}
                   className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
                   title="编辑"
@@ -2828,7 +2979,17 @@ function App() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.08-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.32-.07.64-.07.97c0 .33.03.65.07.97l-2.11 1.63c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.08.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.11-1.63Z" fill="currentColor"/>
                   </svg>
-              </button>
+              </button>)}
+              {isSecondaryView && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); jumpToPrimaryCategory(link); }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900/40 rounded-md"
+                  title="前往主分类"
+                >
+                  <CornerUpLeft size={15} />
+                  <span>主分类</span>
+                </button>
+              )}
           </div>
         )}
       </div>
@@ -3530,7 +3691,7 @@ function App() {
                              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full whitespace-nowrap">
                                {displayedLinks.length}
                              </span>
-                             {!isCategoryLocked(selectedCategory) && (
+                             {!isCategoryLocked(selectedCategory) && hasPrimaryLinksInSelectedCategory && (
                                <>
                                  <AvailabilityControls
                                    status={getEffectiveCategoryCheckStatus(selectedCategory, selectedSubCategory)}
@@ -3557,7 +3718,7 @@ function App() {
                              <Search size={14} />
                              <span>全站查重</span>
                          </button>
-                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && !isSearchActive && (
+                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && !isSearchActive && hasPrimaryLinksInSelectedCategory && (
                              isSortingMode === selectedCategory ? (
                                  <div className="flex flex-wrap items-center gap-2">
                                      <button 
@@ -4000,7 +4161,11 @@ function App() {
             onEditLink={editLinkFromContextMenu}
             onDeleteLink={deleteLinkFromContextMenu}
             onTogglePin={togglePinFromContextMenu}
-            onCheckAvailability={checkSingleLinkAvailability}
+            canManageLink={!(selectedCategory !== 'all' && contextMenu.link && isLinkSecondaryInCategory(contextMenu.link, selectedCategory))}
+            onGoToPrimary={contextMenu.link ? () => jumpToPrimaryCategory(contextMenu.link!) : undefined}
+            onCheckAvailability={selectedCategory === 'all' || !contextMenu.link || !isLinkSecondaryInCategory(contextMenu.link, selectedCategory)
+              ? checkSingleLinkAvailability
+              : undefined}
             isChecking={contextMenu.isChecking}
           />
 

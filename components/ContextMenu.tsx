@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Copy, QrCode, Edit2, Trash2, Pin, Globe, Loader2 } from 'lucide-react';
+import { Copy, QrCode, Edit2, Trash2, Pin, Globe, Loader2, CornerUpLeft } from 'lucide-react';
 
 interface ContextMenuProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface ContextMenuProps {
   onEditLink: () => void;
   onDeleteLink: () => void;
   onTogglePin: () => void;
+  canManageLink?: boolean;
+  onGoToPrimary?: () => void;
   onCheckAvailability?: () => void;
   isChecking?: boolean;
 }
@@ -23,6 +25,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onEditLink,
   onDeleteLink,
   onTogglePin,
+  canManageLink = true,
+  onGoToPrimary,
   onCheckAvailability,
   isChecking = false
 }) => {
@@ -67,9 +71,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   const menuItems = [
     { icon: Copy, label: '复制链接', onClick: onCopyLink },
     { icon: QrCode, label: '显示二维码', onClick: onShowQRCode },
-    { icon: Edit2, label: '编辑链接', onClick: onEditLink },
-    { icon: Pin, label: '置顶/取消置顶', onClick: onTogglePin },
-    { icon: Trash2, label: '删除链接', onClick: onDeleteLink, className: 'text-red-600 dark:text-red-400' }
+    ...(canManageLink ? [
+      { icon: Edit2, label: '编辑链接', onClick: onEditLink },
+      { icon: Pin, label: '置顶/取消置顶', onClick: onTogglePin },
+      { icon: Trash2, label: '删除链接', onClick: onDeleteLink, className: 'text-red-600 dark:text-red-400' }
+    ] : onGoToPrimary ? [
+      { icon: CornerUpLeft, label: '前往主分类', onClick: onGoToPrimary }
+    ] : [])
   ];
 
   return (
