@@ -2713,6 +2713,7 @@ function App() {
       <div
         ref={setNodeRef}
         data-link-id={link.id}
+        title={isSecondaryView ? `主分类：${getLinkLocationText(link)}` : undefined}
         style={style}
         className={`group relative transition-all duration-200 min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
           isSecondaryView ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
@@ -2739,7 +2740,8 @@ function App() {
         )}
         {isSecondaryView && (
           <div
-            className="absolute right-2 top-2 z-20 h-0 w-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-blue-500 drop-shadow-sm"
+            className="pointer-events-none absolute right-0 top-0 z-20 h-6 w-6 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
+            style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
             title={`主分类：${getLinkLocationText(link)}`}
             aria-label={`主分类：${getLinkLocationText(link)}`}
           />
@@ -2815,6 +2817,7 @@ function App() {
       >
       <div
         data-link-id={link.id}
+        title={isSecondaryView ? `主分类：${getLinkLocationText(link)}` : undefined}
         className={`group relative transition-all duration-200 hover:shadow-lg ${
           isOfflineLink 
             ? 'hover:shadow-red-100/50 dark:hover:shadow-red-900/20' 
@@ -2848,7 +2851,8 @@ function App() {
         )}
         {isSecondaryView && (
           <div
-            className="absolute right-2 top-2 z-20 h-0 w-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-blue-500 drop-shadow-sm"
+            className="pointer-events-none absolute right-0 top-0 z-20 h-6 w-6 bg-blue-500/90 shadow-sm dark:bg-blue-400/90"
+            style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 0)' }}
             title={`主分类：${getLinkLocationText(link)}`}
             aria-label={`主分类：${getLinkLocationText(link)}`}
           />
