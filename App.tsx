@@ -2723,8 +2723,8 @@ function App() {
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
         } ${isDragging ? 'shadow-2xl scale-105' : ''} ${duplicateInfo ? 'border-2' : ''} ${
           isDetailedView 
-            ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-green-400 dark:hover:border-green-500' 
-            : 'flex items-center rounded-xl border shadow-sm hover:border-green-300 dark:hover:border-green-600'
+            ? 'flex flex-col rounded-2xl border shadow-sm overflow-hidden p-4 min-h-[100px] hover:border-green-400 dark:hover:border-green-500' 
+            : 'flex items-center rounded-xl border shadow-sm overflow-hidden hover:border-green-300 dark:hover:border-green-600'
         } ${isFocusedLink ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-900 animate-pulse' : ''}`}
         {...attributes}
         {...listeners}
@@ -2830,8 +2830,8 @@ function App() {
               : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
         } ${isBatchSelectionMode ? 'cursor-pointer' : ''} ${duplicateInfo ? 'border-2' : ''} ${
           isDetailedView 
-            ? `flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
-            : `flex items-center justify-between rounded-xl border shadow-sm p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
+            ? `flex flex-col rounded-2xl border shadow-sm overflow-hidden p-4 min-h-[100px] ${isOfflineLink ? 'hover:border-red-400 dark:hover:border-red-500 border-2' : 'hover:border-blue-400 dark:hover:border-blue-500'}` 
+            : `flex items-center justify-between rounded-xl border shadow-sm overflow-hidden p-3 ${isOfflineLink ? 'hover:border-red-300 dark:hover:border-red-600 border-2' : 'hover:border-blue-300 dark:hover:border-blue-600'}`
         } ${isFocusedLink ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-900 animate-pulse' : ''}`}
         style={duplicateInfo ? {
           borderColor: duplicateInfo.color,
