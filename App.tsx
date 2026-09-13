@@ -24,7 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, UrlItem } from './types';
-import { getAdditionalCategoryLocations, normalizeAdditionalCategoryLocations, normalizeLinkCategoryLocations, removeCategoryLocations } from './utils/categoryLocations';
+import { getAdditionalCategoryLocations, getCategoryLocationKey, normalizeAdditionalCategoryLocations, normalizeLinkCategoryLocations, removeCategoryLocations } from './utils/categoryLocations';
 import Icon from './components/Icon';
 import AuthModal from './components/AuthModal';
 import ContextMenu from './components/ContextMenu';
@@ -57,6 +57,11 @@ const AI_CONFIG_KEY = 'cloudnav_ai_config';
 const SEARCH_CONFIG_KEY = 'cloudnav_search_config';
 const LAST_SYNC_TIME_KEY = 'cloudnav_last_sync_time';
 const UNASSIGNED_SUBCATEGORY_FILTER = '__unassigned__';
+// “全部”和“未分配”中的一级附加位置共用顺序；筛选值不是实际二级分类。
+const getCategorySortKey = (categoryId: string, subCategoryId?: string | null) => getCategoryLocationKey({
+  categoryId,
+  subCategoryId: subCategoryId && subCategoryId !== UNASSIGNED_SUBCATEGORY_FILTER ? subCategoryId : undefined,
+});
 const DEFAULT_WEBDAV_CONFIG: WebDavConfig = {
   url: '',
   username: '',
@@ -1707,8 +1712,12 @@ function App() {
 
   const getLinkDisplayOrder = (link: LinkItem, categoryId?: string, subCategoryId?: string | null) => {
     if (categoryId && categoryId !== link.categoryId) {
-      const key = `${categoryId}::${subCategoryId || ''}`;
-      return link.additionalCategoryOrders?.[key] ?? link.createdAt;
+      const key = getCategorySortKey(categoryId, subCategoryId);
+      // 兼容旧版本在“未分配”筛选下保存的顺序。
+      const legacyUnassignedOrder = !subCategoryId || subCategoryId === UNASSIGNED_SUBCATEGORY_FILTER
+        ? link.additionalCategoryOrders?.[getCategoryLocationKey({ categoryId, subCategoryId: UNASSIGNED_SUBCATEGORY_FILTER })]
+        : undefined;
+      return link.additionalCategoryOrders?.[key] ?? legacyUnassignedOrder ?? link.createdAt;
     }
     return link.order ?? link.createdAt;
   };
@@ -1721,32 +1730,32 @@ function App() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (!over || active.id === over.id || selectedCategory === 'all' || isSearchActive) {
+    if (!over || active.id === over.id || selectedCategory === 'all' || isSearchActive || isSortingMode !== selectedCategory) {
       return;
     }
 
     const activeId = String(active.id);
     const overId = String(over.id);
-    const sortableDisplayedLinks = displayedLinks.filter(link => isLinkInCategory(link, selectedCategory));
-    const activeIndex = sortableDisplayedLinks.findIndex(link => link.id === activeId);
-    const overIndex = sortableDisplayedLinks.findIndex(link => link.id === overId);
+    const activeIndex = displayedLinks.findIndex(link => link.id === activeId);
+    const overIndex = displayedLinks.findIndex(link => link.id === overId);
 
     if (activeIndex === -1 || overIndex === -1) {
       return;
     }
 
-    const reorderedVisibleLinks = arrayMove<LinkItem>(sortableDisplayedLinks, activeIndex, overIndex);
-    const visibleLinkIds = new Set(reorderedVisibleLinks.map(link => link.id));
+    // 当前列表中的主分类和附加分类卡片一起参与排序。
+    const reorderedVisibleLinks = arrayMove<LinkItem>(displayedLinks, activeIndex, overIndex);
     const orderByLinkId = new Map<string, number>();
     reorderedVisibleLinks.forEach((link, index) => {
       orderByLinkId.set(link.id, index);
     });
 
+    const key = getCategorySortKey(selectedCategory, selectedSubCategory);
     const updatedLinks = links.map(link => {
       const nextOrder = orderByLinkId.get(link.id);
       if (nextOrder === undefined) return link;
       if (link.categoryId === selectedCategory) return { ...link, order: nextOrder };
-      const key = `${selectedCategory}::${selectedSubCategory || ''}`;
+      // 附加位置单独记录顺序，不修改该网址在主分类或其他附加分类中的顺序。
       return { ...link, additionalCategoryOrders: { ...(link.additionalCategoryOrders || {}), [key]: nextOrder } };
     });
 
@@ -1791,6 +1800,8 @@ function App() {
 
   // 开始排序
   const startSorting = (categoryId: string) => {
+    setIsBatchEditMode(false);
+    setSelectedLinks(new Set());
     setIsSortingMode(categoryId);
   };
 
@@ -2691,7 +2702,7 @@ function App() {
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: link.id, disabled: isSecondaryView && isSortingMode !== selectedCategory });
+    } = useSortable({ id: link.id });
     
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
@@ -2715,9 +2726,7 @@ function App() {
         data-link-id={link.id}
         title={isSecondaryView ? `主分类：${getLinkLocationText(link)}` : undefined}
         style={style}
-        className={`group relative transition-all duration-200 min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
-          isSecondaryView ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
-        } ${
+        className={`group relative cursor-grab active:cursor-grabbing touch-none select-none transition-all duration-200 min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
           isSortingMode || isSortingPinned
             ? 'bg-green-20 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
@@ -3736,7 +3745,7 @@ function App() {
                              <Search size={14} />
                              <span>全站查重</span>
                          </button>
-                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && !isSearchActive && hasPrimaryLinksInSelectedCategory && (
+                         {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && !isSearchActive && displayedLinks.length > 0 && (
                              isSortingMode === selectedCategory ? (
                                  <div className="flex flex-wrap items-center gap-2">
                                      <button 
@@ -3757,18 +3766,20 @@ function App() {
                                  </div>
                              ) : (
                                   <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                                     <button 
-                                         onClick={toggleBatchEditMode}
-                                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0 ${
-                                             isBatchEditMode 
-                                                 ? 'bg-red-600 hover:bg-red-700' 
-                                                 : 'bg-blue-600 hover:bg-blue-700'
-                                         }`}
-                                         title={isBatchEditMode ? "退出批量编辑" : "批量编辑"}
-                                     >
-                                         {isBatchEditMode ? '取消' : '批量编辑'}
-                                     </button>
-                                     {isBatchEditMode ? (
+                                     {(hasPrimaryLinksInSelectedCategory || isBatchEditMode) && (
+                                         <button
+                                             onClick={toggleBatchEditMode}
+                                             className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors whitespace-nowrap shrink-0 ${
+                                                 isBatchEditMode
+                                                     ? 'bg-red-600 hover:bg-red-700'
+                                                     : 'bg-blue-600 hover:bg-blue-700'
+                                             }`}
+                                             title={isBatchEditMode ? "退出批量编辑" : "批量编辑"}
+                                         >
+                                             {isBatchEditMode ? '取消' : '批量编辑'}
+                                         </button>
+                                     )}
+                                     {isBatchEditMode && hasPrimaryLinksInSelectedCategory ? (
                                          <>
                                              <button 
                                                  onClick={handleBatchDelete}
