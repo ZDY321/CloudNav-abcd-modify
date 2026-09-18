@@ -335,21 +335,40 @@ function App() {
     return additional.length > 0 ? `${primary} · 附加：${additional.join('、')}` : primary;
   };
 
+  // 导航到卡片后，将目标滚动到视口中并短暂高亮，方便用户在主分类中找到它。
+  const focusLinkCard = (linkId: string) => {
+    window.setTimeout(() => {
+      const card = document.querySelector(`[data-link-id="${linkId}"]`) as HTMLElement | null;
+      if (!card) return;
+
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setFocusedLinkId(linkId);
+      window.setTimeout(() => {
+        setFocusedLinkId(prev => (prev === linkId ? null : prev));
+      }, 2000);
+    }, 220);
+  };
+
   const jumpToPrimaryCategory = (link: LinkItem) => {
     const primaryCategory = categories.find(category => category.id === link.categoryId);
     if (!primaryCategory) return;
+    const primarySubCategoryId = link.subCategoryId && primaryCategory.subcategories?.some(subCategory => subCategory.id === link.subCategoryId)
+      ? link.subCategoryId
+      : null;
 
     if (primaryCategory.password && !unlockedCategoryIds.has(primaryCategory.id)) {
       setSelectedCategory(primaryCategory.id);
-      setSelectedSubCategory(null);
+      setSelectedSubCategory(primarySubCategoryId);
+      setPendingFocusLinkId(link.id);
       setCatAuthModalData(primaryCategory);
       return;
     }
 
     setSearchQuery('');
     setSelectedCategory(primaryCategory.id);
-    setSelectedSubCategory(link.subCategoryId || null);
+    setSelectedSubCategory(primarySubCategoryId);
     setSidebarOpen(false);
+    focusLinkCard(link.id);
   };
 
   const getCurrentBrowseLocationText = (): string => {
@@ -490,15 +509,7 @@ function App() {
     setSidebarOpen(false);
     closeDuplicateModals();
 
-    setTimeout(() => {
-      const card = document.querySelector(`[data-link-id="${link.id}"]`) as HTMLElement | null;
-      if (!card) return;
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setFocusedLinkId(link.id);
-      setTimeout(() => {
-        setFocusedLinkId(prev => (prev === link.id ? null : prev));
-      }, 2000);
-    }, 220);
+    focusLinkCard(link.id);
   };
 
   // 数据发生变化后清除旧的查重标注，避免展示过期颜色
@@ -1228,8 +1239,18 @@ function App() {
       return;
     }
 
+    const targetCategory = categories.find(category => category.id === targetLink.categoryId);
+    if (targetCategory?.password && !unlockedCategoryIds.has(targetCategory.id)) {
+      setSelectedCategory(targetCategory.id);
+      setSelectedSubCategory(targetCategory.subcategories?.some(subCategory => subCategory.id === targetLink.subCategoryId)
+        ? targetLink.subCategoryId || null
+        : null);
+      setCatAuthModalData(prev => prev?.id === targetCategory.id ? prev : targetCategory);
+      return;
+    }
+
     setPendingFocusLinkId(null);
-    jumpToDuplicateCard(targetLink);
+    jumpToPrimaryCategory(targetLink);
   }, [pendingFocusLinkId, links, categories, unlockedCategoryIds]);
 
   // Update page title and favicon when site settings change
