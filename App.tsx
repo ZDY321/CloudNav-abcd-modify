@@ -75,6 +75,10 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const linksRef = useRef<LinkItem[]>([]);
   const categoriesRef = useRef<Category[]>([]);
+  // Snapshot last confirmed by the server. It is used to send only this
+  // device's changes when another device has modified the cloud data.
+  const cloudDataRef = useRef<{ links: LinkItem[]; categories: Category[] } | null>(null);
+  const syncQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
@@ -596,7 +600,12 @@ function App() {
     return 'text-green-600';
   }, [authToken, syncStatus]);
 
-  const syncToCloud = async (newLinks: LinkItem[], newCategories: Category[], token: string) => {
+  const syncToCloud = async (
+    newLinks: LinkItem[],
+    newCategories: Category[],
+    token: string,
+    baseData: { links: LinkItem[]; categories: Category[] } | null = cloudDataRef.current
+  ) => {
     setSyncStatus('saving');
     try {
         const response = await fetch('/api/storage', {
@@ -605,7 +614,11 @@ function App() {
                 'Content-Type': 'application/json',
                 'x-auth-password': token
             },
-            body: JSON.stringify({ links: newLinks, categories: newCategories })
+            body: JSON.stringify({
+              links: newLinks,
+              categories: newCategories,
+              ...(baseData ? { baseData } : {})
+            })
         });
 
         if (response.status === 401) {
@@ -629,6 +642,15 @@ function App() {
 
         if (!response.ok) throw new Error('Network response was not ok');
         
+        const result = await response.json().catch(() => null);
+        if (result?.data?.links && result?.data?.categories) {
+          cloudDataRef.current = {
+            links: result.data.links,
+            categories: result.data.categories
+          };
+        } else {
+          cloudDataRef.current = { links: newLinks, categories: newCategories };
+        }
         setSyncStatus('saved');
         markSynced();
         setTimeout(() => setSyncStatus('idle'), 2000);
@@ -653,7 +675,20 @@ function App() {
 
       // 3. Sync to Cloud (if authenticated)
       if (authToken) {
-          syncToCloud(normalizedLinks, normalizedCategories, authToken);
+          const baseData = cloudDataRef.current
+            ? {
+                links: cloudDataRef.current.links,
+                categories: cloudDataRef.current.categories
+              }
+            : {
+                links: linksRef.current,
+                categories: categoriesRef.current
+              };
+          // Keep writes in order. Without this, two quick edits can complete
+          // out of order and an older full snapshot wins in KV.
+          syncQueueRef.current = syncQueueRef.current
+            .catch(() => false)
+            .then(() => syncToCloud(normalizedLinks, normalizedCategories, authToken, baseData));
       }
   };
 
@@ -1073,6 +1108,7 @@ function App() {
                 if (data.links && data.links.length > 0) {
                     const normalizedCategories = normalizeCategories(data.categories);
                     const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
+                    cloudDataRef.current = { links: normalizedLinks, categories: normalizedCategories };
                     setLinks(normalizedLinks);
                     setCategories(normalizedCategories);
                     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
@@ -1446,6 +1482,7 @@ function App() {
                     if (data.links && data.links.length > 0) {
                         const normalizedCategories = normalizeCategories(data.categories);
                         const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
+                        cloudDataRef.current = { links: normalizedLinks, categories: normalizedCategories };
                         setLinks(normalizedLinks);
                         setCategories(normalizedCategories);
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({

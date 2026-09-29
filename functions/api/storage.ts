@@ -72,6 +72,60 @@ const normalizeAppData = (rawData: any) => {
   return { ...rawData, links: normalizedLinks, categories };
 };
 
+const valuesEqual = (left: any, right: any) => JSON.stringify(left) === JSON.stringify(right);
+
+/**
+ * Merge a full client snapshot using the snapshot it was based on. This keeps
+ * records created by another device and only applies additions, edits, and
+ * deletions that this client actually made.
+ */
+const mergeCollection = (current: any[], incoming: any[], base: any[] | undefined) => {
+  if (!Array.isArray(base)) return incoming;
+
+  const baseById = new Map(base.filter(item => item?.id).map(item => [item.id, item]));
+  const incomingById = new Map(incoming.filter(item => item?.id).map(item => [item.id, item]));
+  const currentById = new Map(current.filter(item => item?.id).map(item => [item.id, item]));
+
+  // Apply client additions and edits. If another device changed the same
+  // record after the base snapshot, preserve that newer server value.
+  for (const [id, incomingItem] of incomingById) {
+    const baseItem = baseById.get(id);
+    const currentItem = currentById.get(id);
+    const clientChanged = !baseItem || !valuesEqual(baseItem, incomingItem);
+    const serverChanged = !!baseItem && !!currentItem && !valuesEqual(baseItem, currentItem);
+    if (clientChanged && (!serverChanged || !currentItem)) currentById.set(id, incomingItem);
+  }
+
+  // Apply deletions only when the server still has the base version. This
+  // prevents an old device from deleting a record changed elsewhere.
+  for (const [id, baseItem] of baseById) {
+    if (!incomingById.has(id) && currentById.has(id) && valuesEqual(currentById.get(id), baseItem)) {
+      currentById.delete(id);
+    }
+  }
+
+  const orderedIds: string[] = [];
+  incoming.forEach(item => item?.id && !orderedIds.includes(item.id) && orderedIds.push(item.id));
+  current.forEach(item => item?.id && !orderedIds.includes(item.id) && orderedIds.push(item.id));
+  return orderedIds.map(id => currentById.get(id)).filter(Boolean);
+};
+
+const mergeAppData = (currentData: any, incomingData: any, baseData: any) => normalizeAppData({
+  ...currentData,
+  links: mergeCollection(
+    Array.isArray(currentData?.links) ? currentData.links : [],
+    Array.isArray(incomingData?.links) ? incomingData.links : [],
+    Array.isArray(baseData?.links) ? baseData.links : undefined
+  ),
+  categories: mergeCollection(
+    Array.isArray(currentData?.categories) ? currentData.categories : [],
+    Array.isArray(incomingData?.categories) ? incomingData.categories : [],
+    Array.isArray(baseData?.categories) ? baseData.categories : undefined
+  ),
+  ...(incomingData.searchConfig ? { searchConfig: incomingData.searchConfig } : {}),
+  ...(incomingData.aiConfig ? { aiConfig: incomingData.aiConfig } : {})
+});
+
 // 处理 OPTIONS 请求（解决跨域预检）
 export const onRequestOptions = async () => {
   return new Response(null, {
@@ -323,13 +377,20 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       });
     }
     
-    // 将数据写入 KV，并在服务端统一清理无效附加位置引用
-    const appData = body && Array.isArray(body.links) && Array.isArray(body.categories)
-      ? normalizeAppData(body)
-      : body;
+    // Merge a snapshot against its client-side base so an old device cannot
+    // replace records created or edited by another device.
+    let appData = body;
+    if (body && Array.isArray(body.links) && Array.isArray(body.categories)) {
+      const currentDataStr = await env.CLOUDNAV_KV.get('app_data');
+      const currentData = currentDataStr ? JSON.parse(currentDataStr) : { links: [], categories: [] };
+      const { baseData, ...incomingData } = body;
+      appData = baseData
+        ? mergeAppData(currentData, incomingData, baseData)
+        : normalizeAppData(incomingData);
+    }
     await env.CLOUDNAV_KV.put('app_data', JSON.stringify(appData));
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, data: appData }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (err) {
