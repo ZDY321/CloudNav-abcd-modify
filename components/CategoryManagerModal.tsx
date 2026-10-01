@@ -19,6 +19,44 @@ interface CategoryManagerModalProps {
   onVerifyPassword?: (password: string) => Promise<boolean>;
 }
 
+interface SortableCategoryItemProps {
+  id: string;
+  disabled: boolean;
+  domId?: string;
+  className: string;
+  children: (
+    handle: Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners' | 'setActivatorNodeRef'>
+  ) => React.ReactNode;
+}
+
+// Stable component types keep input DOM nodes mounted while the modal state changes.
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ id, disabled, domId, className, children }) => {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition } = useSortable({ id, disabled });
+
+  return (
+    <div
+      id={domId}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={className}
+    >
+      {children({ attributes, listeners, setActivatorNodeRef })}
+    </div>
+  );
+};
+
+const CategoryNameInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useLayoutEffect(() => {
+    // Focus and select only when entering edit mode, never on each keystroke.
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.select();
+  }, []);
+
+  return <input {...props} ref={inputRef} />;
+};
+
 const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -58,8 +96,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [demoteConfirm, setDemoteConfirm] = useState<{ fromCatId: string; toCatId: string } | null>(null);
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollFixRef = useRef<{ scrollTop: number; catId: string } | null>(null);
-  const composingRef = useRef(false);
+  const pendingScrollTopRef = useRef<number | null>(null);
   
   // 分类操作验证相关状态
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -81,24 +118,19 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     return map;
   }, [categories]);
 
-  const captureListScroll = (catId: string) => {
+  const captureListScroll = () => {
     if (!listScrollRef.current) return;
-    pendingScrollFixRef.current = { scrollTop: listScrollRef.current.scrollTop, catId };
+    pendingScrollTopRef.current = listScrollRef.current.scrollTop;
   };
 
   useLayoutEffect(() => {
-    if (!pendingScrollFixRef.current) return;
-    const { scrollTop, catId } = pendingScrollFixRef.current;
-    pendingScrollFixRef.current = null;
+    if (pendingScrollTopRef.current === null) return;
+    const scrollTop = pendingScrollTopRef.current;
+    pendingScrollTopRef.current = null;
 
     if (listScrollRef.current) {
       listScrollRef.current.scrollTop = scrollTop;
     }
-
-    setTimeout(() => {
-      if (!listScrollRef.current) return;
-      listScrollRef.current.scrollTop = scrollTop;
-    }, 0);
   }, [expandedCatIds, editingId, editingSubId, addingSubToCatId, movingSub, demotingCatId, demoteConfirm]);
 
   if (!isOpen) return null;
@@ -233,7 +265,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startEdit = (cat: Category) => {
-    captureListScroll(cat.id);
+    captureListScroll();
     setEditingId(cat.id);
     setEditName(cat.name);
     setEditPassword(cat.password || '');
@@ -241,7 +273,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const saveEdit = () => {
-    if (composingRef.current || !editingId || !editName.trim()) return;
+    if (!editingId || !editName.trim()) return;
     const newCats = categories.map(c => c.id === editingId ? { 
         ...c, 
         name: editName.trim(),
@@ -253,7 +285,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const handleAdd = () => {
-    if (composingRef.current || !newCatName.trim()) return;
+    if (!newCatName.trim()) return;
     const newCat: Category = {
       id: Date.now().toString(),
       name: newCatName.trim(),
@@ -285,7 +317,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 切换分类展开/折叠
   const toggleCategoryExpand = (catId: string) => {
-    captureListScroll(catId);
+    captureListScroll();
     setExpandedCatIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(catId)) {
@@ -299,7 +331,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 开始添加二级分类
   const startAddSubCategory = (catId: string) => {
-    captureListScroll(catId);
+    captureListScroll();
     setAddingSubToCatId(catId);
     setNewSubCatName('');
     setNewSubCatIcon('Tag');
@@ -309,7 +341,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 添加二级分类
   const handleAddSubCategory = (catId: string) => {
-    if (composingRef.current || !newSubCatName.trim()) return;
+    if (!newSubCatName.trim()) return;
     
     const newSubCat: SubCategory = {
       id: Date.now().toString(),
@@ -335,7 +367,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 开始编辑二级分类
   const startEditSubCategory = (catId: string, sub: SubCategory) => {
-    captureListScroll(catId);
+    captureListScroll();
     setEditingSubId(sub.id);
     setEditSubName(sub.name);
     setEditSubIcon(sub.icon);
@@ -343,7 +375,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 保存编辑二级分类
   const saveEditSubCategory = (catId: string) => {
-    if (composingRef.current || !editingSubId || !editSubName.trim()) return;
+    if (!editingSubId || !editSubName.trim()) return;
     
     const newCats = categories.map(c => {
       if (c.id === catId && c.subcategories) {
@@ -381,7 +413,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startMoveSubCategory = (fromCatId: string, subId: string) => {
-    captureListScroll(fromCatId);
+    captureListScroll();
     const firstOther = categories.find(c => c.id !== fromCatId)?.id || '';
     setMovingSub({ fromCatId, subId });
     setMoveTargetCatId(firstOther);
@@ -400,7 +432,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const startDemoteCategory = (fromCategoryId: string) => {
-    captureListScroll(fromCategoryId);
+    captureListScroll();
     const firstOther = categories.find(c => c.id !== fromCategoryId)?.id || '';
     setDemotingCatId(fromCategoryId);
     setDemoteTargetCatId(firstOther);
@@ -432,484 +464,407 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   
 
-  const SortableSubCategoryRow: React.FC<{
-    catId: string;
-    sub: SubCategory;
-    isSorting: boolean;
-    onStartEdit: (catId: string, sub: SubCategory) => void;
-    onDelete: (catId: string, subId: string, subName: string) => void;
-  }> = ({ catId, sub, isSorting, onStartEdit, onDelete }) => {
-    const editInputRef = useRef<HTMLInputElement | null>(null);
-
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      setActivatorNodeRef,
-      transform,
-      transition
-    } = useSortable({ id: `sub:${catId}:${sub.id}`, disabled: !isSorting });
-
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition
-    };
-
-    useLayoutEffect(() => {
-      if (editingSubId !== sub.id) return;
-      const input = editInputRef.current;
-      if (!input) return;
-      try {
-        input.focus({ preventScroll: true });
-      } catch {
-        input.focus();
-      }
-      input.select?.();
-    }, [editingSubId, sub.id]);
+  const renderSubCategoryRow = (catId: string, sub: SubCategory) => {
+    const isSorting = sortingSubCatId === catId;
 
     return (
-      <div
-        ref={setNodeRef}
-        style={style}
+      <SortableCategoryItem
+        key={sub.id}
+        id={`sub:${catId}:${sub.id}`}
+        disabled={!isSorting}
         className={`flex items-center gap-2 py-1.5 px-2 rounded-md border ${
           isSorting
             ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600'
             : 'bg-white dark:bg-slate-800 border-transparent'
         }`}
       >
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
-            isSorting ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
-          }`}
-          title={isSorting ? '拖拽排序' : '开启手动排序后可拖拽'}
-          {...(isSorting ? attributes : {})}
-          {...(isSorting ? listeners : {})}
-          onClick={(e) => e.preventDefault()}
-        >
-          <GripVertical size={14} />
-        </button>
-
-        {editingSubId === sub.id ? (
+        {({ attributes, listeners, setActivatorNodeRef }) => (
           <>
-            <Icon name={editSubIcon} size={14} />
-            <input
-              ref={editInputRef}
-              type="text"
-              value={editSubName}
-              onChange={(e) => setEditSubName(e.target.value)}
-              onCompositionStart={() => { composingRef.current = true; }}
-              onCompositionEnd={(e) => { composingRef.current = false; setEditSubName(e.currentTarget.value); }}
-              className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
-              placeholder="二级分类名称"
-            />
             <button
-              onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
-              className="p-1 text-slate-400 hover:text-blue-500"
-              title="选择图标"
+              type="button"
+              ref={setActivatorNodeRef}
+              className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
+                isSorting ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
+              }`}
+              title={isSorting ? '拖拽排序' : '开启手动排序后可拖拽'}
+              {...(isSorting ? attributes : {})}
+              {...(isSorting ? listeners : {})}
+              onClick={(e) => e.preventDefault()}
             >
-              <Palette size={12} />
+              <GripVertical size={14} />
             </button>
-            <button
-              onClick={() => saveEditSubCategory(catId)}
-              className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              onClick={() => setEditingSubId(null)}
-              className="p-1 text-slate-400 hover:text-red-500"
-            >
-              <X size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <Icon name={sub.icon} size={14} />
-            <span className="flex-1 text-sm dark:text-slate-300">{sub.name}</span>
-            {onMoveSubCategory && (
-              <button
-                type="button"
-                onClick={() => startMoveSubCategory(catId, sub.id)}
-                className="p-1 text-slate-400 hover:text-purple-500"
-                title="移动到其他一级分类"
-              >
-                <ArrowRightLeft size={12} />
-              </button>
-            )}
-            <button
-              onClick={() => onStartEdit(catId, sub)}
-              className="p-1 text-slate-400 hover:text-blue-500"
-              title="编辑"
-            >
-              <Edit2 size={12} />
-            </button>
-            <button
-              onClick={() => onDelete(catId, sub.id, sub.name)}
-              className="p-1 text-slate-400 hover:text-red-500"
-              title="删除"
-            >
-              <Trash2 size={12} />
-            </button>
-          </>
-        )}
-      </div>
-    );
-  };
 
-  const SortableCategoryCard: React.FC<{ cat: Category }> = ({ cat }) => {
-    const isSortableEnabled = isCategorySorting;
-    const editNameInputRef = useRef<HTMLInputElement | null>(null);
-    const addSubInputRef = useRef<HTMLInputElement | null>(null);
-
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      setActivatorNodeRef,
-      transform,
-      transition
-    } = useSortable({ id: `cat:${cat.id}`, disabled: !isSortableEnabled });
-
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition
-    };
-
-    useLayoutEffect(() => {
-      if (editingId !== cat.id) return;
-      const input = editNameInputRef.current;
-      if (!input) return;
-      try {
-        input.focus({ preventScroll: true });
-      } catch {
-        input.focus();
-      }
-      input.select?.();
-    }, [editingId, cat.id]);
-
-    useLayoutEffect(() => {
-      if (addingSubToCatId !== cat.id) return;
-      const input = addSubInputRef.current;
-      if (!input) return;
-      try {
-        input.focus({ preventScroll: true });
-      } catch {
-        input.focus();
-      }
-      input.select?.();
-    }, [addingSubToCatId, cat.id]);
-
-    const subCount = cat.subcategories?.length ?? 0;
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        id={`cat-card-${cat.id}`}
-        className="flex flex-col p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg group gap-2"
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            ref={setActivatorNodeRef}
-            className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
-              isSortableEnabled ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
-            }`}
-            title={isSortableEnabled ? '拖拽排序' : '开启手动排序后可拖拽'}
-            {...(isSortableEnabled ? attributes : {})}
-            {...(isSortableEnabled ? listeners : {})}
-            onClick={(e) => e.preventDefault()}
-          >
-            <GripVertical size={16} />
-          </button>
-
-          <div className="flex items-center gap-2 flex-1">
-            {editingId === cat.id ? (
-              <div className="flex flex-col gap-2 w-full">
-                <div className="flex items-center gap-2">
-                  <Icon name={editIcon} size={16} />
-                  <input
-                    ref={editNameInputRef}
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onCompositionStart={() => { composingRef.current = true; }}
-                    onCompositionEnd={(e) => { composingRef.current = false; setEditName(e.currentTarget.value); }}
-                    className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
-                    placeholder="分类名称"
-                  />
-                  <button
-                    type="button"
-                    className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                    onClick={() => openIconSelector('edit')}
-                    title="选择图标"
-                  >
-                    <Palette size={16} />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Lock size={14} className="text-slate-400" />
-                  <input
-                    type="password"
-                    value={editPassword}
-                    onChange={(e) => setEditPassword(e.target.value)}
-                    className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
-                    placeholder="密码（可选）"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Icon name={cat.icon} size={16} />
-                <span className="font-medium dark:text-slate-200 truncate">
-                  {cat.name}
-                  {cat.id === 'common' && (
-                    <span className="ml-2 text-xs text-slate-400">(默认分类)</span>
-                  )}
-                </span>
-                {subCount > 0 && (
-                  <span
-                    className="px-1.5 py-0.5 text-xs font-medium bg-white/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-300 rounded-full border border-slate-200 dark:border-slate-600"
-                    title="二级分类数量"
-                  >
-                    {subCount}
-                  </span>
-                )}
-                {cat.password && <Lock size={12} className="text-slate-400" />}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 self-start mt-1">
-            {editingId === cat.id ? (
-              <button
-                onClick={saveEdit}
-                className="text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 p-1.5 rounded bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-600"
-              >
-                <Check size={16} />
-              </button>
-            ) : (
+            {editingSubId === sub.id ? (
               <>
-                <button
-                  onClick={() => toggleCategoryExpand(cat.id)}
-                  className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                  title={expandedCatIds.has(cat.id) ? '收起二级分类' : '展开二级分类'}
-                >
-                  {expandedCatIds.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </button>
-                <button
-                  onClick={() => startAddSubCategory(cat.id)}
-                  className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                  title="添加二级分类"
-                >
-                  <Plus size={14} />
-                </button>
-                {cat.id !== 'common' && onDemoteCategoryToSubCategory && (
-                  <button
-                    type="button"
-                    onClick={() => startDemoteCategory(cat.id)}
-                    className="p-1.5 text-slate-400 hover:text-purple-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                    title="将一级分类移动为其他一级分类的二级分类"
-                  >
-                    <CornerDownRight size={14} />
-                  </button>
-                )}
-                <button
-                  onClick={() => handleStartEdit(cat)}
-                  className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                  title="编辑"
-                >
-                  <Edit2 size={14} />
-                </button>
-                {cat.id !== 'common' && (
-                  <button
-                    onClick={() => handleDeleteClick(cat)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
-                    title="删除"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-                {cat.id === 'common' && (
-                  <div className="p-1.5 text-slate-300" title="常用推荐分类不能被删除">
-                    <Lock size={14} />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {demotingCatId === cat.id && onDemoteCategoryToSubCategory && (
-          <div className="flex items-center gap-2 py-2 px-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900">
-            <span className="text-xs text-purple-700 dark:text-purple-300">移动为二级到：</span>
-            <select
-              value={demoteTargetCatId}
-              onChange={(e) => setDemoteTargetCatId(e.target.value)}
-              className="flex-1 p-1.5 text-sm rounded border border-purple-300 dark:border-purple-800 dark:bg-slate-800 dark:text-white outline-none"
-            >
-              {categories
-                .filter(c => c.id !== cat.id)
-                .map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
-            <button
-              type="button"
-              onClick={confirmDemoteCategory}
-              disabled={!demoteTargetCatId}
-              className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-slate-700 rounded disabled:opacity-50"
-              title="确认移动"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={cancelDemoteCategory}
-              className="p-1.5 text-slate-400 hover:text-red-500 rounded"
-              title="取消"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* 二级分类列表 */}
-        {expandedCatIds.has(cat.id) && (
-          <div className="ml-8 mt-2 space-y-1 border-l-2 border-slate-200 dark:border-slate-600 pl-3">
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-slate-400">
-                二级分类{cat.subcategories && cat.subcategories.length > 0 ? `（${cat.subcategories.length}）` : ''}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => toggleSubCategorySorting(cat.id)}
-                  className={`px-2 py-1 text-xs rounded border transition-colors ${
-                    sortingSubCatId === cat.id
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                      : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                  title="开启/关闭手动排序（拖拽）"
-                >
-                  <ArrowUpDown size={12} className="inline-block mr-1" />
-                  手动
-                </button>
-                <button
-                  type="button"
-                  onClick={() => autoSortSubCategories(cat.id)}
-                  disabled={!cat.subcategories || cat.subcategories.length < 2}
-                  className="px-2 py-1 text-xs rounded border bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                  title={`自动按名称排序（${categoryNameMap.get(cat.id) || cat.id}）`}
-                >
-                  <ArrowDownAZ size={12} className="inline-block mr-1" />
-                  A-Z
-                </button>
-              </div>
-            </div>
-
-            {cat.subcategories && cat.subcategories.length > 0 && (
-              <SortableContext items={cat.subcategories.map(s => `sub:${cat.id}:${s.id}`)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-1 mt-1">
-                    {movingSub && movingSub.fromCatId === cat.id && (
-                      <div className="flex items-center gap-2 py-2 px-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900">
-                        <span className="text-xs text-purple-700 dark:text-purple-300">
-                          移动“{cat.subcategories.find(s => s.id === movingSub.subId)?.name || '未命名'}”到：
-                        </span>
-                        <select
-                          value={moveTargetCatId}
-                          onChange={(e) => setMoveTargetCatId(e.target.value)}
-                          className="flex-1 p-1.5 text-sm rounded border border-purple-300 dark:border-purple-800 dark:bg-slate-800 dark:text-white outline-none"
-                        >
-                          {categories
-                            .filter(c => c.id !== cat.id)
-                            .map(c => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={confirmMoveSubCategory}
-                          disabled={!moveTargetCatId}
-                          className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-slate-700 rounded disabled:opacity-50"
-                          title="确认移动"
-                        >
-                          <Check size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelMoveSubCategory}
-                          className="p-1.5 text-slate-400 hover:text-red-500 rounded"
-                          title="取消"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {cat.subcategories.map(sub => (
-                      <SortableSubCategoryRow
-                        key={sub.id}
-                        catId={cat.id}
-                        sub={sub}
-                        isSorting={sortingSubCatId === cat.id}
-                        onStartEdit={startEditSubCategory}
-                        onDelete={deleteSubCategory}
-                      />
-                    ))}
-                </div>
-              </SortableContext>
-            )}
-
-            {addingSubToCatId === cat.id && (
-              <div className="flex items-center gap-2 py-1.5 px-2 bg-blue-50 dark:bg-blue-900/30 rounded-md">
-                <Icon name={newSubCatIcon} size={14} />
-                <input
-                  ref={addSubInputRef}
+                <Icon name={editSubIcon} size={14} />
+                <CategoryNameInput
                   type="text"
-                  value={newSubCatName}
-                  onChange={(e) => setNewSubCatName(e.target.value)}
-                  onCompositionStart={() => { composingRef.current = true; }}
-                  onCompositionEnd={(e) => { composingRef.current = false; setNewSubCatName(e.currentTarget.value); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory(cat.id)}
+                  value={editSubName}
+                  onChange={(e) => setEditSubName(e.target.value)}
                   className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
-                  placeholder="新二级分类名称"
+                  placeholder="二级分类名称"
                 />
                 <button
-                  onClick={() => { setIconSelectorTarget('subNew'); setIsIconSelectorOpen(true); }}
+                  onClick={() => { setIconSelectorTarget('subEdit'); setIsIconSelectorOpen(true); }}
                   className="p-1 text-slate-400 hover:text-blue-500"
                   title="选择图标"
                 >
                   <Palette size={12} />
                 </button>
                 <button
-                  onClick={() => handleAddSubCategory(cat.id)}
-                  disabled={!newSubCatName.trim()}
-                  className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded disabled:opacity-50"
+                  onClick={() => saveEditSubCategory(catId)}
+                  className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
                 >
                   <Check size={14} />
                 </button>
                 <button
-                  onClick={() => setAddingSubToCatId(null)}
+                  onClick={() => setEditingSubId(null)}
                   className="p-1 text-slate-400 hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <Icon name={sub.icon} size={14} />
+                <span className="flex-1 text-sm dark:text-slate-300">{sub.name}</span>
+                {onMoveSubCategory && (
+                  <button
+                    type="button"
+                    onClick={() => startMoveSubCategory(catId, sub.id)}
+                    className="p-1 text-slate-400 hover:text-purple-500"
+                    title="移动到其他一级分类"
+                  >
+                    <ArrowRightLeft size={12} />
+                  </button>
+                )}
+                <button
+                  onClick={() => startEditSubCategory(catId, sub)}
+                  className="p-1 text-slate-400 hover:text-blue-500"
+                  title="编辑"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button
+                  onClick={() => deleteSubCategory(catId, sub.id, sub.name)}
+                  className="p-1 text-slate-400 hover:text-red-500"
+                  title="删除"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </SortableCategoryItem>
+    );
+  };
+
+  const renderCategoryCard = (cat: Category) => {
+    const isSortableEnabled = isCategorySorting;
+    const subCount = cat.subcategories?.length ?? 0;
+
+    return (
+      <SortableCategoryItem
+        key={cat.id}
+        id={`cat:${cat.id}`}
+        disabled={!isSortableEnabled}
+        domId={`cat-card-${cat.id}`}
+        className="flex flex-col p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg group gap-2"
+      >
+        {({ attributes, listeners, setActivatorNodeRef }) => (
+          <>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                ref={setActivatorNodeRef}
+                className={`p-1 -ml-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
+                  isSortableEnabled ? 'cursor-grab active:cursor-grabbing' : 'opacity-40 cursor-default'
+                }`}
+                title={isSortableEnabled ? '拖拽排序' : '开启手动排序后可拖拽'}
+                {...(isSortableEnabled ? attributes : {})}
+                {...(isSortableEnabled ? listeners : {})}
+                onClick={(e) => e.preventDefault()}
+              >
+                <GripVertical size={16} />
+              </button>
+
+              <div className="flex items-center gap-2 flex-1">
+                {editingId === cat.id ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="flex items-center gap-2">
+                      <Icon name={editIcon} size={16} />
+                      <CategoryNameInput
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
+                        placeholder="分类名称"
+                      />
+                      <button
+                        type="button"
+                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                        onClick={() => openIconSelector('edit')}
+                        title="选择图标"
+                      >
+                        <Palette size={16} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Lock size={14} className="text-slate-400" />
+                      <input
+                        type="password"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
+                        placeholder="密码（可选）"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Icon name={cat.icon} size={16} />
+                    <span className="font-medium dark:text-slate-200 truncate">
+                      {cat.name}
+                      {cat.id === 'common' && (
+                        <span className="ml-2 text-xs text-slate-400">(默认分类)</span>
+                      )}
+                    </span>
+                    {subCount > 0 && (
+                      <span
+                        className="px-1.5 py-0.5 text-xs font-medium bg-white/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-300 rounded-full border border-slate-200 dark:border-slate-600"
+                        title="二级分类数量"
+                      >
+                        {subCount}
+                      </span>
+                    )}
+                    {cat.password && <Lock size={12} className="text-slate-400" />}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 self-start mt-1">
+                {editingId === cat.id ? (
+                  <button
+                    onClick={saveEdit}
+                    className="text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 p-1.5 rounded bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-600"
+                  >
+                    <Check size={16} />
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => toggleCategoryExpand(cat.id)}
+                      className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                      title={expandedCatIds.has(cat.id) ? '收起二级分类' : '展开二级分类'}
+                    >
+                      {expandedCatIds.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    <button
+                      onClick={() => startAddSubCategory(cat.id)}
+                      className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                      title="添加二级分类"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    {cat.id !== 'common' && onDemoteCategoryToSubCategory && (
+                      <button
+                        type="button"
+                        onClick={() => startDemoteCategory(cat.id)}
+                        className="p-1.5 text-slate-400 hover:text-purple-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                        title="将一级分类移动为其他一级分类的二级分类"
+                      >
+                        <CornerDownRight size={14} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleStartEdit(cat)}
+                      className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                      title="编辑"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    {cat.id !== 'common' && (
+                      <button
+                        onClick={() => handleDeleteClick(cat)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                        title="删除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    {cat.id === 'common' && (
+                      <div className="p-1.5 text-slate-300" title="常用推荐分类不能被删除">
+                        <Lock size={14} />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {demotingCatId === cat.id && onDemoteCategoryToSubCategory && (
+              <div className="flex items-center gap-2 py-2 px-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900">
+                <span className="text-xs text-purple-700 dark:text-purple-300">移动为二级到：</span>
+                <select
+                  value={demoteTargetCatId}
+                  onChange={(e) => setDemoteTargetCatId(e.target.value)}
+                  className="flex-1 p-1.5 text-sm rounded border border-purple-300 dark:border-purple-800 dark:bg-slate-800 dark:text-white outline-none"
+                >
+                  {categories
+                    .filter(c => c.id !== cat.id)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={confirmDemoteCategory}
+                  disabled={!demoteTargetCatId}
+                  className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-slate-700 rounded disabled:opacity-50"
+                  title="确认移动"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelDemoteCategory}
+                  className="p-1.5 text-slate-400 hover:text-red-500 rounded"
+                  title="取消"
                 >
                   <X size={14} />
                 </button>
               </div>
             )}
 
-            {(!cat.subcategories || cat.subcategories.length === 0) && addingSubToCatId !== cat.id && (
-              <div className="text-xs text-slate-400 py-2 text-center">暂无二级分类</div>
+            {/* 二级分类列表 */}
+            {expandedCatIds.has(cat.id) && (
+              <div className="ml-8 mt-2 space-y-1 border-l-2 border-slate-200 dark:border-slate-600 pl-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-slate-400">
+                    二级分类{cat.subcategories && cat.subcategories.length > 0 ? `（${cat.subcategories.length}）` : ''}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleSubCategorySorting(cat.id)}
+                      className={`px-2 py-1 text-xs rounded border transition-colors ${
+                        sortingSubCatId === cat.id
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                      title="开启/关闭手动排序（拖拽）"
+                    >
+                      <ArrowUpDown size={12} className="inline-block mr-1" />
+                      手动
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => autoSortSubCategories(cat.id)}
+                      disabled={!cat.subcategories || cat.subcategories.length < 2}
+                      className="px-2 py-1 text-xs rounded border bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                      title={`自动按名称排序（${categoryNameMap.get(cat.id) || cat.id}）`}
+                    >
+                      <ArrowDownAZ size={12} className="inline-block mr-1" />
+                      A-Z
+                    </button>
+                  </div>
+                </div>
+
+                {cat.subcategories && cat.subcategories.length > 0 && (
+                  <SortableContext items={cat.subcategories.map(s => `sub:${cat.id}:${s.id}`)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1 mt-1">
+                        {movingSub && movingSub.fromCatId === cat.id && (
+                          <div className="flex items-center gap-2 py-2 px-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900">
+                            <span className="text-xs text-purple-700 dark:text-purple-300">
+                              移动“{cat.subcategories.find(s => s.id === movingSub.subId)?.name || '未命名'}”到：
+                            </span>
+                            <select
+                              value={moveTargetCatId}
+                              onChange={(e) => setMoveTargetCatId(e.target.value)}
+                              className="flex-1 p-1.5 text-sm rounded border border-purple-300 dark:border-purple-800 dark:bg-slate-800 dark:text-white outline-none"
+                            >
+                              {categories
+                                .filter(c => c.id !== cat.id)
+                                .map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={confirmMoveSubCategory}
+                              disabled={!moveTargetCatId}
+                              className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-slate-700 rounded disabled:opacity-50"
+                              title="确认移动"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelMoveSubCategory}
+                              className="p-1.5 text-slate-400 hover:text-red-500 rounded"
+                              title="取消"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
+
+                        {cat.subcategories.map(sub => renderSubCategoryRow(cat.id, sub))}
+                    </div>
+                  </SortableContext>
+                )}
+
+                {addingSubToCatId === cat.id && (
+                  <div className="flex items-center gap-2 py-1.5 px-2 bg-blue-50 dark:bg-blue-900/30 rounded-md">
+                    <Icon name={newSubCatIcon} size={14} />
+                    <CategoryNameInput
+                      type="text"
+                      value={newSubCatName}
+                      onChange={(e) => setNewSubCatName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+                          handleAddSubCategory(cat.id);
+                        }
+                      }}
+                      className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
+                      placeholder="新二级分类名称"
+                    />
+                    <button
+                      onClick={() => { setIconSelectorTarget('subNew'); setIsIconSelectorOpen(true); }}
+                      className="p-1 text-slate-400 hover:text-blue-500"
+                      title="选择图标"
+                    >
+                      <Palette size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleAddSubCategory(cat.id)}
+                      disabled={!newSubCatName.trim()}
+                      className="p-1 text-green-500 hover:bg-green-50 dark:hover:bg-slate-600 rounded disabled:opacity-50"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      onClick={() => setAddingSubToCatId(null)}
+                      className="p-1 text-slate-400 hover:text-red-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {(!cat.subcategories || cat.subcategories.length === 0) && addingSubToCatId !== cat.id && (
+                  <div className="text-xs text-slate-400 py-2 text-center">暂无二级分类</div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
-      </div>
+      </SortableCategoryItem>
     );
   };
   
@@ -955,9 +910,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={categories.map(c => `cat:${c.id}`)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
-                {categories.map(cat => (
-                  <SortableCategoryCard key={cat.id} cat={cat} />
-                ))}
+                {categories.map(renderCategoryCard)}
               </div>
             </SortableContext>
           </DndContext>
@@ -1016,8 +969,6 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   type="text"
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
-                  onCompositionStart={() => { composingRef.current = true; }}
-                  onCompositionEnd={(e) => { composingRef.current = false; setNewCatName(e.currentTarget.value); }}
                   placeholder="分类名称"
                   className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                />
@@ -1039,7 +990,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         onChange={(e) => setNewCatPassword(e.target.value)}
                         placeholder="密码 (可选)"
                         className="w-full pl-8 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+                            handleAdd();
+                          }
+                        }}
                     />
                  </div>
                  <button 
