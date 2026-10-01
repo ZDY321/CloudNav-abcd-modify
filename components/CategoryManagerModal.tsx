@@ -59,6 +59,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollFixRef = useRef<{ scrollTop: number; catId: string } | null>(null);
+  const composingRef = useRef(false);
   
   // 分类操作验证相关状态
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -94,14 +95,9 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       listScrollRef.current.scrollTop = scrollTop;
     }
 
-    const el = document.getElementById(`cat-card-${catId}`);
-    el?.scrollIntoView({ block: 'nearest' });
-
     setTimeout(() => {
       if (!listScrollRef.current) return;
       listScrollRef.current.scrollTop = scrollTop;
-      const elAfter = document.getElementById(`cat-card-${catId}`);
-      elAfter?.scrollIntoView({ block: 'nearest' });
     }, 0);
   }, [expandedCatIds, editingId, editingSubId, addingSubToCatId, movingSub, demotingCatId, demoteConfirm]);
 
@@ -245,7 +241,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const saveEdit = () => {
-    if (!editingId || !editName.trim()) return;
+    if (composingRef.current || !editingId || !editName.trim()) return;
     const newCats = categories.map(c => c.id === editingId ? { 
         ...c, 
         name: editName.trim(),
@@ -257,7 +253,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const handleAdd = () => {
-    if (!newCatName.trim()) return;
+    if (composingRef.current || !newCatName.trim()) return;
     const newCat: Category = {
       id: Date.now().toString(),
       name: newCatName.trim(),
@@ -313,7 +309,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 添加二级分类
   const handleAddSubCategory = (catId: string) => {
-    if (!newSubCatName.trim()) return;
+    if (composingRef.current || !newSubCatName.trim()) return;
     
     const newSubCat: SubCategory = {
       id: Date.now().toString(),
@@ -347,7 +343,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // 保存编辑二级分类
   const saveEditSubCategory = (catId: string) => {
-    if (!editingSubId || !editSubName.trim()) return;
+    if (composingRef.current || !editingSubId || !editSubName.trim()) return;
     
     const newCats = categories.map(c => {
       if (c.id === catId && c.subcategories) {
@@ -503,6 +499,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               type="text"
               value={editSubName}
               onChange={(e) => setEditSubName(e.target.value)}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={(e) => { composingRef.current = false; setEditSubName(e.currentTarget.value); }}
               className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
               placeholder="二级分类名称"
             />
@@ -637,6 +635,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
+                    onCompositionStart={() => { composingRef.current = true; }}
+                    onCompositionEnd={(e) => { composingRef.current = false; setEditName(e.currentTarget.value); }}
                     className="flex-1 p-1.5 px-2 text-sm rounded border border-blue-500 dark:bg-slate-800 dark:text-white outline-none"
                     placeholder="分类名称"
                   />
@@ -875,6 +875,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   type="text"
                   value={newSubCatName}
                   onChange={(e) => setNewSubCatName(e.target.value)}
+                  onCompositionStart={() => { composingRef.current = true; }}
+                  onCompositionEnd={(e) => { composingRef.current = false; setNewSubCatName(e.currentTarget.value); }}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory(cat.id)}
                   className="flex-1 p-1 px-2 text-sm rounded border border-blue-500 dark:bg-slate-700 dark:text-white outline-none"
                   placeholder="新二级分类名称"
@@ -1014,6 +1016,8 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   type="text"
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
+                  onCompositionStart={() => { composingRef.current = true; }}
+                  onCompositionEnd={(e) => { composingRef.current = false; setNewCatName(e.currentTarget.value); }}
                   placeholder="分类名称"
                   className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                />
