@@ -36,6 +36,7 @@ import type { LoginResult } from './components/AuthModal';
 import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
 import { readLocalStorageJson, readLocalStorageNumber } from './utils/localStorage';
 import { DEFAULT_SITE_SETTINGS, mergeSiteSettings, normalizeSiteSettings, SITE_SETTINGS_STORAGE_KEY } from './utils/siteSettings';
+import { enqueueSnapshotSync, type SnapshotSyncQueue } from './utils/syncQueue';
 
 const LinkModal = lazy(() => import('./components/LinkModal'));
 const CategoryManagerModal = lazy(() => import('./components/CategoryManagerModal'));
@@ -75,10 +76,10 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const linksRef = useRef<LinkItem[]>([]);
   const categoriesRef = useRef<Category[]>([]);
-  // Snapshot last confirmed by the server. It is used to send only this
-  // device's changes when another device has modified the cloud data.
-  const cloudDataRef = useRef<{ links: LinkItem[]; categories: Category[] } | null>(null);
-  const syncQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const syncQueueRef = useRef<SnapshotSyncQueue<{ links: LinkItem[]; categories: Category[] }>>({
+    pending: Promise.resolve(true),
+    baseData: null
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
@@ -604,7 +605,7 @@ function App() {
     newLinks: LinkItem[],
     newCategories: Category[],
     token: string,
-    baseData: { links: LinkItem[]; categories: Category[] } | null = cloudDataRef.current
+    baseData: { links: LinkItem[]; categories: Category[] } | null
   ) => {
     setSyncStatus('saving');
     try {
@@ -642,15 +643,8 @@ function App() {
 
         if (!response.ok) throw new Error('Network response was not ok');
         
-        const result = await response.json().catch(() => null);
-        if (result?.data?.links && result?.data?.categories) {
-          cloudDataRef.current = {
-            links: result.data.links,
-            categories: result.data.categories
-          };
-        } else {
-          cloudDataRef.current = { links: newLinks, categories: newCategories };
-        }
+        const result = await response.json();
+        if (!result.success) throw new Error('Server did not confirm saving data');
         setSyncStatus('saved');
         markSynced();
         setTimeout(() => setSyncStatus('idle'), 2000);
@@ -661,6 +655,18 @@ function App() {
         return false;
     }
   };
+
+  const queueCloudSync = (
+    newLinks: LinkItem[],
+    newCategories: Category[],
+    token: string,
+    fallbackBase: { links: LinkItem[]; categories: Category[] } | null = null
+  ) => enqueueSnapshotSync(
+    syncQueueRef.current,
+    { links: newLinks, categories: newCategories },
+    (snapshot, baseData) => syncToCloud(snapshot.links, snapshot.categories, token, baseData),
+    fallbackBase
+  );
 
   const updateData = (newLinks: LinkItem[], newCategories: Category[]) => {
       const normalizedCategories = normalizeCategories(newCategories);
@@ -675,20 +681,10 @@ function App() {
 
       // 3. Sync to Cloud (if authenticated)
       if (authToken) {
-          const baseData = cloudDataRef.current
-            ? {
-                links: cloudDataRef.current.links,
-                categories: cloudDataRef.current.categories
-              }
-            : {
-                links: linksRef.current,
-                categories: categoriesRef.current
-              };
-          // Keep writes in order. Without this, two quick edits can complete
-          // out of order and an older full snapshot wins in KV.
-          syncQueueRef.current = syncQueueRef.current
-            .catch(() => false)
-            .then(() => syncToCloud(normalizedLinks, normalizedCategories, authToken, baseData));
+          queueCloudSync(normalizedLinks, normalizedCategories, authToken, {
+            links: linksRef.current,
+            categories: categoriesRef.current
+          });
       }
   };
 
@@ -1108,7 +1104,7 @@ function App() {
                 if (data.links && data.links.length > 0) {
                     const normalizedCategories = normalizeCategories(data.categories);
                     const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
-                    cloudDataRef.current = { links: normalizedLinks, categories: normalizedCategories };
+                    syncQueueRef.current.baseData = { links: normalizedLinks, categories: normalizedCategories };
                     setLinks(normalizedLinks);
                     setCategories(normalizedCategories);
                     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
@@ -1482,7 +1478,7 @@ function App() {
                     if (data.links && data.links.length > 0) {
                         const normalizedCategories = normalizeCategories(data.categories);
                         const normalizedLinks = normalizeLinks(data.links, normalizedCategories);
-                        cloudDataRef.current = { links: normalizedLinks, categories: normalizedCategories };
+                        syncQueueRef.current.baseData = { links: normalizedLinks, categories: normalizedCategories };
                         setLinks(normalizedLinks);
                         setCategories(normalizedCategories);
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
@@ -1497,7 +1493,7 @@ function App() {
                         // 如果服务器没有数据，使用本地数据
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links, categories }));
                         // 并将本地数据同步到服务器
-                        syncToCloud(links, categories, password);
+                        queueCloudSync(links, categories, password);
                         
                         // 加载链接图标缓存
                         loadLinkIcons(links);
@@ -1507,7 +1503,7 @@ function App() {
                 console.warn("Failed to fetch data after login.", e);
                 loadFromLocal();
                 // 尝试将本地数据同步到服务器
-                syncToCloud(links, categories, password);
+                queueCloudSync(links, categories, password);
             }
             
             // 登录成功后，从KV空间加载AI配置

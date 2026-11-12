@@ -72,7 +72,19 @@ const normalizeAppData = (rawData: any) => {
   return { ...rawData, links: normalizedLinks, categories };
 };
 
-const valuesEqual = (left: any, right: any) => JSON.stringify(left) === JSON.stringify(right);
+const valuesEqual = (left: any, right: any): boolean => {
+  if (left === right) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+      left.every((value, index) => valuesEqual(value, right[index]));
+  }
+  const leftKeys = Object.keys(left).filter(key => left[key] !== undefined);
+  const rightKeys = Object.keys(right).filter(key => right[key] !== undefined);
+  return leftKeys.length === rightKeys.length && leftKeys.every(key => (
+    Object.prototype.hasOwnProperty.call(right, key) && valuesEqual(left[key], right[key])
+  ));
+};
 
 /**
  * Merge a full client snapshot using the snapshot it was based on. This keeps
@@ -110,21 +122,28 @@ const mergeCollection = (current: any[], incoming: any[], base: any[] | undefine
   return orderedIds.map(id => currentById.get(id)).filter(Boolean);
 };
 
-const mergeAppData = (currentData: any, incomingData: any, baseData: any) => normalizeAppData({
-  ...currentData,
-  links: mergeCollection(
-    Array.isArray(currentData?.links) ? currentData.links : [],
-    Array.isArray(incomingData?.links) ? incomingData.links : [],
-    Array.isArray(baseData?.links) ? baseData.links : undefined
-  ),
-  categories: mergeCollection(
-    Array.isArray(currentData?.categories) ? currentData.categories : [],
-    Array.isArray(incomingData?.categories) ? incomingData.categories : [],
-    Array.isArray(baseData?.categories) ? baseData.categories : undefined
-  ),
-  ...(incomingData.searchConfig ? { searchConfig: incomingData.searchConfig } : {}),
-  ...(incomingData.aiConfig ? { aiConfig: incomingData.aiConfig } : {})
-});
+const mergeAppData = (currentData: any, incomingData: any, baseData: any) => {
+  // GET normalizes legacy category fields. Compare the same representation so
+  // reading old data does not look like a concurrent edit by another device.
+  const current = normalizeAppData(currentData);
+  const incoming = normalizeAppData(incomingData);
+  const base = normalizeAppData(baseData);
+  return normalizeAppData({
+    ...currentData,
+    links: mergeCollection(
+      current.links,
+      incoming.links,
+      Array.isArray(baseData?.links) ? base.links : undefined
+    ),
+    categories: mergeCollection(
+      current.categories,
+      incoming.categories,
+      Array.isArray(baseData?.categories) ? base.categories : undefined
+    ),
+    ...(incomingData.searchConfig ? { searchConfig: incomingData.searchConfig } : {}),
+    ...(incomingData.aiConfig ? { aiConfig: incomingData.aiConfig } : {})
+  });
+};
 
 // 处理 OPTIONS 请求（解决跨域预检）
 export const onRequestOptions = async () => {
