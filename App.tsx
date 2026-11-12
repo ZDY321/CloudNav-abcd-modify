@@ -36,7 +36,7 @@ import type { LoginResult } from './components/AuthModal';
 import { useAvailabilityCheck } from './hooks/useAvailabilityCheck';
 import { readLocalStorageJson, readLocalStorageNumber } from './utils/localStorage';
 import { DEFAULT_SITE_SETTINGS, mergeSiteSettings, normalizeSiteSettings, SITE_SETTINGS_STORAGE_KEY } from './utils/siteSettings';
-import { enqueueSnapshotSync, type SnapshotSyncQueue } from './utils/syncQueue';
+import { enqueueSnapshotSync, resumeSnapshotSync, type SnapshotSyncQueue, type SnapshotSyncJournal } from './utils/syncQueue';
 
 const LinkModal = lazy(() => import('./components/LinkModal'));
 const CategoryManagerModal = lazy(() => import('./components/CategoryManagerModal'));
@@ -52,6 +52,7 @@ const QRCodeModal = lazy(() => import('./components/QRCodeModal'));
 const GITHUB_REPO_URL = 'https://github.com/aabacada/CloudNav-abcd';
 
 const LOCAL_STORAGE_KEY = 'cloudnav_data_cache';
+const PENDING_SYNC_KEY = 'cloudnav_pending_sync';
 const AUTH_KEY = 'cloudnav_auth_token';
 const WEBDAV_CONFIG_KEY = 'cloudnav_webdav_config';
 const AI_CONFIG_KEY = 'cloudnav_ai_config';
@@ -70,13 +71,15 @@ const DEFAULT_WEBDAV_CONFIG: WebDavConfig = {
   enabled: false
 };
 
+type DataSnapshot = { links: LinkItem[]; categories: Category[] };
+
 function App() {
   // --- State ---
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const linksRef = useRef<LinkItem[]>([]);
   const categoriesRef = useRef<Category[]>([]);
-  const syncQueueRef = useRef<SnapshotSyncQueue<{ links: LinkItem[]; categories: Category[] }>>({
+  const syncQueueRef = useRef<SnapshotSyncQueue<DataSnapshot>>({
     pending: Promise.resolve(true),
     baseData: null
   });
@@ -190,6 +193,16 @@ function App() {
     linksRef.current = links;
     categoriesRef.current = categories;
   }, [links, categories]);
+
+  useEffect(() => {
+    const warnIfUnsaved = (event: BeforeUnloadEvent) => {
+      if (!syncQueueRef.current.outbox?.length) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnIfUnsaved);
+    return () => window.removeEventListener('beforeunload', warnIfUnsaved);
+  }, []);
   
   const {
     checkingLinkIds,
@@ -605,7 +618,7 @@ function App() {
     newLinks: LinkItem[],
     newCategories: Category[],
     token: string,
-    baseData: { links: LinkItem[]; categories: Category[] } | null
+    baseData: DataSnapshot | null
   ) => {
     setSyncStatus('saving');
     try {
@@ -645,9 +658,7 @@ function App() {
         
         const result = await response.json();
         if (!result.success) throw new Error('Server did not confirm saving data');
-        setSyncStatus('saved');
         markSynced();
-        setTimeout(() => setSyncStatus('idle'), 2000);
         return true;
     } catch (error) {
         console.error("Sync failed", error);
@@ -656,17 +667,54 @@ function App() {
     }
   };
 
+  const persistSyncQueue = (queue: SnapshotSyncQueue<DataSnapshot>) => {
+    if (queue.outbox?.length) {
+      const journal: SnapshotSyncJournal<DataSnapshot> = {
+        baseData: queue.baseData,
+        outbox: queue.outbox
+      };
+      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(journal));
+      setSyncStatus('saving');
+    } else {
+      localStorage.removeItem(PENDING_SYNC_KEY);
+      setSyncStatus('saved');
+    }
+  };
+
   const queueCloudSync = (
     newLinks: LinkItem[],
     newCategories: Category[],
     token: string,
-    fallbackBase: { links: LinkItem[]; categories: Category[] } | null = null
-  ) => enqueueSnapshotSync(
-    syncQueueRef.current,
-    { links: newLinks, categories: newCategories },
-    (snapshot, baseData) => syncToCloud(snapshot.links, snapshot.categories, token, baseData),
-    fallbackBase
-  );
+    fallbackBase: DataSnapshot | null = null
+  ) => {
+    syncQueueRef.current.onChange = persistSyncQueue;
+    return enqueueSnapshotSync(
+      syncQueueRef.current,
+      { links: newLinks, categories: newCategories },
+      (snapshot, baseData) => syncToCloud(snapshot.links, snapshot.categories, token, baseData),
+      fallbackBase
+    );
+  };
+
+  const recoverPendingSync = async (token: string): Promise<boolean> => {
+    if (!token) return false;
+    const journal = readLocalStorageJson<SnapshotSyncJournal<DataSnapshot> | null>(PENDING_SYNC_KEY, null);
+    const isSnapshot = (value: DataSnapshot | null) => value && Array.isArray(value.links) && Array.isArray(value.categories);
+    if (!journal || !Array.isArray(journal.outbox) || !journal.outbox.length ||
+        !journal.outbox.every(entry => isSnapshot(entry?.snapshot)) ||
+        (journal.baseData !== null && !isSnapshot(journal.baseData))) return false;
+
+    // Restore the latest local intent before reading cloud data, which may still
+    // precede an interrupted save. Keep failed writes for the next reload/login.
+    const latest = journal.outbox[journal.outbox.length - 1].snapshot;
+    setLinks(latest.links);
+    setCategories(latest.categories);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(latest));
+    syncQueueRef.current.onChange = persistSyncQueue;
+    await resumeSnapshotSync(syncQueueRef.current, journal,
+      (snapshot, baseData) => syncToCloud(snapshot.links, snapshot.categories, token, baseData));
+    return true;
+  };
 
   const updateData = (newLinks: LinkItem[], newCategories: Category[]) => {
       const normalizedCategories = normalizeCategories(newCategories);
@@ -1093,10 +1141,12 @@ function App() {
         let hasCloudData = false;
         try {
             const requestToken = savedToken || authToken;
-            const res = await fetch('/api/storage', {
+            const recovered = await recoverPendingSync(requestToken);
+            if (recovered) hasCloudData = true;
+            const res = recovered ? null : await fetch('/api/storage', {
                 headers: requestToken ? { 'x-auth-password': requestToken } : {}
             });
-            if (res.ok) {
+            if (res?.ok) {
                 if (requestToken) {
                     markSynced();
                 }
@@ -1117,7 +1167,7 @@ function App() {
                     loadLinkIcons(normalizedLinks);
                     hasCloudData = true;
                 }
-            } else if (res.status === 401) {
+            } else if (res?.status === 401) {
                 // 如果返回401，可能是密码过期，清除本地token并要求重新登录
                 const errorData = await res.json();
                 if (errorData.error && errorData.error.includes('过期')) {
@@ -1466,12 +1516,13 @@ function App() {
             
             // 登录成功后，从服务器获取数据
             try {
-                const res = await fetch('/api/storage', {
+                const recovered = await recoverPendingSync(password);
+                const res = recovered ? null : await fetch('/api/storage', {
                     headers: {
                         'x-auth-password': password
                     }
                 });
-                if (res.ok) {
+                if (res?.ok) {
                     markSynced();
                     const data = await res.json();
                     // 如果服务器有数据，使用服务器数据
