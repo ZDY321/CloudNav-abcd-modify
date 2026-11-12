@@ -14,7 +14,8 @@ const loadTypeScript = async path => {
 
 const { onRequestGet, onRequestPost } = await loadTypeScript('../functions/api/storage.ts');
 const { onRequestPost: saveExtensionLink } = await loadTypeScript('../functions/api/link.ts');
-const { enqueueSnapshotSync, resumeSnapshotSync } = await loadTypeScript('../utils/syncQueue.ts');
+const { enqueueSnapshotSync } = await loadTypeScript('../utils/syncQueue.ts');
+const { areSnapshotChangesSaved } = await loadTypeScript('../utils/syncConfirmation.ts');
 const clone = value => JSON.parse(JSON.stringify(value));
 const category = id => ({ id, name: id, icon: 'Folder' });
 const subcategory = id => ({ id, name: id, icon: 'Tag' });
@@ -228,117 +229,123 @@ test('the initial fallback base is retained if the first offline-cache save fail
   assert.equal((await storage.read()).links[0].subCategoryId, 'new-sub');
 });
 
-const createJournalStore = () => {
-  let saved = null;
-  return {
-    read: () => saved && JSON.parse(saved),
-    persist: queue => {
-      saved = queue.outbox?.length
-        ? JSON.stringify({ baseData: queue.baseData, outbox: queue.outbox })
-        : null;
-    }
-  };
+const deferred = () => {
+  let resolve;
+  const promise = new Promise(complete => { resolve = complete; });
+  return { promise, resolve };
 };
 
-test('refresh before a request starts preserves and replays every queued edit', async () => {
+test('the indicator changes immediately and stays saving until the server response arrives', async () => {
   const storage = createStorage();
-  const local = await storage.read();
-  const journalStore = createJournalStore();
-  const queue = { pending: Promise.resolve(true), baseData: clone(local), onChange: journalStore.persist };
-  // An abandoned page's request never reaches the server or resolves.
-  const interruptedSave = () => new Promise(() => {});
-  local.categories[0].subcategories = [subcategory('first')];
-  enqueueSnapshotSync(queue, clone(local), interruptedSave);
-  local.categories[0].subcategories.push(subcategory('new-sub'));
-  enqueueSnapshotSync(queue, clone(local), interruptedSave);
-  local.links[0].subCategoryId = 'new-sub';
-  enqueueSnapshotSync(queue, clone(local), interruptedSave);
-
-  // The intent must already be durable in the same JavaScript turn.
-  assert.equal(journalStore.read().outbox.length, 3);
-  const reloadedQueue = { pending: Promise.resolve(true), baseData: null, onChange: journalStore.persist };
-  await resumeSnapshotSync(reloadedQueue, journalStore.read(), storage.save);
-  const reloaded = await storage.read();
-  assert.equal(reloaded.links[0].subCategoryId, 'new-sub');
-  assert.equal(reloaded.categories[0].subcategories.length, 2);
-  assert.equal(journalStore.read(), null);
+  const snapshot = await storage.read();
+  const baseData = clone(snapshot);
+  snapshot.links[0].categoryId = 'other';
+  const statuses = [];
+  const response = deferred();
+  const committed = deferred();
+  const queue = { pending: Promise.resolve(true), baseData, onStatusChange: status => statuses.push(status) };
+  const saving = enqueueSnapshotSync(queue, snapshot, async (...args) => {
+    await storage.save(...args);
+    committed.resolve();
+    return response.promise;
+  });
+  assert.deepEqual(statuses, ['saving']);
+  await committed.promise;
+  assert.deepEqual(statuses, ['saving']);
+  response.resolve(true);
+  await saving;
+  assert.deepEqual(statuses, ['saving', 'saved']);
+  assert.equal((await storage.read()).links[0].categoryId, 'other');
 });
 
-test('refresh after the server committed but before its response replays safely', async () => {
+test('completing an earlier write does not show saved while newer changes are pending', async () => {
   const storage = createStorage();
-  const local = await storage.read();
-  const journalStore = createJournalStore();
-  const queue = { pending: Promise.resolve(true), baseData: clone(local), onChange: journalStore.persist };
-  let notifyCommitted;
-  const committed = new Promise(resolve => { notifyCommitted = resolve; });
-  const interruptedResponse = async (snapshot, baseData) => {
-    await storage.save(snapshot, baseData);
-    notifyCommitted();
-    return new Promise(() => {});
+  const snapshot = await storage.read();
+  const statuses = [];
+  const queue = { pending: Promise.resolve(true), baseData: clone(snapshot), onStatusChange: status => statuses.push(status) };
+  const responses = [deferred(), deferred()];
+  const started = [deferred(), deferred()];
+  let requests = 0;
+  const save = async (...args) => {
+    const index = requests++;
+    await storage.save(...args);
+    started[index].resolve();
+    return responses[index].promise;
   };
-  local.categories[0].subcategories = [subcategory('new-sub')];
-  enqueueSnapshotSync(queue, clone(local), interruptedResponse);
-  local.links[0].subCategoryId = 'new-sub';
-  enqueueSnapshotSync(queue, clone(local), interruptedResponse);
-  await committed;
-
-  const reloadedQueue = { pending: Promise.resolve(true), baseData: null, onChange: journalStore.persist };
-  await resumeSnapshotSync(reloadedQueue, journalStore.read(), storage.save);
-  assert.equal((await storage.read()).links[0].subCategoryId, 'new-sub');
-  assert.equal(journalStore.read(), null);
+  snapshot.links[0].description = 'First edit';
+  const firstSave = enqueueSnapshotSync(queue, clone(snapshot), save);
+  snapshot.links[0].categoryId = 'other';
+  const secondSave = enqueueSnapshotSync(queue, clone(snapshot), save);
+  await started[0].promise;
+  responses[0].resolve(true);
+  await firstSave;
+  await started[1].promise;
+  assert.deepEqual(statuses, ['saving', 'saving']);
+  responses[1].resolve(true);
+  await secondSave;
+  assert.deepEqual(statuses, ['saving', 'saving', 'saved']);
+  assert.equal((await storage.read()).links[0].categoryId, 'other');
 });
 
-test('a confirmed save checkpoints the journal while later edits remain pending', async () => {
-  const storage = createStorage();
-  const local = await storage.read();
-  const journalStore = createJournalStore();
-  const queue = { pending: Promise.resolve(true), baseData: clone(local), onChange: journalStore.persist };
-  local.categories[0].subcategories = [subcategory('new-sub')];
-  await enqueueSnapshotSync(queue, clone(local), storage.save);
-  local.links[0].subCategoryId = 'new-sub';
-  enqueueSnapshotSync(queue, clone(local), () => new Promise(() => {}));
-  const journal = journalStore.read();
-  assert.equal(journal.outbox.length, 1);
-  assert.equal(journal.baseData.links[0].subCategoryId, undefined);
-  assert.equal(journal.baseData.categories[0].subcategories[0].id, 'new-sub');
+for (const throws of [false, true]) {
+  test(`a failed final write shows error and a later successful edit clears it (throws=${throws})`, async () => {
+    const storage = createStorage();
+    const snapshot = await storage.read();
+    const statuses = [];
+    const queue = { pending: Promise.resolve(true), baseData: clone(snapshot), onStatusChange: status => statuses.push(status) };
+    snapshot.links[0].categoryId = 'other';
+    const failedSave = enqueueSnapshotSync(queue, clone(snapshot), async () => {
+      if (throws) throw new Error('Network failure');
+      return false;
+    });
+    if (throws) await assert.rejects(failedSave, /Network failure/);
+    else assert.equal(await failedSave, false);
+    assert.deepEqual(statuses, ['saving', 'error']);
+    snapshot.links[0].description = 'Next edit';
+    await enqueueSnapshotSync(queue, clone(snapshot), storage.save);
+    assert.deepEqual(statuses, ['saving', 'error', 'saving', 'saved']);
+    assert.equal((await storage.read()).links[0].categoryId, 'other');
+  });
+}
 
-  const reloadedQueue = { pending: Promise.resolve(true), baseData: null, onChange: journalStore.persist };
-  await resumeSnapshotSync(reloadedQueue, journal, storage.save);
-  assert.equal((await storage.read()).links[0].subCategoryId, 'new-sub');
-});
-
-test('failed recovery retains local intent and can retry after login in the same page', async () => {
+test('a successful API response which discarded a move shows error', async () => {
   const storage = createStorage();
   const baseData = await storage.read();
   const moved = clone(baseData);
   moved.links[0].categoryId = 'other';
-  const journalStore = createJournalStore();
-  const queue = { pending: Promise.resolve(true), baseData: null, onChange: journalStore.persist };
-  const journal = { baseData, outbox: [{ snapshot: moved }] };
-  assert.equal(await resumeSnapshotSync(queue, journal, async () => false), false);
-  assert.equal(journalStore.read().outbox[0].snapshot.links[0].categoryId, 'other');
-  assert.equal(await resumeSnapshotSync(queue, journalStore.read(), storage.save), true);
-  assert.equal((await storage.read()).links[0].categoryId, 'other');
-  assert.equal(journalStore.read(), null);
+  const server = clone(baseData);
+  server.links[0].title = 'Changed on another device';
+  storage.replace(server);
+  const statuses = [];
+  const queue = { pending: Promise.resolve(true), baseData, onStatusChange: status => statuses.push(status) };
+  const success = await enqueueSnapshotSync(queue, moved, async (snapshot, base) => {
+    await storage.save(snapshot, base);
+    return areSnapshotChangesSaved(snapshot, base, await storage.read());
+  });
+  assert.equal(success, false);
+  assert.deepEqual(statuses, ['saving', 'error']);
 });
 
-test('duplicate initialization shares recovery and does not report completion early', async () => {
-  const storage = createStorage();
-  const baseData = await storage.read();
-  const first = clone(baseData);
-  first.links[0].description = 'First edit';
-  const second = clone(first);
-  second.links[0].categoryId = 'other';
-  const journal = { baseData, outbox: [{ snapshot: first }, { snapshot: second }] };
-  const pendingCounts = [];
-  const queue = { pending: Promise.resolve(true), baseData: null,
-    onChange: current => pendingCounts.push(current.outbox.length) };
-  let saveCalls = 0;
-  const save = async (...args) => { saveCalls++; return storage.save(...args); };
-  const recovery = resumeSnapshotSync(queue, journal, save);
-  const duplicate = resumeSnapshotSync(queue, journal, save);
-  await Promise.all([recovery, duplicate]);
-  assert.equal(saveCalls, 2);
-  assert.deepEqual(pendingCounts, [2, 1, 0]);
-  assert.equal((await storage.read()).links[0].categoryId, 'other');
+test('confirmation accepts local edits alongside records added on another device', async () => {
+  const baseData = initialData();
+  const moved = clone(baseData);
+  moved.links[0].categoryId = 'other';
+  const saved = clone(moved);
+  saved.links.push({ ...saved.links[0], id: 'extension', title: 'From extension' });
+  saved.categories.push(category('server-only'));
+  saved.links[0] = Object.fromEntries(Object.entries(saved.links[0]).reverse());
+  assert.equal(areSnapshotChangesSaved(moved, baseData, saved), true);
+  assert.equal(areSnapshotChangesSaved(moved, baseData, undefined), false);
+});
+
+test('confirmation detects rejected category edits and deletions', async () => {
+  const baseData = initialData();
+  const edited = clone(baseData);
+  edited.categories[0].subcategories = [subcategory('new-sub')];
+  assert.equal(areSnapshotChangesSaved(edited, baseData, baseData), false);
+  assert.equal(areSnapshotChangesSaved(edited, baseData, clone(edited)), true);
+  const deleted = clone(baseData);
+  deleted.links = [];
+  assert.equal(areSnapshotChangesSaved(deleted, baseData, baseData), false);
+  assert.equal(areSnapshotChangesSaved(deleted, baseData, clone(deleted)), true);
 });
